@@ -11,16 +11,22 @@ Niney Life Pickr is a life decision-making application being built as a multi-pl
 ### Current Structure
 ```
 niney-life-pickr/
+├── config/                     # Shared YAML configuration files
+│   ├── base.yml                # Base configuration for all environments
+│   └── production.yml          # Production-specific overrides
 ├── apps/
 │   └── web/                    # React + Vite PWA application
 │       ├── src/
 │       │   ├── components/     # Reusable UI components
+│       │   ├── config/         # TypeScript config loader (index.ts)
 │       │   ├── pages/          # Page components (Home.tsx)
 │       │   ├── hooks/          # Custom React hooks
 │       │   ├── services/       # API services
 │       │   ├── utils/          # Utility functions
 │       │   └── types/          # TypeScript type definitions
-│       └── public/             # Static assets
+│       ├── scripts/            # Utility scripts
+│       │   └── kill-dev.cjs    # Windows dev server kill script
+│       └── public/             # Static assets including manifest.json
 ```
 
 ### Planned Architecture
@@ -34,10 +40,12 @@ niney-life-pickr/
 ### Web Application Development
 ```bash
 cd apps/web
-npm run dev        # Start development server (currently on port 5174)
+npm run dev        # Start development server on port 3000
 npm run build      # Build for production with TypeScript checking
 npm run preview    # Preview production build
 npm run lint       # Run ESLint
+npm run kill       # Kill dev server process on Windows (reads port from config)
+npm run dev:clean  # Kill existing dev server and start fresh
 ```
 
 ## Technology Stack
@@ -48,28 +56,52 @@ npm run lint       # Run ESLint
 - **Tailwind CSS v4.1.13** with @tailwindcss/postcss for styling
 - **PWA Support** via vite-plugin-pwa with auto-update and offline capabilities
 - **PostCSS** configuration using @tailwindcss/postcss plugin
+- **js-yaml** for YAML configuration parsing
 
-## Configuration Details
+## Configuration System
 
-### Tailwind CSS v4 Setup
+### YAML-based Configuration
+- Configuration files stored in root `config/` directory
+- `base.yml`: Default configuration for development
+- `production.yml`: Production overrides (merged with base)
+- TypeScript loader at `apps/web/src/config/index.ts`
+- Environment variable overrides supported (VITE_PORT, VITE_HOST)
+
+### Port Management
+- Default port: 3000 (configured in `config/base.yml`)
+- `strictPort: true` ensures the server fails if port is occupied
+- Windows kill script (`kill-dev.cjs`) reads port from config to ensure correct process termination
+
+## Development Workflow
+
+### Windows Process Management
+The project includes a Node.js script to handle development server cleanup on Windows:
+- `npm run kill`: Terminates any process using the configured port
+- `npm run dev:clean`: Kills existing processes before starting new dev server
+- Script reads port from `config/base.yml` or `VITE_PORT` environment variable
+- Uses Windows `netstat` and `taskkill` commands for process management
+
+### Configuration Details
+
+#### Tailwind CSS v4 Setup
 - Uses `@import "tailwindcss";` syntax (v4 requirement)
 - PostCSS configured with `@tailwindcss/postcss` plugin
 - Content paths configured for all TypeScript/TSX files
 
-### PWA Configuration
-- Auto-update registration type
+#### PWA Configuration
+- Auto-update registration type in development
 - Service worker with Workbox for offline support
-- Manifest configured with app name "Niney Life Pickr"
+- Manifest at `public/manifest.json` with app metadata
 - Caching strategies for static assets and Google Fonts
 
-## Development Notes
+## Current Implementation Status
 
-### Current Implementation
-- Home page with counter demo and navigation placeholders
-- Tailwind CSS with gradient backgrounds and responsive design
-- Folder structure prepared for scalable development
-
-### Communication Pattern (Planned)
-- Node.js "friendly" server will act as API gateway
-- Python "smart" server will handle ML/AI processing
-- Inter-service communication via HTTP/REST or gRPC
+- ✅ Web application foundation with React + Vite + TypeScript
+- ✅ Tailwind CSS v4 with PostCSS integration
+- ✅ PWA setup with offline capabilities
+- ✅ YAML-based configuration system
+- ✅ Windows-compatible development scripts
+- ✅ Home page with responsive design
+- 🔲 React Native mobile app
+- 🔲 Node.js "friendly" backend service
+- 🔲 Python "smart" backend service with ML capabilities

@@ -1,0 +1,22 @@
+# Base configuration for all environments
+app:
+  name: "Niney Life Pickr"
+  version: "1.0.0"
+  description: "Life decision picker app"
+
+server:
+  host: "localhost"
+  port: 3000
+  strictPort: true # Must use this exact port
+
+vite:
+  clearScreen: true
+  logLevel: "info"
+
+pwa:
+  enabled: true
+  registerType: "autoUpdate"
+
+api:
+  timeout: 30000
+  retries: 3

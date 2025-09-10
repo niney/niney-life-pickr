@@ -1,0 +1,30 @@
+# Production-specific configuration
+# Inherits from base.yml and overrides specific values
+
+server:
+  host: "0.0.0.0" # Allow external connections
+  port: 8080
+  strictPort: true # Must use this exact port in production
+
+vite:
+  clearScreen: false
+  logLevel: "error"
+  
+build:
+  minify: true
+  sourcemap: false
+  chunkSizeWarningLimit: 1000
+
+pwa:
+  enabled: true
+  registerType: "prompt" # Ask user before updating
+  
+api:
+  baseUrl: "https://api.niney-life-pickr.com"
+  timeout: 60000
+  retries: 5
+
+performance:
+  preload: true
+  prefetch: true
+  compression: true
