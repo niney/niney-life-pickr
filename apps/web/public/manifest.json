@@ -1,0 +1,17 @@
+{
+  "name": "Niney Life Pickr",
+  "short_name": "NLP",
+  "description": "Life decision picker app",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
