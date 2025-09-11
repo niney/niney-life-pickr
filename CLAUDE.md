@@ -652,30 +652,6 @@ Examples:
 [mobile] test: Add Maestro flows for navigation
 ```
 
-## Shared Code Architecture
-
-### Package Structure
-The `@niney/shared` package centralizes common code between web and mobile applications:
-
-- **Types**: All TypeScript interfaces and types are defined once and shared
-- **API Services**: Common API logic with platform-specific implementations possible
-- **Validation**: Shared form validation rules ensure consistency
-- **Constants**: API endpoints, configuration values shared across platforms
-
-### Import Best Practices
-```typescript
-// For runtime values (classes, functions, constants)
-import { StorageService, WebStorageAdapter } from '@niney/shared'
-
-// For types only (interfaces, type aliases)
-import type { User, ApiResponse } from '@niney/shared'
-```
-
-### Building and Linking
-1. Build shared package: `cd packages/shared && npm run build`
-2. Link to apps: Uses local file reference in package.json
-3. TypeScript compilation: Outputs to `dist/` with declaration files
-
 ## Performance Considerations
 
 ### Fastify Optimizations
