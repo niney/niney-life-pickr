@@ -21,7 +21,8 @@ niney-life-pickr/
 │       │   ├── types/          # Common TypeScript types
 │       │   ├── services/       # API service classes
 │       │   ├── utils/          # Shared utility functions
-│       │   └── constants/      # Shared constants
+│       │   ├── constants/      # Shared constants
+│       │   └── styles/         # Shared authentication styles
 │       └── dist/               # Compiled JavaScript output
 ├── apps/
 │   ├── web/                    # React + Vite PWA application
@@ -200,6 +201,7 @@ mypy src                  # Type checking
 - **API Service Classes**: BaseApiService with fetch wrapper, AuthService
 - **Validation Utilities**: Form validation rules and helpers
 - **Storage Abstraction**: Platform-agnostic storage interface
+- **Shared Styles**: Authentication styles for web and mobile
 
 ### Web Application
 - **React 19.1.1** with TypeScript 5.8.3
@@ -215,6 +217,7 @@ mypy src                  # Type checking
 ### Mobile Application
 - **React Native 0.81.1** with TypeScript 5.8.3
 - **React Navigation v7** for navigation (stack + bottom tabs)
+- **NativeWind 2.0.11** for Tailwind CSS support
 - **React Native Elements v3.4.3** for UI components
 - **React Native Reanimated v4.1.0** for animations
 - **React Native Vector Icons v10.3.0** for icons
@@ -398,6 +401,31 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 - Bearer token authentication configured in OpenAPI spec
 - Response types include token field for future implementation
 
+## Shared Styles System
+
+### Authentication Styles
+The shared package provides a comprehensive style system for authentication screens that works across web and mobile platforms:
+
+```typescript
+// packages/shared/src/styles/auth.styles.ts
+export const authStyles = {
+  container: { /* Wrappers and content containers */ },
+  typography: { /* Text styles and labels */ },
+  form: { /* Form wrappers and field groups */ },
+  input: { /* Input field base and variants */ },
+  button: { /* Button styles */ },
+  alert: { /* Error and success messages */ },
+  mobile: { /* React Native specific styles */ }
+}
+```
+
+### Helper Functions
+- `getInputStyles(position, hasError)` - For grouped inputs (login)
+- `getRegisterInputStyles(hasError)` - For individual inputs (register)
+- `getButtonStyles()` - For primary buttons
+- `formFields` - Shared form field configurations
+- `authText` - All UI text in Korean
+
 ## API Response Standardization
 
 All API endpoints use a consistent response format:
@@ -531,6 +559,7 @@ cd apps/mobile && npm run test:e2e:studio
 ### ✅ Completed
 - Web application with React + Vite + TypeScript
 - **Shared package (@niney/shared) for code reuse between web and mobile**
+- **Shared authentication styles system**
 - **Web authentication UI (login, registration, home with protected routes)**
 - **React Router DOM integration for navigation**
 - Tailwind CSS v4 with PostCSS integration
@@ -539,6 +568,7 @@ cd apps/mobile && npm run test:e2e:studio
 - Windows-compatible development scripts
 - E2E testing with Playwright for web
 - React Native mobile app with navigation
+- **NativeWind integration for Tailwind CSS in React Native**
 - Maestro E2E testing for mobile app
 - **Fastify-based backend service with comprehensive API documentation**
 - **SQLite database integration with automated migrations**
@@ -643,10 +673,12 @@ Prefix commits with the affected scope:
 - `[mobile]` - Mobile application changes
 - `[friendly]` - Node.js backend changes
 - `[smart]` - Python backend changes
+- `[shared]` - Shared package changes
 - `[config]` - Configuration file changes
 
 Examples:
 ```
+[shared] feat: Add authentication styles system for web and mobile
 [friendly] feat: Add Swagger documentation with AI prompt generation
 [web] fix: Resolve hydration mismatch in PWA mode
 [mobile] test: Add Maestro flows for navigation
