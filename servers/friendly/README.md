@@ -7,7 +7,6 @@ Node.js backend service for Niney Life Pickr application.
 ```bash
 cd servers/friendly
 npm install
-cp .env.example .env
 ```
 
 ## Development
@@ -23,6 +22,34 @@ npm run type-check
 npm run lint
 npm run lint:fix
 ```
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run only unit tests
+npm run test:unit
+
+# Run only integration tests
+npm run test:integration
+```
+
+### Test Structure
+- **Unit Tests**: `src/__tests__/unit/` - Test individual functions and modules
+- **Integration Tests**: `src/__tests__/integration/` - Test API endpoints with Supertest
+- **Test Setup**: `src/__tests__/setup.ts` - Global test configuration
+- **Coverage Threshold**: 80% for branches, functions, lines, and statements
 
 ## Production
 
@@ -69,9 +96,16 @@ servers/friendly/
 ## Configuration
 
 The server loads configuration from:
-1. `config/base.yml` - Shared configuration
-2. Environment variables - Override config values
-3. `.env` file - Local environment variables
+1. `config/base.yml` - Base configuration for all environments
+2. `config/test.yml` - Test environment overrides (when NODE_ENV=test)
+3. `config/production.yml` - Production overrides (when NODE_ENV=production)
+4. Environment variables - Override any config values
+
+Configuration priority (highest to lowest):
+- Environment variables
+- Environment-specific config (test.yml, production.yml)
+- Base config (base.yml)
+- Default values
 
 Default port: 4000
 
@@ -84,3 +118,5 @@ Default port: 4000
 - CORS
 - Morgan (Logging)
 - Compression
+- Vitest (Testing Framework)
+- Supertest (API Testing)

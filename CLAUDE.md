@@ -13,6 +13,7 @@ Niney Life Pickr is a life decision-making application built as a multi-platform
 niney-life-pickr/
 ├── config/                     # Shared YAML configuration files
 │   ├── base.yml                # Base configuration for all environments
+│   ├── test.yml                # Test environment overrides
 │   └── production.yml          # Production-specific overrides
 ├── apps/
 │   ├── web/                    # React + Vite PWA application
@@ -105,13 +106,21 @@ cd ios && pod install              # Install iOS dependencies (macOS only)
 ```bash
 cd servers/friendly
 npm run dev        # Start development server with hot reload (port 4000)
-npm run build      # Build TypeScript to JavaScript
+npm run build      # Build TypeScript to JavaScript (uses tsconfig.build.json)
 npm run start      # Start production server
 npm run start:prod # Start with NODE_ENV=production
 npm run clean      # Clean build directory
 npm run lint       # Run ESLint
 npm run lint:fix   # Fix linting issues
 npm run type-check # TypeScript type checking without building
+
+# Testing with Vitest + Supertest
+npm test           # Run all tests in watch mode
+npm run test:run   # Run all tests once
+npm run test:ui    # Open Vitest UI
+npm run test:coverage  # Run tests with coverage report
+npm run test:unit      # Run unit tests only
+npm run test:integration  # Run integration tests only
 ```
 
 ## Technology Stack
@@ -124,6 +133,7 @@ npm run type-check # TypeScript type checking without building
 - **PostCSS** configuration using @tailwindcss/postcss plugin
 - **js-yaml** for YAML configuration parsing
 - **Playwright** for E2E testing with @axe-core/playwright for accessibility testing
+- **Node.js**: No specific version requirement
 
 ### Mobile Application
 - **React Native 0.81.1** with TypeScript 5.8.3
@@ -137,6 +147,7 @@ npm run type-check # TypeScript type checking without building
 - **Maestro** for E2E testing with YAML-based test flows
 - **Testing Library React Native** for unit testing
 - **Babel plugin**: Uses `react-native-worklets/plugin` (not deprecated `react-native-reanimated/plugin`)
+- **Node.js**: Requires >=20
 
 ### Friendly Server (Node.js Backend)
 - **Node.js** with TypeScript 5.9.2
@@ -148,35 +159,55 @@ npm run type-check # TypeScript type checking without building
 - **js-yaml** for YAML config parsing
 - **Nodemon** for development hot reload
 - **ts-node** for TypeScript execution
+- **Vitest** for unit and integration testing
+- **Supertest** for HTTP endpoint testing
+- **c8** for code coverage reporting
 
 ## Configuration System
 
 ### YAML-based Configuration
 - Configuration files stored in root `config/` directory
 - `base.yml`: Default configuration for development
+- `test.yml`: Test environment overrides (port: 0, error logging, wildcard CORS)
 - `production.yml`: Production overrides (merged with base)
 - TypeScript loaders in each app load and parse configuration
-- Environment variable overrides supported
+- Server loads environment-specific config automatically based on NODE_ENV
+
+### Environment Variables
+Environment variables override YAML configuration:
+- `NODE_ENV`: development | test | production
+- `PORT`: Server port number
+- `HOST`: Server host address
+- `LOG_LEVEL`: debug | info | warn | error
+- `CORS_ORIGIN`: Allowed CORS origins
+- `VITE_PORT`, `VITE_HOST`: Web app overrides
 
 ### Port Configuration
 - Web app: 3000 (development), 8080 (production)
-- Friendly server: 4000
+- Friendly server: 4000 (0 for tests - random port)
 - Smart server (planned): 5000
 - `strictPort: true` ensures exact port usage
 
-### Production Configuration
-- External host binding (0.0.0.0)
-- PWA prompt mode instead of auto-update
-- API endpoint configuration
-- Performance optimizations
+## TypeScript Configuration
+
+### Build Configuration
+- **Development**: Uses `tsconfig.json` (includes test files for IDE support)
+- **Production Build**: Uses `tsconfig.build.json` (excludes test files)
+- **Path Aliases**: Configured in both TypeScript and test runners
+  - Server: `@routes`, `@controllers`, `@services`, `@middlewares`, `@utils`, `@types`
+  - Mobile: `@/*` for src directory access
+
+### IDE Support
+- Test files included in main tsconfig for proper IDE type checking
+- Some imports may require `@ts-ignore` comments due to IDE limitations with `esModuleInterop`
 
 ## Development Workflow
 
 ### Windows Process Management
 - `npm run kill`: Terminates processes using configured port
 - `npm run dev:clean`: Kills existing processes before starting
-- Scripts read port from config files
-- Cross-platform compatibility via Node.js scripts
+- Scripts read port from YAML config files with fallback to environment variables
+- Enhanced error handling and multi-PID support
 
 ### Mobile Development Setup
 #### Android Requirements
@@ -184,30 +215,22 @@ npm run type-check # TypeScript type checking without building
 - ANDROID_HOME environment variable
 - Path includes: `%ANDROID_HOME%\platform-tools`
 - JDK 17-20 (React Native requirement)
-- Android emulator or physical device
+- Android emulator or physical device must be running for Maestro tests
 
 #### iOS Requirements (macOS only)
 - Xcode with iOS Simulator
 - CocoaPods: `cd ios && pod install`
 - Apple Developer account for device testing
 
-### Configuration Details
-
-#### Tailwind CSS v4 Setup
-- Uses `@import "tailwindcss";` syntax (v4 requirement)
-- PostCSS configured with `@tailwindcss/postcss` plugin
-- Content paths configured for all TypeScript/TSX files
-
-#### PWA Configuration
-- Auto-update in development, prompt in production
-- Service worker with Workbox for offline support
-- Manifest at `public/manifest.json` with app metadata
-- Caching strategies for static assets and Google Fonts
+### Cross-Platform Maestro Testing
+- Uses `scripts/maestro.js` for Windows/Mac/Linux compatibility
+- Automatically detects and uses correct Maestro executable
+- Requires device/emulator to be running before test execution
 
 ## Testing Strategy
 
 ### Hybrid Testing Approach (Jest + E2E)
-- **Unit/Integration Tests (Jest)**: Business logic, utilities, components
+- **Unit/Integration Tests (Jest/Vitest)**: Business logic, utilities, components
 - **E2E Tests**: Critical user flows and cross-platform verification
   - Web: Playwright
   - Mobile: Maestro
@@ -226,23 +249,64 @@ npm run type-check # TypeScript type checking without building
 - Comprehensive mocking setup in `jest.setup.js`
 - Transform ignore patterns for React Native modules
 - Module path mappings for TypeScript aliases
+- Global worklet initialization for Reanimated
 
 #### E2E Testing (Maestro)
 - Test flows in `apps/mobile/tests/e2e/flows/`
 - Cross-platform runner script for Windows/macOS/Linux
 - Visual test creation with Maestro Studio
+- Workspace configuration for test organization
 - Available test flows:
   - `smoke-test.yaml`: Basic app functionality
   - `app-launch.yaml`: App launch verification
   - `counter-test.yaml`: Counter functionality
   - `navigation-test.yaml`: Menu navigation
 
+### Server Testing (Vitest + Supertest)
+
+#### Unit Testing
+- Tests in `servers/friendly/src/__tests__/unit/`
+- Mock external dependencies
+- Test individual functions and modules
+- Isolated testing environment
+
+#### Integration Testing
+- Tests in `servers/friendly/src/__tests__/integration/`
+- Test API endpoints with Supertest
+- Test middleware integration
+- Database interaction testing (when implemented)
+- Coverage threshold: 80% for all metrics (branches, functions, lines, statements)
+
+#### Test Configuration
+- Custom setup file with environment variables
+- Automatic mock reset and restoration
+- 10-second timeouts for tests and hooks
+- Path aliases support in test files
+
 ### Test Coverage Focus
 - Critical user paths (E2E)
 - Business logic and utilities (Unit)
+- API endpoint functionality (Integration)
 - Accessibility compliance (WCAG)
 - Component interactions
 - Error handling
+- Security middleware validation
+
+## Code Style and Quality
+
+### ESLint Configuration
+- Web app uses new flat config format (`eslint.config.js`)
+- Mobile and server use traditional `.eslintrc` format
+- TypeScript-specific rules enabled
+
+### Prettier Configuration
+- Mobile app has Prettier configuration
+- Consistent formatting across TypeScript/TSX files
+
+### Build Optimization
+- Vite dynamic configuration from YAML files
+- PWA runtime caching for Google Fonts (1-year cache)
+- Conditional minification based on environment
 
 ## Current Implementation Status
 
@@ -257,6 +321,7 @@ npm run type-check # TypeScript type checking without building
 - ✅ React Native mobile app with navigation
 - ✅ Maestro E2E testing for mobile app
 - ✅ Node.js "friendly" backend service structure
+- ✅ Vitest + Supertest testing for backend
 - 🔲 Mobile app feature parity with web
 - 🔲 Backend API implementation
 - 🔲 Python "smart" backend service with ML capabilities

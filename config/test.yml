@@ -1,0 +1,15 @@
+# Test environment configuration
+# Overrides base.yml for testing
+
+server:
+  friendly:
+    port: 0 # Use random port for tests
+    logLevel: "error" # Reduce log noise in tests
+    cors:
+      origin: "*" # Allow all origins in tests
+    
+# Disable features for faster testing
+features:
+  metrics: false
+  cache: false
+  analytics: false

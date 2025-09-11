@@ -3,19 +3,36 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 
-// Load configuration
-const configPath = path.join(__dirname, '../../../config/base.yml');
+// Load configuration based on environment
+const env = process.env.NODE_ENV || 'development';
+const baseConfigPath = path.join(__dirname, '../../../config/base.yml');
+const envConfigPath = path.join(__dirname, `../../../config/${env}.yml`);
+
 let config: any = { server: { port: 4000, host: 'localhost' } };
 
-if (fs.existsSync(configPath)) {
+// Load base configuration
+if (fs.existsSync(baseConfigPath)) {
   try {
-    const fileContents = fs.readFileSync(configPath, 'utf8');
+    const fileContents = fs.readFileSync(baseConfigPath, 'utf8');
     const loadedConfig = yaml.load(fileContents) as any;
     if (loadedConfig?.server?.friendly) {
       config.server = { ...config.server, ...loadedConfig.server.friendly };
     }
   } catch (error) {
-    console.warn('Failed to load config file, using defaults:', error);
+    console.warn('Failed to load base config file, using defaults:', error);
+  }
+}
+
+// Load environment-specific configuration and merge
+if (fs.existsSync(envConfigPath)) {
+  try {
+    const fileContents = fs.readFileSync(envConfigPath, 'utf8');
+    const envConfig = yaml.load(fileContents) as any;
+    if (envConfig?.server?.friendly) {
+      config.server = { ...config.server, ...envConfig.server.friendly };
+    }
+  } catch (error) {
+    console.warn(`Failed to load ${env} config file:`, error);
   }
 }
 

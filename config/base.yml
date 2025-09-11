@@ -1,4 +1,19 @@
 # Base configuration for all environments
+# 
+# Environment variables can override these values:
+# - NODE_ENV: development | test | production
+# - PORT: Server port number
+# - HOST: Server host address
+# - LOG_LEVEL: debug | info | warn | error
+# - CORS_ORIGIN: Allowed CORS origins (comma-separated)
+# 
+# Future environment variables:
+# - DATABASE_URL: PostgreSQL connection string
+# - REDIS_URL: Redis connection string
+# - API_KEY: External API keys
+# - ENABLE_METRICS: true | false
+# - ENABLE_CACHE: true | false
+
 app:
   name: "Niney Life Pickr"
   version: "1.0.0"
@@ -14,6 +29,7 @@ server:
     port: 4000
     cors:
       origin: "http://localhost:3000"
+    logLevel: "debug" # debug | info | warn | error
   # Smart server (Python backend) - Future
   smart:
     host: "localhost"
