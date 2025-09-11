@@ -25,6 +25,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
     Body: typeof RegisterSchema.static
   }>('/register', {
     schema: {
+      tags: ['auth'],
+      summary: 'Register a new user',
+      description: 'Create a new user account with email, username and password',
       body: RegisterSchema,
       response: {
         201: Type.Object({
@@ -96,6 +99,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
     Body: typeof LoginSchema.static
   }>('/login', {
     schema: {
+      tags: ['auth'],
+      summary: 'User login',
+      description: 'Authenticate user with email and password',
       body: LoginSchema,
       response: {
         200: Type.Object({
@@ -161,6 +167,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
    */
   fastify.get('/users', {
     schema: {
+      tags: ['users'],
+      summary: 'Get all users',
+      description: 'Retrieve a list of all registered users (for testing purposes)',
       response: {
         200: Type.Object({
           result: Type.Boolean(),

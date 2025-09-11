@@ -2,6 +2,9 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
+import swagger from '@fastify/swagger';
+import swaggerUI from '@fastify/swagger-ui';
+import scalarApiReference from '@scalar/fastify-api-reference';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import dotenv from 'dotenv';
 
@@ -12,6 +15,7 @@ dotenv.config();
 import healthRoutes from './routes/health.routes';
 import apiRoutes from './routes/api.routes';
 import authRoutes from './routes/authRoutes';
+import docsRoutes from './routes/docs.routes';
 
 // Create Fastify app with TypeBox provider
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -42,6 +46,90 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   });
 
   await app.register(sensible);
+
+  // Register Swagger for API documentation
+  await app.register(swagger, {
+    openapi: {
+      openapi: '3.0.0',
+      info: {
+        title: 'Niney Life Pickr API',
+        description: 'Life decision-making application API documentation',
+        version: '1.0.0',
+        contact: {
+          name: 'API Support',
+          email: 'api@nineylifepickr.com'
+        },
+        license: {
+          name: 'MIT',
+          url: 'https://opensource.org/licenses/MIT'
+        }
+      },
+      servers: [
+        {
+          url: process.env.NODE_ENV === 'production' 
+            ? 'https://api.nineylifepickr.com'
+            : `http://localhost:${process.env.PORT || 4000}`,
+          description: process.env.NODE_ENV === 'production' ? 'Production' : 'Development'
+        }
+      ],
+      tags: [
+        { name: 'auth', description: 'Authentication endpoints' },
+        { name: 'health', description: 'Health check endpoints' },
+        { name: 'api', description: 'General API endpoints' },
+        { name: 'users', description: 'User management endpoints' }
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            description: 'JWT token for authentication'
+          }
+        }
+      },
+      security: []
+    }
+  });
+
+  // Register Swagger UI
+  await app.register(swaggerUI, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: true,
+      persistAuthorization: true,
+      displayOperationId: false,
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 1,
+      defaultModelRendering: 'example',
+      displayRequestDuration: true,
+      filter: true,
+      showExtensions: true,
+      showCommonExtensions: true,
+      tryItOutEnabled: true
+    },
+    staticCSP: false,
+    transformStaticCSP: (header) => header,
+    transformSpecification: (swaggerObject) => { 
+      return swaggerObject 
+    },
+    transformSpecificationClone: true
+  });
+
+  // Register Scalar API Reference (modern alternative to Swagger UI)
+  await app.register(scalarApiReference, {
+    routePrefix: '/reference',
+    configuration: {
+      theme: 'purple',
+      darkMode: true,
+      hideModels: false,
+      hideDownloadButton: false,
+      spec: {
+        url: '/docs/json'
+      }
+    }
+  });
 
   // Global error handler
   app.setErrorHandler((error, request, reply) => {
@@ -86,6 +174,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(healthRoutes, { prefix: '/health' });
   await app.register(apiRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(docsRoutes, { prefix: '/api/docs' });
 
   return app;
 };

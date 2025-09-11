@@ -5,6 +5,9 @@ export default async function apiRoutes(fastify: FastifyInstance) {
   // API version info
   fastify.get('/version', {
     schema: {
+      tags: ['api'],
+      summary: 'API version information',
+      description: 'Get the current API version and basic information',
       response: {
         200: Type.Object({
           version: Type.String(),
@@ -24,6 +27,9 @@ export default async function apiRoutes(fastify: FastifyInstance) {
   // Placeholder for future endpoints
   fastify.get('/choices', {
     schema: {
+      tags: ['api'],
+      summary: 'Get choice categories',
+      description: 'Get available choice categories for decision making',
       response: {
         200: Type.Object({
           message: Type.String(),
@@ -40,6 +46,9 @@ export default async function apiRoutes(fastify: FastifyInstance) {
 
   fastify.get('/recommendations', {
     schema: {
+      tags: ['api'],
+      summary: 'Get recommendations',
+      description: 'Get personalized recommendations (coming soon)',
       response: {
         200: Type.Object({
           message: Type.String(),

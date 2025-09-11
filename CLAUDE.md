@@ -48,6 +48,10 @@ niney-life-pickr/
     │   │   ├── app.ts          # Fastify app configuration
     │   │   ├── server.ts       # Server entry point
     │   │   ├── routes/         # API route definitions
+    │   │   │   ├── authRoutes.ts    # Authentication endpoints
+    │   │   │   ├── health.routes.ts # Health check endpoints
+    │   │   │   ├── api.routes.ts    # General API endpoints
+    │   │   │   └── docs.routes.ts   # API documentation endpoints
     │   │   ├── services/       # Business logic
     │   │   ├── db/             # Database layer
     │   │   │   ├── database.ts # SQLite connection manager
@@ -124,7 +128,7 @@ npm run clean      # Clean build directory
 npm run lint       # Run ESLint
 npm run lint:fix   # Fix linting issues
 npm run type-check # TypeScript type checking without building
-npm run db:reset   # Delete and recreate SQLite database
+npm run db:reset   # Reset database and re-run migrations
 
 # Testing with Vitest + Supertest
 npm test           # Run all tests in watch mode
@@ -188,14 +192,17 @@ mypy src                  # Type checking
 - **Node.js**: Requires >=20
 
 ### Friendly Server (Node.js Backend)
-- **Fastify 5.6.0** high-performance web framework
+- **Fastify 5.6.0** high-performance web framework (migrated from Express)
 - **TypeScript 5.9.2** with strict type checking
-- **SQLite3** lightweight file-based database
-- **bcrypt** for password hashing
-- **@fastify/cors** for cross-origin resource sharing
-- **@fastify/helmet** for security headers
-- **@fastify/sensible** for common utilities
-- **@sinclair/typebox** for runtime type validation
+- **SQLite3 5.1.7** lightweight file-based database
+- **bcrypt 6.0.0** for password hashing
+- **@fastify/swagger 9.5.1** for OpenAPI 3.0 specification
+- **@fastify/swagger-ui 5.2.3** for interactive API documentation
+- **@scalar/fastify-api-reference 1.35.3** for modern API reference UI
+- **@fastify/type-provider-typebox 5.2.0** with **@sinclair/typebox 0.34.41** for runtime validation
+- **@fastify/helmet 13.0.1** for security headers
+- **@fastify/cors 11.1.0** for cross-origin resource sharing
+- **@fastify/sensible 6.0.3** for sensible defaults
 - **pino** structured logging with pino-pretty for development
 - **Vitest** for unit and integration testing
 - **Supertest** for HTTP endpoint testing
@@ -210,6 +217,49 @@ mypy src                  # Type checking
 - **pytest-asyncio** for async test support
 - **Black, Ruff, mypy** for code quality
 - **Optional ML libraries**: numpy, pandas, scikit-learn, tensorflow, torch, transformers
+
+## API Documentation System
+
+### Multiple Documentation Formats
+The friendly server provides comprehensive API documentation in multiple formats:
+
+#### Swagger UI (Interactive Documentation)
+- **URL**: `http://localhost:4000/docs`
+- Interactive interface for testing API endpoints
+- JWT Bearer token authentication support
+- Request/response examples with TypeBox schema validation
+- Persistent authorization across sessions
+
+#### Scalar API Reference (Modern Alternative)
+- **URL**: `http://localhost:4000/reference`
+- Modern, responsive API documentation interface
+- Dark mode support with purple theme
+- Enhanced UX with better navigation and search
+
+#### OpenAPI JSON Specification
+- **Endpoint**: `GET /api/docs/spec`
+- Complete OpenAPI 3.0 specification in JSON format
+- Machine-readable API specification for tooling integration
+
+#### AI-Friendly API Prompt
+- **Endpoint**: `GET /api/docs/ai-prompt`
+- Generates comprehensive AI-friendly prompts describing all API endpoints
+- Includes request/response examples, authentication info, and usage examples
+- Grouped by endpoint tags with detailed descriptions
+- Perfect for training AI assistants or generating documentation
+
+#### Markdown Documentation
+- **Endpoint**: `GET /api/docs/markdown`
+- Complete API documentation in Markdown format
+- Suitable for README files or static documentation sites
+- Includes endpoint tables, schemas, and examples
+
+### Documentation Features
+- **Auto-generated Examples**: TypeBox schemas automatically generate JSON examples
+- **JWT Authentication**: Ready for Bearer token implementation
+- **Tag-based Organization**: Endpoints organized by functional areas (auth, health, api, users)
+- **Response Standardization**: Consistent error/success response format across all endpoints
+- **Schema Validation**: Request/response validation with detailed error messages
 
 ## Configuration System
 
@@ -236,14 +286,14 @@ Environment variables override YAML configuration:
 - Smart server: 5000
 - `strictPort: true` ensures exact port usage
 
-## Database Architecture
+## Database System
 
-### Friendly Server (SQLite)
-- Database file: `servers/friendly/data/niney.db`
-- Automatic migration system on server startup
-- Migration files in `servers/friendly/src/db/migrations/`
+### SQLite Integration
+- **Database**: SQLite3 with file-based storage (`servers/friendly/data/niney.db`)
+- **Migrations**: Automated database migrations on server startup
+- **Location**: Migration files in `servers/friendly/src/db/migrations/`
 
-Current schema:
+### Current Schema
 ```sql
 -- users table
 id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -264,6 +314,44 @@ expires_at DATETIME NOT NULL
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 FOREIGN KEY (user_id) REFERENCES users(id)
 ```
+
+### Migration System
+- **Auto-execution**: Migrations run automatically on server startup
+- **Version Tracking**: Migration history stored in migrations table
+- **Reset Command**: `npm run db:reset` for development database reset
+- **File-based**: SQL migration files with sequential naming (001_create_users.sql)
+
+## Authentication System
+
+### Current Implementation
+- **Registration**: `POST /api/auth/register`
+  - Email/username uniqueness validation
+  - Password strength requirements (minimum 6 characters)
+  - Bcrypt password hashing with 10 salt rounds
+  - Automatic account activation
+
+- **Login**: `POST /api/auth/login`
+  - Email/password authentication
+  - Last login timestamp tracking
+  - Standardized response format
+
+- **User Management**: `GET /api/auth/users`
+  - User listing endpoint (for testing/admin purposes)
+  - Excludes password hashes from responses
+  - User count and details
+
+### Security Features
+- **Password Hashing**: bcrypt with configurable salt rounds
+- **SQL Injection Protection**: Parameterized queries throughout
+- **Input Validation**: TypeBox schema validation for all endpoints
+- **Security Headers**: Helmet integration for common security headers
+- **CORS Configuration**: Configurable cross-origin resource sharing
+
+### Future JWT Implementation
+- Authentication system is prepared for JWT token integration
+- Session table ready for token storage
+- Bearer token authentication configured in OpenAPI spec
+- Response types include token field for future implementation
 
 ## API Response Standardization
 
@@ -289,6 +377,7 @@ All API endpoints use a consistent response format:
 }
 ```
 
+### Response Helper Utilities
 Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 - `ResponseHelper.success()` - 200 OK
 - `ResponseHelper.created()` - 201 Created
@@ -298,6 +387,7 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 - `ResponseHelper.forbidden()` - 403 Forbidden
 - `ResponseHelper.notFound()` - 404 Not Found
 - `ResponseHelper.conflict()` - 409 Conflict
+- `ResponseHelper.paginated()` - Paginated response format
 
 ## TypeScript Configuration
 
@@ -385,17 +475,20 @@ cd apps/mobile && npm run test:e2e:studio
 - E2E testing with Playwright for web
 - React Native mobile app with navigation
 - Maestro E2E testing for mobile app
-- **Fastify migration** for friendly server
-- **SQLite authentication system** with bcrypt
-- **API response standardization**
-- **Database migration system**
+- **Fastify-based backend service with comprehensive API documentation**
+- **SQLite database integration with automated migrations**
+- **Complete authentication system (registration, login, user management)**
+- **OpenAPI 3.0 specification with multiple documentation formats**
+- **Standardized API response format with TypeScript validation**
+- **Multiple API documentation interfaces (Swagger UI, Scalar, AI-friendly)**
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
 
 ### 🔲 In Progress
+- JWT token authentication implementation
 - Mobile app feature parity with web
-- JWT token implementation
+- Backend business logic implementation
 - ML model integration in smart server
 - Real-time features
 - Production database (PostgreSQL)
@@ -416,6 +509,15 @@ curl -X POST http://localhost:4000/api/auth/login \
 
 # Health check
 curl http://localhost:4000/health
+
+# Get OpenAPI specification
+curl http://localhost:4000/api/docs/spec
+
+# Get AI-friendly API prompt
+curl http://localhost:4000/api/docs/ai-prompt
+
+# Get Markdown documentation
+curl http://localhost:4000/api/docs/markdown
 ```
 
 ### Database Operations
@@ -426,6 +528,18 @@ cd servers/friendly && npm run db:reset
 # View database (requires SQLite CLI)
 sqlite3 servers/friendly/data/niney.db ".tables"
 sqlite3 servers/friendly/data/niney.db "SELECT * FROM users;"
+```
+
+### Accessing API Documentation
+```bash
+# Interactive Swagger UI
+open http://localhost:4000/docs
+
+# Modern Scalar API Reference
+open http://localhost:4000/reference
+
+# Get AI prompt for API integration
+curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.txt
 ```
 
 ### Troubleshooting TypeScript Errors
@@ -458,7 +572,7 @@ Prefix commits with the affected scope:
 
 Examples:
 ```
-[friendly] feat: Migrate from Express to Fastify
+[friendly] feat: Add Swagger documentation with AI prompt generation
 [web] fix: Resolve hydration mismatch in PWA mode
 [mobile] test: Add Maestro flows for navigation
 ```

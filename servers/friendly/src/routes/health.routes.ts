@@ -5,6 +5,9 @@ export default async function healthRoutes(fastify: FastifyInstance) {
   // Health check endpoint
   fastify.get('/', {
     schema: {
+      tags: ['health'],
+      summary: 'Health check',
+      description: 'Get server health status and system information',
       response: {
         200: Type.Object({
           status: Type.String(),
@@ -32,12 +35,30 @@ export default async function healthRoutes(fastify: FastifyInstance) {
   });
 
   // Liveness probe for K8s
-  fastify.get('/live', async (_request, reply) => {
+  fastify.get('/live', {
+    schema: {
+      tags: ['health'],
+      summary: 'Liveness probe',
+      description: 'Check if the server is alive (for Kubernetes)',
+      response: {
+        200: Type.String()
+      }
+    }
+  }, async (_request, reply) => {
     return reply.code(200).send('OK');
   });
 
   // Readiness probe for K8s
-  fastify.get('/ready', async (_request, reply) => {
+  fastify.get('/ready', {
+    schema: {
+      tags: ['health'],
+      summary: 'Readiness probe',
+      description: 'Check if the server is ready to accept requests (for Kubernetes)',
+      response: {
+        200: Type.String()
+      }
+    }
+  }, async (_request, reply) => {
     // Add checks for database connections, external services, etc.
     return reply.code(200).send('OK');
   });
