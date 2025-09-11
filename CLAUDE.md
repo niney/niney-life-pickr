@@ -6,6 +6,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Niney Life Pickr is a life decision-making application built as a multi-platform solution with web (React + Vite + TypeScript), mobile (React Native), and backend services (Node.js "friendly" server and Python "smart" ML/AI server).
 
+## Git Commit Message Convention
+
+When creating commits, prefix the subject with the affected project scope:
+- `[web]` - Changes to the web application (apps/web)
+- `[mobile]` - Changes to the mobile application (apps/mobile)
+- `[friendly]` - Changes to the Node.js backend (servers/friendly)
+- `[smart]` - Changes to the Python ML/AI backend (servers/smart)
+- `[config]` - Changes to shared configuration files
+- `[root]` - Changes to root-level files (package.json, CLAUDE.md, etc.)
+
+Examples:
+```
+[web] feat: Add dark mode toggle to settings
+[mobile] fix: Resolve navigation gesture handler conflict
+[friendly] test: Add integration tests for health endpoints
+[smart] feat: Implement recommendation engine with collaborative filtering
+[config] chore: Update production API endpoints
+```
+
+For changes affecting multiple projects, use multiple prefixes:
+```
+[web][mobile] refactor: Standardize API service error handling
+[friendly][smart] feat: Add rate limiting middleware
+```
+
 ## High-Level Architecture
 
 ### Multi-Platform Architecture
