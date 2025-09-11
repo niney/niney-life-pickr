@@ -98,6 +98,7 @@ cd android && ./gradlew clean      # Clean Android build (Mac/Linux)
 - **React Native Reanimated v4.1.0** for animations
 - **React Native Vector Icons v10.3.0** for icons
 - **React Native Worklets v0.5.1** for Reanimated support
+- **Babel plugin**: Uses `react-native-worklets/plugin` (not deprecated `react-native-reanimated/plugin`)
 
 ## Configuration System
 
@@ -135,22 +136,46 @@ The project includes a Node.js script to handle development server cleanup on Wi
 - Manifest at `public/manifest.json` with app metadata
 - Caching strategies for static assets and Google Fonts
 
-## E2E Testing
+## Testing Strategy
 
-### Playwright Configuration
+### Hybrid Testing Approach (Jest + E2E)
+The project follows a hybrid testing strategy:
+- **Unit/Integration Tests (Jest)**: For business logic, utilities, and component testing
+- **E2E Tests**: For critical user flows and cross-platform verification
+  - Web: Playwright
+  - Mobile: Maestro (planned)
+
+### Web Testing (Playwright)
 - Tests located in `apps/web/tests/e2e/`
 - Configuration in `apps/web/playwright.config.ts`
 - Browsers tested: Chromium, Mobile Chrome, Mobile Safari
-- Note: Firefox and Desktop Safari are currently disabled in config
+- Firefox and Desktop Safari are disabled in config
 - Automatic dev server startup before tests
-- HTML reporter for test results
 
-### Test Coverage
-- Homepage functionality tests
-- Accessibility tests (WCAG compliance)
-- PWA feature verification
-- Responsive design testing
-- Keyboard navigation testing
+```bash
+cd apps/web
+npm run test:e2e         # Run all E2E tests
+npm run test:e2e:ui      # UI mode for debugging
+npm run test:e2e:headed  # Run with visible browser
+```
+
+### Mobile Testing (Jest + React Native Testing Library)
+- Unit tests in `apps/mobile/__tests__/`
+- Configuration in `apps/mobile/jest.config.js`
+- Setup file in `apps/mobile/jest.setup.js`
+- Uses @testing-library/react-native (not deprecated react-test-renderer)
+
+```bash
+cd apps/mobile
+npm test                 # Run all Jest tests
+```
+
+### Test Coverage Focus
+- Critical user paths (E2E)
+- Business logic and utilities (Unit)
+- Accessibility compliance (WCAG)
+- Component interactions
+- Error handling
 
 ## Mobile Development Requirements
 
