@@ -9,14 +9,21 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "kill": "node scripts/kill-dev.cjs",
-    "dev:clean": "node scripts/kill-dev.cjs && vite"
+    "dev:clean": "node scripts/kill-dev.cjs && vite",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.3.1",

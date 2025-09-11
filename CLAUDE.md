@@ -46,6 +46,13 @@ npm run preview    # Preview production build
 npm run lint       # Run ESLint
 npm run kill       # Kill dev server process on Windows (reads port from config)
 npm run dev:clean  # Kill existing dev server and start fresh
+
+# E2E Testing with Playwright
+npm run test:e2e         # Run all E2E tests
+npm run test:e2e:ui      # Open Playwright UI mode
+npm run test:e2e:debug   # Run tests in debug mode
+npm run test:e2e:headed  # Run tests with browser visible
+npm run test:e2e:report  # Show test report
 ```
 
 ## Technology Stack
@@ -57,6 +64,7 @@ npm run dev:clean  # Kill existing dev server and start fresh
 - **PWA Support** via vite-plugin-pwa with auto-update and offline capabilities
 - **PostCSS** configuration using @tailwindcss/postcss plugin
 - **js-yaml** for YAML configuration parsing
+- **Playwright** for E2E testing with @axe-core/playwright for accessibility testing
 
 ## Configuration System
 
@@ -94,6 +102,23 @@ The project includes a Node.js script to handle development server cleanup on Wi
 - Manifest at `public/manifest.json` with app metadata
 - Caching strategies for static assets and Google Fonts
 
+## E2E Testing
+
+### Playwright Configuration
+- Tests located in `apps/web/tests/e2e/`
+- Configuration in `apps/web/playwright.config.ts`
+- Browsers tested: Chromium, Mobile Chrome, Mobile Safari
+- Note: Firefox and Desktop Safari are currently disabled in config
+- Automatic dev server startup before tests
+- HTML reporter for test results
+
+### Test Coverage
+- Homepage functionality tests
+- Accessibility tests (WCAG compliance)
+- PWA feature verification
+- Responsive design testing
+- Keyboard navigation testing
+
 ## Current Implementation Status
 
 - ✅ Web application foundation with React + Vite + TypeScript
@@ -102,6 +127,8 @@ The project includes a Node.js script to handle development server cleanup on Wi
 - ✅ YAML-based configuration system
 - ✅ Windows-compatible development scripts
 - ✅ Home page with responsive design
+- ✅ E2E testing with Playwright
+- ✅ Accessibility compliance (semantic HTML, ARIA labels)
 - 🔲 React Native mobile app
 - 🔲 Node.js "friendly" backend service
 - 🔲 Python "smart" backend service with ML capabilities
