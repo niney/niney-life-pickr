@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
+    "dev:clean": "npm run kill && npm run dev",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
@@ -20,7 +21,8 @@
     "test:integration": "vitest run src/__tests__/integration",
     "test:unit": "vitest run src/__tests__/unit",
     "test:auth": "vitest run src/__tests__/integration/auth.routes.test.ts",
-    "db:reset": "node scripts/db-reset.js"
+    "db:reset": "node scripts/db-reset.js",
+    "kill": "node scripts/kill.js"
   },
   "keywords": [],
   "author": "",

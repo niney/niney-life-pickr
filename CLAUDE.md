@@ -121,6 +121,7 @@ cd ios && pod install              # Install iOS dependencies (macOS only)
 ```bash
 cd servers/friendly
 npm run dev        # Start development server with hot reload (port 4000)
+npm run dev:clean  # Kill existing server and start fresh
 npm run build      # Build TypeScript to JavaScript (uses tsconfig.build.json)
 npm run start      # Start production server
 npm run start:prod # Start with NODE_ENV=production
@@ -129,6 +130,7 @@ npm run lint       # Run ESLint
 npm run lint:fix   # Fix linting issues
 npm run type-check # TypeScript type checking without building
 npm run db:reset   # Reset database and re-run migrations
+npm run kill       # Kill server process (reads port from config/base.yml)
 
 # Testing with Vitest + Supertest
 npm test           # Run all tests in watch mode
@@ -409,11 +411,13 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 
 ## Development Workflow
 
-### Windows Process Management
-- `npm run kill`: Terminates processes using configured port
-- `npm run dev:clean`: Kills existing processes before starting
-- Scripts read port from YAML config files with fallback to environment variables
-- Enhanced error handling and multi-PID support
+### Process Management
+- **Kill Script**: `scripts/kill.js` automatically reads port from `config/base.yml`
+  - Reads `server.friendly.port` configuration (default: 4000)
+  - Cross-platform support (Windows/Mac/Linux)
+  - Handles multiple processes on the same port
+- `npm run kill`: Terminates server process on configured port
+- `npm run dev:clean`: Kills existing server then starts fresh
 
 ### Mobile Development Setup
 #### Android Requirements
