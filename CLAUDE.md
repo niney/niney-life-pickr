@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Niney Life Pickr is a life decision-making application being built as a multi-platform solution. Currently implementing the web application with React + Vite + TypeScript, with plans for React Native mobile app and dual backend services (Node.js "friendly" and Python "smart" servers).
+Niney Life Pickr is a life decision-making application built as a multi-platform solution. Currently implementing web (React + Vite + TypeScript) and mobile (React Native) applications, with plans for dual backend services (Node.js "friendly" and Python "smart" servers).
 
 ## Architecture
 
@@ -15,22 +15,33 @@ niney-life-pickr/
 │   ├── base.yml                # Base configuration for all environments
 │   └── production.yml          # Production-specific overrides
 ├── apps/
-│   └── web/                    # React + Vite PWA application
+│   ├── web/                    # React + Vite PWA application
+│   │   ├── src/
+│   │   │   ├── components/     # Reusable UI components
+│   │   │   ├── config/         # TypeScript config loader (index.ts)
+│   │   │   ├── pages/          # Page components (Home.tsx)
+│   │   │   ├── hooks/          # Custom React hooks
+│   │   │   ├── services/       # API services
+│   │   │   ├── utils/          # Utility functions
+│   │   │   └── types/          # TypeScript type definitions
+│   │   ├── scripts/            # Utility scripts
+│   │   │   └── kill-dev.cjs    # Windows dev server kill script
+│   │   ├── tests/e2e/          # Playwright E2E tests
+│   │   └── public/             # Static assets including manifest.json
+│   └── mobile/                 # React Native mobile application
 │       ├── src/
+│       │   ├── screens/        # Screen components
+│       │   ├── navigation/     # React Navigation setup
 │       │   ├── components/     # Reusable UI components
-│       │   ├── config/         # TypeScript config loader (index.ts)
-│       │   ├── pages/          # Page components (Home.tsx)
-│       │   ├── hooks/          # Custom React hooks
 │       │   ├── services/       # API services
+│       │   ├── hooks/          # Custom React hooks
 │       │   ├── utils/          # Utility functions
 │       │   └── types/          # TypeScript type definitions
-│       ├── scripts/            # Utility scripts
-│       │   └── kill-dev.cjs    # Windows dev server kill script
-│       └── public/             # Static assets including manifest.json
+│       ├── android/            # Android native code
+│       └── ios/                # iOS native code
 ```
 
 ### Planned Architecture
-- **apps/mobile**: React Native CLI project (not Expo)
 - **servers/friendly**: Node.js backend service
 - **servers/smart**: Python backend with ML/AI capabilities
 - **packages/**: Shared code between applications
@@ -55,6 +66,20 @@ npm run test:e2e:headed  # Run tests with browser visible
 npm run test:e2e:report  # Show test report
 ```
 
+### Mobile Application Development
+```bash
+cd apps/mobile
+npm start          # Start Metro bundler
+npm run android    # Run on Android device/emulator
+npm run ios        # Run on iOS device/simulator (macOS only)
+npm run lint       # Run ESLint
+npm test           # Run Jest tests
+
+# Android specific
+cd android && ./gradlew.bat clean  # Clean Android build (Windows)
+cd android && ./gradlew clean      # Clean Android build (Mac/Linux)
+```
+
 ## Technology Stack
 
 ### Web Application
@@ -65,6 +90,14 @@ npm run test:e2e:report  # Show test report
 - **PostCSS** configuration using @tailwindcss/postcss plugin
 - **js-yaml** for YAML configuration parsing
 - **Playwright** for E2E testing with @axe-core/playwright for accessibility testing
+
+### Mobile Application
+- **React Native 0.81.1** with TypeScript 5.8.3
+- **React Navigation v7** for navigation (stack + bottom tabs)
+- **React Native Elements v3.4.3** for UI components
+- **React Native Reanimated v4.1.0** for animations
+- **React Native Vector Icons v10.3.0** for icons
+- **React Native Worklets v0.5.1** for Reanimated support
 
 ## Configuration System
 
@@ -119,6 +152,19 @@ The project includes a Node.js script to handle development server cleanup on Wi
 - Responsive design testing
 - Keyboard navigation testing
 
+## Mobile Development Requirements
+
+### Android Setup
+- Android Studio with SDK
+- ANDROID_HOME environment variable
+- Path includes: `%ANDROID_HOME%\platform-tools` and `%ANDROID_HOME%\tools`
+- JDK 17-20 (React Native requirement)
+- Android SDK Build Tools 36.0.0
+
+### iOS Setup (macOS only)
+- Xcode with iOS Simulator
+- CocoaPods: `cd ios && pod install`
+
 ## Current Implementation Status
 
 - ✅ Web application foundation with React + Vite + TypeScript
@@ -129,6 +175,7 @@ The project includes a Node.js script to handle development server cleanup on Wi
 - ✅ Home page with responsive design
 - ✅ E2E testing with Playwright
 - ✅ Accessibility compliance (semantic HTML, ARIA labels)
-- 🔲 React Native mobile app
+- ✅ React Native mobile app structure and navigation
+- 🔲 Mobile app feature parity with web
 - 🔲 Node.js "friendly" backend service
 - 🔲 Python "smart" backend service with ML capabilities
