@@ -1,18 +1,56 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const Home = () => {
   const [count, setCount] = useState(0)
+  const [user, setUser] = useState<any>(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user')
+    if (!storedUser) {
+      navigate('/login')
+    } else {
+      setUser(JSON.parse(storedUser))
+    }
+  }, [navigate])
+
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    navigate('/login')
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-4">
       <article className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
         <header>
-          <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-            Niney Life Pickr
-          </h1>
-          <p className="text-gray-600 text-center">
-            인생의 선택을 도와드립니다
-          </p>
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-800 text-center">
+                Niney Life Pickr
+              </h1>
+              <p className="text-gray-600 text-center mt-2">
+                인생의 선택을 도와드립니다
+              </p>
+            </div>
+          </div>
+          
+          {user && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">환영합니다!</p>
+                  <p className="text-lg font-semibold text-gray-800">{user.username}님</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-red-600 hover:text-red-700 font-medium"
+                >
+                  로그아웃
+                </button>
+              </div>
+            </div>
+          )}
         </header>
         
         <section className="space-y-4 mt-4">

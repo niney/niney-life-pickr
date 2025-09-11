@@ -180,6 +180,7 @@ mypy src                  # Type checking
 ### Web Application
 - **React 19.1.1** with TypeScript 5.8.3
 - **Vite 7.1.2** for fast development and building
+- **React Router DOM 7.1.1** for client-side routing
 - **Tailwind CSS v4.1.13** with @tailwindcss/postcss for styling
 - **PWA Support** via vite-plugin-pwa with auto-update and offline capabilities
 - **PostCSS** configuration using @tailwindcss/postcss plugin
@@ -504,6 +505,8 @@ cd apps/mobile && npm run test:e2e:studio
 
 ### ✅ Completed
 - Web application with React + Vite + TypeScript
+- **Web authentication UI (login, registration, home with protected routes)**
+- **React Router DOM integration for navigation**
 - Tailwind CSS v4 with PostCSS integration
 - PWA setup with offline capabilities
 - YAML-based configuration system
@@ -517,6 +520,7 @@ cd apps/mobile && npm run test:e2e:studio
 - **OpenAPI 3.0 specification with multiple documentation formats**
 - **Standardized API response format with TypeScript validation**
 - **Multiple API documentation interfaces (Swagger UI, Scalar, AI-friendly)**
+- **Route-specific documentation generation (auth, health, api)**
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
@@ -542,6 +546,10 @@ curl -X POST http://localhost:4000/api/auth/register \
 curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
+
+# Test account for quick access (already registered)
+# Email: niney@ks.com
+# Password: tester
 
 # Health check
 curl http://localhost:4000/health
