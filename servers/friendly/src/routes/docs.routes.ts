@@ -1,7 +1,110 @@
 import { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
+import fs from 'fs';
+import path from 'path';
+
+// Helper function to ensure directory exists
+function ensureDirectoryExists(dirPath: string): void {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+// Helper function to write documentation to file
+function saveDocumentationToFile(routeName: string, content: string, format: 'markdown' | 'json' | 'txt'): string {
+  const docsDir = path.join(process.cwd(), 'generated-docs', routeName);
+  ensureDirectoryExists(docsDir);
+  
+  const extension = format === 'markdown' ? 'md' : format;
+  const filename = `${routeName}-api-doc.${extension}`;
+  const filepath = path.join(docsDir, filename);
+  
+  fs.writeFileSync(filepath, content, 'utf-8');
+  return filepath;
+}
 
 export default async function docsRoutes(fastify: FastifyInstance) {
+  /**
+   * Generate documentation for specific route
+   * GET /api/docs/generate/:routeName
+   */
+  fastify.get<{
+    Params: { routeName: string }
+  }>('/generate/:routeName', {
+    schema: {
+      tags: ['api'],
+      summary: 'Generate documentation for a specific route',
+      description: 'Generates and saves documentation for a specific route (auth, health, or api) in markdown, JSON, and text formats',
+      params: Type.Object({
+        routeName: Type.String({ description: 'Name of the route to generate docs for (auth, health, api)' })
+      }),
+      response: {
+        200: Type.Object({
+          routeName: Type.String(),
+          files: Type.Object({
+            markdown: Type.String(),
+            json: Type.String()
+          }),
+          generatedAt: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { routeName } = request.params;
+      const validRoutes = ['auth', 'health', 'api'];
+      
+      if (!validRoutes.includes(routeName)) {
+        return reply.status(400).send({
+          error: `Invalid route name. Must be one of: ${validRoutes.join(', ')}`
+        });
+      }
+
+      // Get swagger specification
+      const spec = fastify.swagger({ yaml: false });
+      
+      // Filter routes by prefix
+      const filteredSpec = {
+        ...spec,
+        paths: Object.entries(spec.paths || {})
+          .filter(([path]) => {
+            if (routeName === 'health') return path.startsWith('/health');
+            if (routeName === 'api') return path === '/api' || (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/docs'));
+            if (routeName === 'auth') return path.startsWith('/api/auth');
+            return false;
+          })
+          .reduce((acc, [path, methods]) => ({ ...acc, [path]: methods }), {})
+      };
+
+      // Generate markdown documentation
+      const markdownDoc = generateMarkdownForRoute(filteredSpec, routeName);
+      const markdownFile = saveDocumentationToFile(routeName, markdownDoc, 'markdown');
+
+      // Generate JSON specification
+      const jsonDoc = JSON.stringify(filteredSpec, null, 2);
+      const jsonFile = saveDocumentationToFile(routeName, jsonDoc, 'json');
+
+      // Generate AI-friendly prompt (txt format) - commented out as markdown is better for AI
+      // const aiPrompt = generateAIPromptForRoute(filteredSpec, routeName);
+      // const aiFile = saveDocumentationToFile(routeName, aiPrompt, 'txt');
+
+      return {
+        routeName,
+        files: {
+          markdown: markdownFile,
+          json: jsonFile,
+          // aiPrompt: aiFile
+        },
+        generatedAt: new Date().toISOString()
+      };
+    } catch (error: any) {
+      fastify.log.error('Error generating route documentation:', error);
+      return reply.status(500).send({
+        error: 'Failed to generate route documentation'
+      });
+    }
+  });
+
   /**
    * Get OpenAPI specification in JSON format
    */
@@ -108,6 +211,97 @@ export default async function docsRoutes(fastify: FastifyInstance) {
     };
   });
 }
+
+/**
+ * Generate markdown documentation for a specific route
+ */
+function generateMarkdownForRoute(spec: any, routeName: string): string {
+  const title = routeName.charAt(0).toUpperCase() + routeName.slice(1);
+  let markdown = `# ${title} API Documentation\n\n`;
+  markdown += `Generated: ${new Date().toISOString()}\n\n`;
+  markdown += `## Overview\n\n`;
+  markdown += `This document describes the ${routeName} endpoints for the Niney Life Pickr API.\n\n`;
+  
+  if (spec.info) {
+    markdown += `**Version**: ${spec.info.version || '1.0.0'}\n`;
+    markdown += `**Base URL**: ${spec.servers?.[0]?.url || 'http://localhost:4000'}\n\n`;
+  }
+
+  markdown += '## Endpoints\n\n';
+  
+  // Generate endpoint documentation
+  Object.entries(spec.paths).forEach(([path, methods]: [string, any]) => {
+    Object.entries(methods).forEach(([method, details]: [string, any]) => {
+      markdown += `### ${method.toUpperCase()} ${path}\n\n`;
+      if (details.summary) markdown += `**Summary**: ${details.summary}\n\n`;
+      if (details.description) markdown += `**Description**: ${details.description}\n\n`;
+      
+      // Request body
+      if (details.requestBody?.content?.['application/json']?.schema) {
+        markdown += '**Request Body**:\n```json\n';
+        markdown += generateExampleFromSchema(details.requestBody.content['application/json'].schema);
+        markdown += '\n```\n\n';
+      }
+      
+      // Responses
+      if (details.responses) {
+        markdown += '**Responses**:\n\n';
+        Object.entries(details.responses).forEach(([code, response]: [string, any]) => {
+          markdown += `- **${code}**: ${response.description || 'Response'}\n`;
+          if (response.content?.['application/json']?.schema) {
+            markdown += '  ```json\n  ';
+            markdown += generateExampleFromSchema(response.content['application/json'].schema).replace(/\n/g, '\n  ');
+            markdown += '\n  ```\n';
+          }
+        });
+        markdown += '\n';
+      }
+    });
+  });
+  
+  return markdown;
+}
+
+// /**
+//  * Generate AI-friendly prompt for a specific route
+//  */
+// function generateAIPromptForRoute(spec: any, routeName: string): string {
+//   const title = routeName.charAt(0).toUpperCase() + routeName.slice(1);
+//   let prompt = `You are an AI assistant helping developers integrate with the ${title} API endpoints of Niney Life Pickr.\n\n`;
+//   prompt += `API SPECIFICATION:\n\n`;
+//   prompt += `Base URL: ${spec.servers?.[0]?.url || 'http://localhost:4000'}\n`;
+//   prompt += `Version: ${spec.info?.version || '1.0.0'}\n\n`;
+  
+//   prompt += `AVAILABLE ENDPOINTS:\n\n`;
+  
+//   Object.entries(spec.paths).forEach(([path, methods]: [string, any]) => {
+//     Object.entries(methods).forEach(([method, details]: [string, any]) => {
+//       prompt += `${method.toUpperCase()} ${path}\n`;
+//       if (details.summary) prompt += `Purpose: ${details.summary}\n`;
+//       if (details.description) prompt += `Details: ${details.description}\n`;
+      
+//       // Include request/response examples
+//       if (details.requestBody?.content?.['application/json']?.schema) {
+//         prompt += `Request Body Example:\n`;
+//         prompt += generateExampleFromSchema(details.requestBody.content['application/json'].schema);
+//         prompt += '\n';
+//       }
+      
+//       if (details.responses?.['200']?.content?.['application/json']?.schema) {
+//         prompt += `Success Response Example:\n`;
+//         prompt += generateExampleFromSchema(details.responses['200'].content['application/json'].schema);
+//         prompt += '\n';
+//       }
+      
+//       prompt += '\n';
+//     });
+//   });
+  
+//   prompt += `\nWhen users ask about ${routeName} endpoints, provide accurate information based on this specification.`;
+//   prompt += `\nAlways use the standardized response format with 'result', 'message', 'data', and 'timestamp' fields.`;
+  
+//   return prompt;
+// }
 
 /**
  * Generate AI-friendly prompt from OpenAPI spec

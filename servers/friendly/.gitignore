@@ -47,3 +47,6 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+
+# Generated documentation
+generated-docs/

@@ -247,6 +247,15 @@ The friendly server provides comprehensive API documentation in multiple formats
 - Complete OpenAPI 3.0 specification in JSON format
 - Machine-readable API specification for tooling integration
 
+#### Route-Specific Documentation Generation
+- **Endpoint**: `GET /api/docs/generate/:routeName`
+- Generates documentation for specific routes (auth, health, api)
+- Creates separate folders in `generated-docs/` directory (gitignored)
+- Outputs two formats per route:
+  - `{routeName}-api-doc.md` - Markdown documentation with examples
+  - `{routeName}-api-doc.json` - Filtered OpenAPI specification
+- Automatically filters endpoints by route prefix
+
 #### AI-Friendly API Prompt
 - **Endpoint**: `GET /api/docs/ai-prompt`
 - Generates comprehensive AI-friendly prompts describing all API endpoints
@@ -545,6 +554,11 @@ curl http://localhost:4000/api/docs/ai-prompt
 
 # Get Markdown documentation
 curl http://localhost:4000/api/docs/markdown
+
+# Generate route-specific documentation
+curl http://localhost:4000/api/docs/generate/auth
+curl http://localhost:4000/api/docs/generate/health
+curl http://localhost:4000/api/docs/generate/api
 ```
 
 ### Database Operations
