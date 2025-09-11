@@ -1,0 +1,14 @@
+appId: com.nineylifepickrmobile
+---
+# Smoke test - basic app functionality check
+- launchApp
+- assertVisible: "Niney Life Pickr"
+- assertVisible: "인생의 선택을 도와드립니다"
+- assertVisible: "카운터 테스트"
+- assertVisible: "0"
+- assertVisible: "증가"
+- assertVisible: "음식 선택"
+- assertVisible: "장소 선택"
+- assertVisible: "활동 선택"
+- assertVisible: "설정"
+- takeScreenshot: "screenshots/smoke-test-complete"

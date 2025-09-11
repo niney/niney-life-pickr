@@ -159,7 +159,9 @@ npm run test:e2e:ui      # UI mode for debugging
 npm run test:e2e:headed  # Run with visible browser
 ```
 
-### Mobile Testing (Jest + React Native Testing Library)
+### Mobile Testing
+
+#### Unit Testing (Jest + React Native Testing Library)
 - Unit tests in `apps/mobile/__tests__/`
 - Configuration in `apps/mobile/jest.config.js`
 - Setup file in `apps/mobile/jest.setup.js`
@@ -168,7 +170,29 @@ npm run test:e2e:headed  # Run with visible browser
 ```bash
 cd apps/mobile
 npm test                 # Run all Jest tests
+npm test -- --watch      # Watch mode
 ```
+
+#### E2E Testing (Maestro)
+- Test flows in `apps/mobile/tests/e2e/flows/`
+- Configuration in `apps/mobile/maestro.yaml`
+- Visual test creation with Maestro Studio
+- Cross-platform test execution (iOS/Android)
+
+```bash
+cd apps/mobile
+npm run test:e2e         # Run all E2E tests
+npm run test:e2e:smoke   # Run smoke test only
+npm run test:e2e:studio  # Open Maestro Studio
+npm run test:e2e:record  # Record new test flows
+npm run test:e2e:cloud   # Run on Maestro Cloud
+```
+
+Test flows available:
+- `smoke-test.yaml`: Basic app functionality verification
+- `app-launch.yaml`: App launch and initial screen
+- `counter-test.yaml`: Counter increment functionality
+- `navigation-test.yaml`: Menu navigation testing
 
 ### Test Coverage Focus
 - Critical user paths (E2E)
