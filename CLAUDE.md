@@ -15,14 +15,22 @@ niney-life-pickr/
 │   ├── base.yml                # Base configuration for all environments
 │   ├── test.yml                # Test environment overrides
 │   └── production.yml          # Production-specific overrides
+├── packages/
+│   └── shared/                 # Shared code between web and mobile
+│       ├── src/
+│       │   ├── types/          # Common TypeScript types
+│       │   ├── services/       # API service classes
+│       │   ├── utils/          # Shared utility functions
+│       │   └── constants/      # Shared constants
+│       └── dist/               # Compiled JavaScript output
 ├── apps/
 │   ├── web/                    # React + Vite PWA application
 │   │   ├── src/
 │   │   │   ├── components/     # Reusable UI components
 │   │   │   ├── config/         # TypeScript config loader
-│   │   │   ├── pages/          # Page components
+│   │   │   ├── pages/          # Page components (Login, Register, Home)
 │   │   │   ├── hooks/          # Custom React hooks
-│   │   │   ├── services/       # API services
+│   │   │   ├── services/       # Web-specific API services
 │   │   │   ├── utils/          # Utility functions
 │   │   │   └── types/          # TypeScript type definitions
 │   │   ├── scripts/            # Utility scripts
@@ -34,7 +42,7 @@ niney-life-pickr/
 │       │   ├── screens/        # Screen components
 │       │   ├── navigation/     # React Navigation setup
 │       │   ├── components/     # Reusable UI components
-│       │   ├── services/       # API services
+│       │   ├── services/       # Mobile-specific API services
 │       │   ├── hooks/          # Custom React hooks
 │       │   ├── utils/          # Utility functions
 │       │   └── types/          # TypeScript type definitions
@@ -76,6 +84,15 @@ niney-life-pickr/
 ```
 
 ## Key Commands
+
+### Shared Package Development
+```bash
+cd packages/shared
+npm run build      # Build TypeScript to JavaScript
+npm run dev        # Watch mode for development
+npm run type-check # TypeScript type checking without building
+npm run clean      # Clean build directory
+```
 
 ### Web Application Development
 ```bash
@@ -177,10 +194,18 @@ mypy src                  # Type checking
 
 ## Technology Stack
 
+### Shared Package
+- **TypeScript 5.8.3** with ES2020 target
+- **Centralized Types**: User, ApiResponse, LoginRequest, etc.
+- **API Service Classes**: BaseApiService with fetch wrapper, AuthService
+- **Validation Utilities**: Form validation rules and helpers
+- **Storage Abstraction**: Platform-agnostic storage interface
+
 ### Web Application
 - **React 19.1.1** with TypeScript 5.8.3
 - **Vite 7.1.2** for fast development and building
-- **React Router DOM 7.1.1** for client-side routing
+- **React Router DOM 7.8.2** for client-side routing
+- **@niney/shared** local package for shared code
 - **Tailwind CSS v4.1.13** with @tailwindcss/postcss for styling
 - **PWA Support** via vite-plugin-pwa with auto-update and offline capabilities
 - **PostCSS** configuration using @tailwindcss/postcss plugin
@@ -505,6 +530,7 @@ cd apps/mobile && npm run test:e2e:studio
 
 ### ✅ Completed
 - Web application with React + Vite + TypeScript
+- **Shared package (@niney/shared) for code reuse between web and mobile**
 - **Web authentication UI (login, registration, home with protected routes)**
 - **React Router DOM integration for navigation**
 - Tailwind CSS v4 with PostCSS integration
@@ -625,6 +651,30 @@ Examples:
 [web] fix: Resolve hydration mismatch in PWA mode
 [mobile] test: Add Maestro flows for navigation
 ```
+
+## Shared Code Architecture
+
+### Package Structure
+The `@niney/shared` package centralizes common code between web and mobile applications:
+
+- **Types**: All TypeScript interfaces and types are defined once and shared
+- **API Services**: Common API logic with platform-specific implementations possible
+- **Validation**: Shared form validation rules ensure consistency
+- **Constants**: API endpoints, configuration values shared across platforms
+
+### Import Best Practices
+```typescript
+// For runtime values (classes, functions, constants)
+import { StorageService, WebStorageAdapter } from '@niney/shared'
+
+// For types only (interfaces, type aliases)
+import type { User, ApiResponse } from '@niney/shared'
+```
+
+### Building and Linking
+1. Build shared package: `cd packages/shared && npm run build`
+2. Link to apps: Uses local file reference in package.json
+3. TypeScript compilation: Outputs to `dist/` with declaration files
 
 ## Performance Considerations
 

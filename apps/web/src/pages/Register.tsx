@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authService } from '../services/auth.service'
+import { Validator } from '@niney/shared'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -15,30 +16,12 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false)
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address'
-    }
-
-    // Username validation
-    if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters'
-    } else if (formData.username.length > 50) {
-      newErrors.username = 'Username must be less than 50 characters'
-    }
-
-    // Password validation
-    if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'
-    }
-
-    // Confirm password validation
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match'
-    }
+    const newErrors = Validator.validateRegisterForm(
+      formData.email,
+      formData.username,
+      formData.password,
+      formData.confirmPassword
+    )
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0

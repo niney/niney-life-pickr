@@ -1,0 +1,23 @@
+{
+  "name": "@niney/shared",
+  "version": "1.0.0",
+  "description": "Shared code for Niney Life Pickr web and mobile apps",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.5.4",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  }
+}

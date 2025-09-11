@@ -1,22 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { StorageService, WebStorageAdapter } from '@niney/shared'
+import type { User } from '@niney/shared'
 
 const Home = () => {
   const [count, setCount] = useState(0)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const navigate = useNavigate()
+  const storage = new StorageService(new WebStorageAdapter())
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (!storedUser) {
+    const userData = storage.getUserData()
+    if (!userData) {
       navigate('/login')
     } else {
-      setUser(JSON.parse(storedUser))
+      setUser(userData)
     }
   }, [navigate])
 
   const handleLogout = () => {
-    localStorage.removeItem('user')
+    storage.removeUserData()
+    storage.removeAuthToken()
     navigate('/login')
   }
 
@@ -34,7 +38,7 @@ const Home = () => {
               </p>
             </div>
           </div>
-          
+
           {user && (
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
               <div className="flex justify-between items-center">
@@ -52,7 +56,7 @@ const Home = () => {
             </div>
           )}
         </header>
-        
+
         <section className="space-y-4 mt-4">
           <div className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg p-6 text-white" role="region" aria-label="카운터 섹션">
             <div className="text-center">
@@ -67,7 +71,7 @@ const Home = () => {
               </button>
             </div>
           </div>
-          
+
           <nav className="grid grid-cols-2 gap-3 mt-6" aria-label="메인 네비게이션">
             <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-medium transition-all">
               음식 선택

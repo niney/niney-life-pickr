@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authService } from '../services/auth.service'
+import { StorageService, WebStorageAdapter } from '@niney/shared'
 
 export default function Login() {
   const navigate = useNavigate()
+  const storage = new StorageService(new WebStorageAdapter())
   const [email, setEmail] = useState('niney@ks.com')
   const [password, setPassword] = useState('tester')
   const [error, setError] = useState('')
@@ -23,7 +25,9 @@ export default function Login() {
 
       // Handle successful login
       console.log('Login successful:', response.data?.user)
-      localStorage.setItem('user', JSON.stringify(response.data?.user))
+      storage.setUserData(response.data?.user)
+      // TODO: Set auth token when JWT is implemented
+      // storage.setAuthToken(response.data?.token)
       // Redirect to home
       navigate('/')
       
