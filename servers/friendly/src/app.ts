@@ -1,59 +1,93 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import compression from 'compression';
+import Fastify, { FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import sensible from '@fastify/sensible';
+import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
 
 // Import routes
-import healthRouter from './routes/health.routes';
-import apiRouter from './routes/api.routes';
-import authRouter from './routes/authRoutes';
+import healthRoutes from './routes/health.routes';
+import apiRoutes from './routes/api.routes';
+import authRoutes from './routes/authRoutes';
 
-// Create Express app
-const app: Application = express();
+// Create Fastify app with TypeBox provider
+export const buildApp = async (): Promise<FastifyInstance> => {
+  const app = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL || 'info',
+      transport: process.env.NODE_ENV === 'development' 
+        ? {
+            target: 'pino-pretty',
+            options: {
+              translateTime: 'HH:MM:ss Z',
+              ignore: 'pid,hostname',
+            },
+          }
+        : undefined,
+    },
+    trustProxy: true,
+  }).withTypeProvider<TypeBoxTypeProvider>();
 
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(compression());
-app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Routes
-app.use('/health', healthRouter);
-app.use('/api', apiRouter);
-app.use('/api/auth', authRouter);
-
-// Root route
-app.get('/', (_req: Request, res: Response) => {
-  res.json({
-    name: 'Niney Life Pickr Friendly Server',
-    version: '1.0.0',
-    status: 'running',
-    timestamp: new Date().toISOString()
+  // Register plugins
+  await app.register(cors, {
+    origin: true,
+    credentials: true,
   });
-});
 
-// 404 handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Cannot ${req.method} ${req.url}`
+  await app.register(helmet, {
+    contentSecurityPolicy: false, // Disable for API
   });
-});
 
-// Error handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' ? 'Something went wrong!' : err.message
+  await app.register(sensible);
+
+  // Global error handler
+  app.setErrorHandler((error, request, reply) => {
+    const statusCode = error.statusCode || 500;
+    const message = error.message || 'Internal Server Error';
+    
+    app.log.error({
+      err: error,
+      req: request.raw,
+      res: reply.raw,
+    });
+
+    reply.status(statusCode).send({
+      result: false,
+      message,
+      statusCode,
+      timestamp: new Date().toISOString(),
+    });
   });
-});
 
-export default app;
+  // 404 handler
+  app.setNotFoundHandler((request, reply) => {
+    reply.status(404).send({
+      result: false,
+      message: `Route ${request.method} ${request.url} not found`,
+      statusCode: 404,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Root route
+  app.get('/', async () => {
+    return {
+      name: 'Niney Life Pickr Friendly Server',
+      version: '1.0.0',
+      status: 'running',
+      timestamp: new Date().toISOString(),
+    };
+  });
+
+  // Register routes
+  await app.register(healthRoutes, { prefix: '/health' });
+  await app.register(apiRoutes, { prefix: '/api' });
+  await app.register(authRoutes, { prefix: '/api/auth' });
+
+  return app;
+};
+
+export default buildApp;

@@ -1,19 +1,19 @@
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 import { SuccessResponse, ErrorResponse } from '../types/response.types';
 
 /**
- * Response helper utilities
+ * Response helper utilities for Fastify
  */
 export class ResponseHelper {
   /**
    * Send success response
    */
   static success<T>(
-    res: Response,
+    reply: FastifyReply,
     data: T,
     message: string = 'Success',
     statusCode: number = 200
-  ): Response {
+  ): FastifyReply {
     const response: SuccessResponse<T> = {
       result: true,
       message,
@@ -21,17 +21,17 @@ export class ResponseHelper {
       timestamp: new Date().toISOString()
     };
 
-    return res.status(statusCode).json(response);
+    return reply.code(statusCode).send(response);
   }
 
   /**
    * Send error response
    */
   static error(
-    res: Response,
+    reply: FastifyReply,
     message: string,
     statusCode: number = 500
-  ): Response {
+  ): FastifyReply {
     const response: ErrorResponse = {
       result: false,
       message,
@@ -39,88 +39,88 @@ export class ResponseHelper {
       timestamp: new Date().toISOString()
     };
 
-    return res.status(statusCode).json(response);
+    return reply.code(statusCode).send(response);
   }
 
   /**
    * Send validation error response
    */
   static validationError(
-    res: Response,
+    reply: FastifyReply,
     message: string = 'Validation failed'
-  ): Response {
-    return this.error(res, message, 400);
+  ): FastifyReply {
+    return this.error(reply, message, 400);
   }
 
   /**
    * Send unauthorized error response
    */
   static unauthorized(
-    res: Response,
+    reply: FastifyReply,
     message: string = 'Unauthorized'
-  ): Response {
-    return this.error(res, message, 401);
+  ): FastifyReply {
+    return this.error(reply, message, 401);
   }
 
   /**
    * Send forbidden error response
    */
   static forbidden(
-    res: Response,
+    reply: FastifyReply,
     message: string = 'Forbidden'
-  ): Response {
-    return this.error(res, message, 403);
+  ): FastifyReply {
+    return this.error(reply, message, 403);
   }
 
   /**
    * Send not found error response
    */
   static notFound(
-    res: Response,
+    reply: FastifyReply,
     message: string = 'Resource not found'
-  ): Response {
-    return this.error(res, message, 404);
+  ): FastifyReply {
+    return this.error(reply, message, 404);
   }
 
   /**
    * Send conflict error response (e.g., duplicate resource)
    */
   static conflict(
-    res: Response,
+    reply: FastifyReply,
     message: string = 'Resource already exists'
-  ): Response {
-    return this.error(res, message, 409);
+  ): FastifyReply {
+    return this.error(reply, message, 409);
   }
 
   /**
    * Send created response (201)
    */
   static created<T>(
-    res: Response,
+    reply: FastifyReply,
     data: T,
     message: string = 'Resource created successfully'
-  ): Response {
-    return this.success(res, data, message, 201);
+  ): FastifyReply {
+    return this.success(reply, data, message, 201);
   }
 
   /**
    * Send no content response (204)
    */
-  static noContent(res: Response): Response {
-    return res.status(204).send();
+  static noContent(reply: FastifyReply): FastifyReply {
+    return reply.code(204).send();
   }
 
   /**
    * Send paginated response
    */
   static paginated<T>(
-    res: Response,
+    reply: FastifyReply,
     items: T[],
     page: number,
     pageSize: number,
     total: number,
     message: string = 'Success'
-  ): Response {
+  ): FastifyReply {
     const totalPages = Math.ceil(total / pageSize);
 
     const response = {
@@ -140,7 +140,7 @@ export class ResponseHelper {
       timestamp: new Date().toISOString()
     };
 
-    return res.status(200).json(response);
+    return reply.code(200).send(response);
   }
 }
 

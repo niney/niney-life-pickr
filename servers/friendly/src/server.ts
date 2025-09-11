@@ -1,4 +1,4 @@
-import app from './app';
+import buildApp from './app';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
@@ -38,7 +38,7 @@ if (fs.existsSync(envConfigPath)) {
   }
 }
 
-const PORT = process.env.PORT || config.server.port;
+const PORT = Number(process.env.PORT || config.server.port);
 const HOST = process.env.HOST || config.server.host;
 
 // Initialize database and start server
@@ -52,9 +52,13 @@ async function startServer() {
     await migrator.migrate();
     console.log('✅ Migrations completed');
     
+    // Build Fastify app
+    const app = await buildApp();
+    
     // Start server
-    const server = app.listen(PORT, () => {
-  console.log(`
+    await app.listen({ port: PORT, host: HOST });
+    
+    console.log(`
 ╔════════════════════════════════════════════╗
 ║   Niney Life Pickr Friendly Server        ║
 ║   Node.js Backend Service                  ║
@@ -67,31 +71,30 @@ async function startServer() {
 
 Server is running at http://${HOST}:${PORT}
 Press Ctrl+C to stop
-  `);
-    });
+    `);
 
     // Graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM signal received: closing HTTP server');
-      server.close(async () => {
+    const closeGracefully = async (signal: string) => {
+      console.log(`\n${signal} signal received: closing HTTP server`);
+      
+      try {
+        await app.close();
         console.log('HTTP server closed');
+        
         await db.close();
         console.log('Database connection closed');
+        
         process.exit(0);
-      });
-    });
+      } catch (error) {
+        console.error('Error during graceful shutdown:', error);
+        process.exit(1);
+      }
+    };
 
-    process.on('SIGINT', () => {
-      console.log('\nSIGINT signal received: closing HTTP server');
-      server.close(async () => {
-        console.log('HTTP server closed');
-        await db.close();
-        console.log('Database connection closed');
-        process.exit(0);
-      });
-    });
+    process.on('SIGTERM', () => closeGracefully('SIGTERM'));
+    process.on('SIGINT', () => closeGracefully('SIGINT'));
 
-    return server;
+    return app;
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

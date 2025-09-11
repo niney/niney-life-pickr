@@ -1,167 +1,215 @@
-import { Router, Request, Response } from 'express';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { Type } from '@sinclair/typebox';
 import userService, { CreateUserDto } from '../services/userService';
 import { ResponseHelper } from '../utils/response.utils';
 import { AuthResponseData, UserListResponseData } from '../types/response.types';
 
-const router = Router();
+// Request body schemas using TypeBox
+const RegisterSchema = Type.Object({
+  email: Type.String({ format: 'email' }),
+  username: Type.String({ minLength: 3, maxLength: 50 }),
+  password: Type.String({ minLength: 6 })
+});
 
-/**
- * Register a new user
- * POST /api/auth/register
- */
-router.post('/register', async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { email, username, password } = req.body;
+const LoginSchema = Type.Object({
+  email: Type.String({ format: 'email' }),
+  password: Type.String()
+});
 
-    // Validate input
-    if (!email || !username || !password) {
-      return ResponseHelper.validationError(
-        res,
-        'Missing required fields: email, username, password'
-      );
-    }
-
-    // Simple validation
-    if (password.length < 6) {
-      return ResponseHelper.validationError(
-        res,
-        'Password must be at least 6 characters long'
-      );
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return ResponseHelper.validationError(
-        res,
-        'Invalid email format'
-      );
-    }
-
-    // Create user
-    const userData: CreateUserDto = {
-      email,
-      username,
-      password
-    };
-
-    const user = await userService.createUser(userData);
-
-    const responseData: AuthResponseData = {
-      user: {
-        id: user.id!,
-        email: user.email,
-        username: user.username,
-        provider: user.provider,
-        created_at: user.created_at,
-        is_active: user.is_active
+export default async function authRoutes(fastify: FastifyInstance) {
+  /**
+   * Register a new user
+   * POST /api/auth/register
+   */
+  fastify.post<{
+    Body: typeof RegisterSchema.static
+  }>('/register', {
+    schema: {
+      body: RegisterSchema,
+      response: {
+        201: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            user: Type.Object({
+              id: Type.Number(),
+              email: Type.String(),
+              username: Type.String(),
+              provider: Type.Optional(Type.String()),
+              created_at: Type.Optional(Type.String()),
+              is_active: Type.Optional(Type.Boolean())
+            })
+          }),
+          timestamp: Type.String()
+        })
       }
-    };
-
-    return ResponseHelper.created(
-      res,
-      responseData,
-      'User registered successfully'
-    );
-  } catch (error: any) {
-    console.error('Registration error:', error);
-
-    if (error.message.includes('already exists')) {
-      return ResponseHelper.conflict(res, error.message);
     }
+  }, async (request: FastifyRequest<{ Body: typeof RegisterSchema.static }>, reply: FastifyReply) => {
+    try {
+      const { email, username, password } = request.body;
 
-    return ResponseHelper.error(
-      res,
-      'Failed to register user',
-      500
-    );
-  }
-});
+      // Create user
+      const userData: CreateUserDto = {
+        email,
+        username,
+        password
+      };
 
-/**
- * Login user (simple hardcoded for now)
- * POST /api/auth/login
- */
-router.post('/login', async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { email, password } = req.body;
+      const user = await userService.createUser(userData);
 
-    if (!email || !password) {
-      return ResponseHelper.validationError(
-        res,
-        'Email and password are required'
+      const responseData: AuthResponseData = {
+        user: {
+          id: user.id!,
+          email: user.email,
+          username: user.username,
+          provider: user.provider,
+          created_at: user.created_at,
+          is_active: user.is_active
+        }
+      };
+
+      return ResponseHelper.created(
+        reply,
+        responseData,
+        'User registered successfully'
       );
-    }
+    } catch (error: any) {
+      fastify.log.error('Registration error:', error);
 
-    const user = await userService.verifyPassword(email, password);
-
-    if (!user) {
-      return ResponseHelper.unauthorized(
-        res,
-        'Invalid email or password'
-      );
-    }
-
-    const responseData: AuthResponseData = {
-      user: {
-        id: user.id!,
-        email: user.email,
-        username: user.username,
-        provider: user.provider,
-        last_login: user.last_login,
-        is_active: user.is_active
+      if (error.message.includes('already exists')) {
+        return ResponseHelper.conflict(reply, error.message);
       }
-      // token will be added here when JWT is implemented
-    };
 
-    return ResponseHelper.success(
-      res,
-      responseData,
-      'Login successful'
-    );
-  } catch (error: any) {
-    console.error('Login error:', error);
-    return ResponseHelper.error(
-      res,
-      'Failed to login',
-      500
-    );
-  }
-});
+      return ResponseHelper.error(
+        reply,
+        'Failed to register user',
+        500
+      );
+    }
+  });
 
-/**
- * Get all users (for testing)
- * GET /api/auth/users
- */
-router.get('/users', async (_req: Request, res: Response): Promise<Response> => {
-  try {
-    const users = await userService.getAllUsers();
+  /**
+   * Login user
+   * POST /api/auth/login
+   */
+  fastify.post<{
+    Body: typeof LoginSchema.static
+  }>('/login', {
+    schema: {
+      body: LoginSchema,
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            user: Type.Object({
+              id: Type.Number(),
+              email: Type.String(),
+              username: Type.String(),
+              provider: Type.Optional(Type.String()),
+              last_login: Type.Optional(Type.String()),
+              is_active: Type.Optional(Type.Boolean())
+            })
+          }),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request: FastifyRequest<{ Body: typeof LoginSchema.static }>, reply: FastifyReply) => {
+    try {
+      const { email, password } = request.body;
 
-    const responseData: UserListResponseData = {
-      users: users.map(user => ({
-        id: user.id!,
-        email: user.email,
-        username: user.username,
-        provider: user.provider,
-        created_at: user.created_at,
-        last_login: user.last_login,
-        is_active: user.is_active
-      })),
-      count: users.length
-    };
+      const user = await userService.verifyPassword(email, password);
 
-    return ResponseHelper.success(
-      res,
-      responseData,
-      'Users fetched successfully'
-    );
-  } catch (error: any) {
-    console.error('Error fetching users:', error);
-    return ResponseHelper.error(
-      res,
-      'Failed to fetch users',
-      500
-    );
-  }
-});
+      if (!user) {
+        return ResponseHelper.unauthorized(
+          reply,
+          'Invalid email or password'
+        );
+      }
 
-export default router;
+      const responseData: AuthResponseData = {
+        user: {
+          id: user.id!,
+          email: user.email,
+          username: user.username,
+          provider: user.provider,
+          last_login: user.last_login,
+          is_active: user.is_active
+        }
+        // token will be added here when JWT is implemented
+      };
+
+      return ResponseHelper.success(
+        reply,
+        responseData,
+        'Login successful'
+      );
+    } catch (error: any) {
+      fastify.log.error('Login error:', error);
+      return ResponseHelper.error(
+        reply,
+        'Failed to login',
+        500
+      );
+    }
+  });
+
+  /**
+   * Get all users (for testing)
+   * GET /api/auth/users
+   */
+  fastify.get('/users', {
+    schema: {
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            users: Type.Array(Type.Object({
+              id: Type.Number(),
+              email: Type.String(),
+              username: Type.String(),
+              provider: Type.Optional(Type.String()),
+              created_at: Type.Optional(Type.String()),
+              last_login: Type.Optional(Type.String()),
+              is_active: Type.Optional(Type.Boolean())
+            })),
+            count: Type.Number()
+          }),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (_request, reply) => {
+    try {
+      const users = await userService.getAllUsers();
+
+      const responseData: UserListResponseData = {
+        users: users.map(user => ({
+          id: user.id!,
+          email: user.email,
+          username: user.username,
+          provider: user.provider,
+          created_at: user.created_at,
+          last_login: user.last_login,
+          is_active: user.is_active
+        })),
+        count: users.length
+      };
+
+      return ResponseHelper.success(
+        reply,
+        responseData,
+        'Users fetched successfully'
+      );
+    } catch (error: any) {
+      fastify.log.error('Error fetching users:', error);
+      return ResponseHelper.error(
+        reply,
+        'Failed to fetch users',
+        500
+      );
+    }
+  });
+}
