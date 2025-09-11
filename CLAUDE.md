@@ -37,6 +37,8 @@ For changes affecting multiple projects, use multiple prefixes:
 The application follows a microservices architecture with separate frontend applications (web and mobile) and backend services:
 - **Frontend**: Web PWA and React Native mobile app share similar component structure and service patterns
 - **Backend**: Two specialized servers - "friendly" (Node.js for general API) and "smart" (Python for ML/AI features)
+- **Database**: SQLite for friendly server (lightweight, file-based), future PostgreSQL for production
+- **Authentication**: Simple email/password with bcrypt hashing (hardcoded for now, JWT planned)
 - **Configuration**: Centralized YAML configuration system shared across all services
 - **Communication**: RESTful APIs with CORS support for cross-origin requests
 
@@ -174,6 +176,9 @@ npm run lint       # Run ESLint
 npm run lint:fix   # Fix linting issues
 npm run type-check # TypeScript type checking without building
 
+# Database commands
+npm run db:reset   # Reset SQLite database (delete and recreate on next server start)
+
 # Testing with Vitest + Supertest
 npm test           # Run all tests in watch mode
 npm run test:run   # Run all tests once
@@ -181,6 +186,17 @@ npm run test:ui    # Open Vitest UI
 npm run test:coverage  # Run tests with coverage report
 npm run test:unit      # Run unit tests only
 npm run test:integration  # Run integration tests only
+
+# Test API endpoints (server must be running)
+# Register user
+curl -X POST http://localhost:4000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
+
+# Login
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
 ```
 
 ### Smart Server (Python ML/AI Backend)
@@ -252,6 +268,8 @@ mypy src                  # Type checking
 ### Friendly Server (Node.js Backend)
 - **Node.js** with TypeScript 5.9.2
 - **Express 5.1.0** web framework
+- **SQLite3** for database (file-based, lightweight)
+- **bcrypt** for password hashing
 - **Helmet** for security headers
 - **CORS** for cross-origin resource sharing
 - **Morgan** for HTTP request logging
@@ -310,6 +328,34 @@ Environment variables override YAML configuration:
 - `strictPort: true` ensures exact port usage
 
 ## Critical Implementation Details
+
+### Database Architecture (Friendly Server)
+
+#### SQLite Setup
+- Database file: `servers/friendly/data/niney.db` (auto-created on first run)
+- Migration system: Automatic migrations on server startup
+- Schema versioning: SQL files in `src/db/migrations/` (e.g., `001_create_users.sql`)
+
+#### Current Schema
+```sql
+users table:
+  - id (INTEGER PRIMARY KEY AUTOINCREMENT)
+  - email (TEXT UNIQUE)
+  - username (TEXT UNIQUE)
+  - password_hash (TEXT)
+  - provider (TEXT DEFAULT 'local')
+  - created_at, updated_at, last_login (DATETIME)
+  - is_active (BOOLEAN)
+
+sessions table (prepared for JWT):
+  - id, user_id, token, expires_at, created_at
+```
+
+#### Migration Pattern
+To add new schema changes:
+1. Create new SQL file: `src/db/migrations/002_your_change.sql`
+2. Server automatically applies on next startup
+3. Migration history tracked in `migrations` table
 
 ### TypeScript Configuration
 

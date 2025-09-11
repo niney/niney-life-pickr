@@ -11,6 +11,7 @@ dotenv.config();
 // Import routes
 import healthRouter from './routes/health.routes';
 import apiRouter from './routes/api.routes';
+import authRouter from './routes/authRoutes';
 
 // Create Express app
 const app: Application = express();
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/health', healthRouter);
 app.use('/api', apiRouter);
+app.use('/api/auth', authRouter);
 
 // Root route
 app.get('/', (_req: Request, res: Response) => {

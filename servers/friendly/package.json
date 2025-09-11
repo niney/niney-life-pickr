@@ -18,20 +18,25 @@
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run src/__tests__/integration",
-    "test:unit": "vitest run src/__tests__/unit"
+    "test:unit": "vitest run src/__tests__/unit",
+    "db:reset": "node scripts/db-reset.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/sqlite3": "^3.1.11",
+    "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "js-yaml": "^4.1.0",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",
