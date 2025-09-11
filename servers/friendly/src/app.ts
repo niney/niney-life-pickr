@@ -14,7 +14,7 @@ dotenv.config();
 // Import routes
 import healthRoutes from './routes/health.routes';
 import apiRoutes from './routes/api.routes';
-import authRoutes from './routes/authRoutes';
+import authRoutes from './routes/auth.routes';
 import docsRoutes from './routes/docs.routes';
 
 // Create Fastify app with TypeBox provider

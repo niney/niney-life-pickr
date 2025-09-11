@@ -48,7 +48,7 @@ niney-life-pickr/
     │   │   ├── app.ts          # Fastify app configuration
     │   │   ├── server.ts       # Server entry point
     │   │   ├── routes/         # API route definitions
-    │   │   │   ├── authRoutes.ts    # Authentication endpoints
+    │   │   │   ├── auth.routes.ts   # Authentication endpoints
     │   │   │   ├── health.routes.ts # Health check endpoints
     │   │   │   ├── api.routes.ts    # General API endpoints
     │   │   │   └── docs.routes.ts   # API documentation endpoints
