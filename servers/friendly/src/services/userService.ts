@@ -71,11 +71,11 @@ export class UserService {
   }
   
   /**
-   * Find user by email
+   * Find user by email (case-insensitive)
    */
   async findByEmail(email: string): Promise<User | undefined> {
     return db.get<User>(
-      'SELECT * FROM users WHERE email = ?',
+      'SELECT * FROM users WHERE LOWER(email) = LOWER(?)',
       [email]
     );
   }
@@ -128,8 +128,13 @@ export class UserService {
       [user.id]
     );
     
-    delete user.password_hash;
-    return user;
+    // Get updated user with last_login
+    const updatedUser = await db.get<User>(
+      'SELECT id, email, username, provider, created_at, last_login, is_active FROM users WHERE id = ?',
+      [user.id]
+    );
+    
+    return updatedUser || user;
   }
   
   /**

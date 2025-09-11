@@ -137,6 +137,10 @@ npm run test:ui    # Open Vitest UI
 npm run test:coverage  # Run tests with coverage report
 npm run test:unit      # Run unit tests only
 npm run test:integration  # Run integration tests only
+npm run test:auth  # Run auth routes tests only
+
+# Run a single test file
+npm test -- src/__tests__/integration/auth.routes.test.ts
 ```
 
 ### Smart Server (Python ML/AI Backend)
@@ -327,18 +331,22 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 - **Registration**: `POST /api/auth/register`
   - Email/username uniqueness validation
   - Password strength requirements (minimum 6 characters)
+  - Username length validation (3-50 characters)
   - Bcrypt password hashing with 10 salt rounds
   - Automatic account activation
+  - TypeBox schema validation
 
 - **Login**: `POST /api/auth/login`
-  - Email/password authentication
-  - Last login timestamp tracking
+  - Email/password authentication (case-insensitive email)
+  - Last login timestamp tracking with database update
+  - Returns updated user with last_login field
   - Standardized response format
 
 - **User Management**: `GET /api/auth/users`
   - User listing endpoint (for testing/admin purposes)
   - Excludes password hashes from responses
   - User count and details
+  - Consistent ordering by ID
 
 ### Security Features
 - **Password Hashing**: bcrypt with configurable salt rounds
@@ -392,8 +400,9 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 ## TypeScript Configuration
 
 ### Build Configuration
-- **Development**: Uses `tsconfig.json` (includes test files for IDE support)
+- **Development**: Uses `tsconfig.json` (excludes vitest.config.ts from includes)
 - **Production Build**: Uses `tsconfig.build.json` (excludes test files)
+- **Test Configuration**: Tests use `buildApp()` function for proper Fastify initialization
 - **Path Aliases**: Configured in both TypeScript and test runners
   - Friendly Server: `@routes`, `@controllers`, `@services`, `@middlewares`, `@utils`, `@types`
   - Mobile: `@/*` for src directory access
@@ -426,6 +435,16 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 
 ## Testing Strategy
 
+### Test Organization
+- **Friendly Server Tests**:
+  - Unit tests: `src/__tests__/unit/`
+  - Integration tests: `src/__tests__/integration/`
+  - Auth routes test: Comprehensive test suite for authentication endpoints
+    - Registration validation and error handling
+    - Login with case-insensitive email support
+    - User listing and management
+    - Performance and concurrent request handling
+
 ### Hybrid Testing Approach
 - **Unit/Integration Tests**: Business logic, utilities, components
   - Mobile: Jest with React Native Testing Library
@@ -441,6 +460,10 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 ```bash
 # Vitest (Friendly Server)
 npm test -- src/__tests__/unit/userService.test.ts
+npm test -- src/__tests__/integration/auth.routes.test.ts
+
+# Run specific test suite
+npm run test:auth  # Auth routes tests only
 
 # Jest (Mobile)
 npm test -- UserService.test.ts
@@ -497,12 +520,12 @@ cd apps/mobile && npm run test:e2e:studio
 
 ### Testing API Endpoints
 ```bash
-# Registration
+# Registration (validates email format, username length 3-50, password min 6)
 curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
 
-# Login
+# Login (case-insensitive email, updates last_login)
 curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
