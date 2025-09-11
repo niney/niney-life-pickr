@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Niney Life Pickr is a life decision-making application built as a multi-platform solution. Currently implementing web (React + Vite + TypeScript) and mobile (React Native) applications, with plans for dual backend services (Node.js "friendly" and Python "smart" servers).
+Niney Life Pickr is a life decision-making application built as a multi-platform solution with web (React + Vite + TypeScript), mobile (React Native), and backend (Node.js) applications. Future plans include a Python "smart" backend service with ML/AI capabilities.
 
 ## Architecture
 
@@ -18,8 +18,8 @@ niney-life-pickr/
 │   ├── web/                    # React + Vite PWA application
 │   │   ├── src/
 │   │   │   ├── components/     # Reusable UI components
-│   │   │   ├── config/         # TypeScript config loader (index.ts)
-│   │   │   ├── pages/          # Page components (Home.tsx)
+│   │   │   ├── config/         # TypeScript config loader
+│   │   │   ├── pages/          # Page components
 │   │   │   ├── hooks/          # Custom React hooks
 │   │   │   ├── services/       # API services
 │   │   │   ├── utils/          # Utility functions
@@ -37,12 +37,25 @@ niney-life-pickr/
 │       │   ├── hooks/          # Custom React hooks
 │       │   ├── utils/          # Utility functions
 │       │   └── types/          # TypeScript type definitions
+│       ├── tests/e2e/flows/    # Maestro E2E test flows
+│       ├── scripts/             # Cross-platform Maestro runner
 │       ├── android/            # Android native code
 │       └── ios/                # iOS native code
+└── servers/
+    └── friendly/               # Node.js backend service
+        ├── src/
+        │   ├── app.ts          # Express app configuration
+        │   ├── server.ts       # Server entry point
+        │   ├── routes/         # API route definitions
+        │   ├── controllers/    # Request handlers
+        │   ├── services/       # Business logic
+        │   ├── middlewares/    # Custom middleware
+        │   ├── utils/          # Utility functions
+        │   └── types/          # TypeScript type definitions
+        └── dist/               # Compiled JavaScript output
 ```
 
 ### Planned Architecture
-- **servers/friendly**: Node.js backend service
 - **servers/smart**: Python backend with ML/AI capabilities
 - **packages/**: Shared code between applications
 
@@ -73,11 +86,32 @@ npm start          # Start Metro bundler
 npm run android    # Run on Android device/emulator
 npm run ios        # Run on iOS device/simulator (macOS only)
 npm run lint       # Run ESLint
-npm test           # Run Jest tests
+npm test           # Run Jest unit tests
 
-# Android specific
+# E2E Testing with Maestro
+npm run test:e2e         # Run all Maestro E2E tests
+npm run test:e2e:smoke   # Run smoke test only
+npm run test:e2e:studio  # Open Maestro Studio for visual test creation
+npm run test:e2e:record  # Record new test flows
+npm run test:e2e:cloud   # Run tests on Maestro Cloud
+
+# Platform-specific
 cd android && ./gradlew.bat clean  # Clean Android build (Windows)
 cd android && ./gradlew clean      # Clean Android build (Mac/Linux)
+cd ios && pod install              # Install iOS dependencies (macOS only)
+```
+
+### Friendly Server (Node.js Backend)
+```bash
+cd servers/friendly
+npm run dev        # Start development server with hot reload (port 4000)
+npm run build      # Build TypeScript to JavaScript
+npm run start      # Start production server
+npm run start:prod # Start with NODE_ENV=production
+npm run clean      # Clean build directory
+npm run lint       # Run ESLint
+npm run lint:fix   # Fix linting issues
+npm run type-check # TypeScript type checking without building
 ```
 
 ## Technology Stack
@@ -98,7 +132,22 @@ cd android && ./gradlew clean      # Clean Android build (Mac/Linux)
 - **React Native Reanimated v4.1.0** for animations
 - **React Native Vector Icons v10.3.0** for icons
 - **React Native Worklets v0.5.1** for Reanimated support
+- **React Native Gesture Handler** for touch interactions
+- **React Native Safe Area Context** for device-safe layouts
+- **Maestro** for E2E testing with YAML-based test flows
+- **Testing Library React Native** for unit testing
 - **Babel plugin**: Uses `react-native-worklets/plugin` (not deprecated `react-native-reanimated/plugin`)
+
+### Friendly Server (Node.js Backend)
+- **Node.js** with TypeScript 5.9.2
+- **Express 5.1.0** web framework
+- **Helmet** for security headers
+- **CORS** for cross-origin resource sharing
+- **Morgan** for HTTP request logging
+- **Compression** for response compression
+- **js-yaml** for YAML config parsing
+- **Nodemon** for development hot reload
+- **ts-node** for TypeScript execution
 
 ## Configuration System
 
@@ -106,22 +155,41 @@ cd android && ./gradlew clean      # Clean Android build (Mac/Linux)
 - Configuration files stored in root `config/` directory
 - `base.yml`: Default configuration for development
 - `production.yml`: Production overrides (merged with base)
-- TypeScript loader at `apps/web/src/config/index.ts`
-- Environment variable overrides supported (VITE_PORT, VITE_HOST)
+- TypeScript loaders in each app load and parse configuration
+- Environment variable overrides supported
 
-### Port Management
-- Default port: 3000 (configured in `config/base.yml`)
-- `strictPort: true` ensures the server fails if port is occupied
-- Windows kill script (`kill-dev.cjs`) reads port from config to ensure correct process termination
+### Port Configuration
+- Web app: 3000 (development), 8080 (production)
+- Friendly server: 4000
+- Smart server (planned): 5000
+- `strictPort: true` ensures exact port usage
+
+### Production Configuration
+- External host binding (0.0.0.0)
+- PWA prompt mode instead of auto-update
+- API endpoint configuration
+- Performance optimizations
 
 ## Development Workflow
 
 ### Windows Process Management
-The project includes a Node.js script to handle development server cleanup on Windows:
-- `npm run kill`: Terminates any process using the configured port
-- `npm run dev:clean`: Kills existing processes before starting new dev server
-- Script reads port from `config/base.yml` or `VITE_PORT` environment variable
-- Uses Windows `netstat` and `taskkill` commands for process management
+- `npm run kill`: Terminates processes using configured port
+- `npm run dev:clean`: Kills existing processes before starting
+- Scripts read port from config files
+- Cross-platform compatibility via Node.js scripts
+
+### Mobile Development Setup
+#### Android Requirements
+- Android Studio with SDK
+- ANDROID_HOME environment variable
+- Path includes: `%ANDROID_HOME%\platform-tools`
+- JDK 17-20 (React Native requirement)
+- Android emulator or physical device
+
+#### iOS Requirements (macOS only)
+- Xcode with iOS Simulator
+- CocoaPods: `cd ios && pod install`
+- Apple Developer account for device testing
 
 ### Configuration Details
 
@@ -131,7 +199,7 @@ The project includes a Node.js script to handle development server cleanup on Wi
 - Content paths configured for all TypeScript/TSX files
 
 #### PWA Configuration
-- Auto-update registration type in development
+- Auto-update in development, prompt in production
 - Service worker with Workbox for offline support
 - Manifest at `public/manifest.json` with app metadata
 - Caching strategies for static assets and Google Fonts
@@ -139,60 +207,35 @@ The project includes a Node.js script to handle development server cleanup on Wi
 ## Testing Strategy
 
 ### Hybrid Testing Approach (Jest + E2E)
-The project follows a hybrid testing strategy:
-- **Unit/Integration Tests (Jest)**: For business logic, utilities, and component testing
-- **E2E Tests**: For critical user flows and cross-platform verification
+- **Unit/Integration Tests (Jest)**: Business logic, utilities, components
+- **E2E Tests**: Critical user flows and cross-platform verification
   - Web: Playwright
-  - Mobile: Maestro (planned)
+  - Mobile: Maestro
 
 ### Web Testing (Playwright)
-- Tests located in `apps/web/tests/e2e/`
-- Configuration in `apps/web/playwright.config.ts`
+- Tests in `apps/web/tests/e2e/`
 - Browsers tested: Chromium, Mobile Chrome, Mobile Safari
-- Firefox and Desktop Safari are disabled in config
 - Automatic dev server startup before tests
-
-```bash
-cd apps/web
-npm run test:e2e         # Run all E2E tests
-npm run test:e2e:ui      # UI mode for debugging
-npm run test:e2e:headed  # Run with visible browser
-```
+- HTML reporter for test results
+- Accessibility testing with axe-core
 
 ### Mobile Testing
 
 #### Unit Testing (Jest + React Native Testing Library)
-- Unit tests in `apps/mobile/__tests__/`
-- Configuration in `apps/mobile/jest.config.js`
-- Setup file in `apps/mobile/jest.setup.js`
-- Uses @testing-library/react-native (not deprecated react-test-renderer)
-
-```bash
-cd apps/mobile
-npm test                 # Run all Jest tests
-npm test -- --watch      # Watch mode
-```
+- Tests in `apps/mobile/__tests__/`
+- Comprehensive mocking setup in `jest.setup.js`
+- Transform ignore patterns for React Native modules
+- Module path mappings for TypeScript aliases
 
 #### E2E Testing (Maestro)
 - Test flows in `apps/mobile/tests/e2e/flows/`
-- Configuration in `apps/mobile/maestro.yaml`
+- Cross-platform runner script for Windows/macOS/Linux
 - Visual test creation with Maestro Studio
-- Cross-platform test execution (iOS/Android)
-
-```bash
-cd apps/mobile
-npm run test:e2e         # Run all E2E tests
-npm run test:e2e:smoke   # Run smoke test only
-npm run test:e2e:studio  # Open Maestro Studio
-npm run test:e2e:record  # Record new test flows
-npm run test:e2e:cloud   # Run on Maestro Cloud
-```
-
-Test flows available:
-- `smoke-test.yaml`: Basic app functionality verification
-- `app-launch.yaml`: App launch and initial screen
-- `counter-test.yaml`: Counter increment functionality
-- `navigation-test.yaml`: Menu navigation testing
+- Available test flows:
+  - `smoke-test.yaml`: Basic app functionality
+  - `app-launch.yaml`: App launch verification
+  - `counter-test.yaml`: Counter functionality
+  - `navigation-test.yaml`: Menu navigation
 
 ### Test Coverage Focus
 - Critical user paths (E2E)
@@ -201,30 +244,22 @@ Test flows available:
 - Component interactions
 - Error handling
 
-## Mobile Development Requirements
-
-### Android Setup
-- Android Studio with SDK
-- ANDROID_HOME environment variable
-- Path includes: `%ANDROID_HOME%\platform-tools` and `%ANDROID_HOME%\tools`
-- JDK 17-20 (React Native requirement)
-- Android SDK Build Tools 36.0.0
-
-### iOS Setup (macOS only)
-- Xcode with iOS Simulator
-- CocoaPods: `cd ios && pod install`
-
 ## Current Implementation Status
 
-- ✅ Web application foundation with React + Vite + TypeScript
+- ✅ Web application with React + Vite + TypeScript
 - ✅ Tailwind CSS v4 with PostCSS integration
 - ✅ PWA setup with offline capabilities
 - ✅ YAML-based configuration system
 - ✅ Windows-compatible development scripts
 - ✅ Home page with responsive design
-- ✅ E2E testing with Playwright
+- ✅ E2E testing with Playwright for web
 - ✅ Accessibility compliance (semantic HTML, ARIA labels)
-- ✅ React Native mobile app structure and navigation
+- ✅ React Native mobile app with navigation
+- ✅ Maestro E2E testing for mobile app
+- ✅ Node.js "friendly" backend service structure
 - 🔲 Mobile app feature parity with web
-- 🔲 Node.js "friendly" backend service
+- 🔲 Backend API implementation
 - 🔲 Python "smart" backend service with ML capabilities
+- 🔲 Database integration
+- 🔲 Authentication system
+- 🔲 Real-time features

@@ -8,6 +8,16 @@ server:
   host: "localhost"
   port: 3000
   strictPort: true # Must use this exact port
+  # Friendly server (Node.js backend)
+  friendly:
+    host: "localhost"
+    port: 4000
+    cors:
+      origin: "http://localhost:3000"
+  # Smart server (Python backend) - Future
+  smart:
+    host: "localhost"
+    port: 5000
 
 vite:
   clearScreen: true
