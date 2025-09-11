@@ -4,9 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Niney Life Pickr is a life decision-making application built as a multi-platform solution with web (React + Vite + TypeScript), mobile (React Native), and backend (Node.js) applications. Future plans include a Python "smart" backend service with ML/AI capabilities.
+Niney Life Pickr is a life decision-making application built as a multi-platform solution with web (React + Vite + TypeScript), mobile (React Native), and backend services (Node.js "friendly" server and Python "smart" ML/AI server).
 
-## Architecture
+## High-Level Architecture
+
+### Multi-Platform Architecture
+The application follows a microservices architecture with separate frontend applications (web and mobile) and backend services:
+- **Frontend**: Web PWA and React Native mobile app share similar component structure and service patterns
+- **Backend**: Two specialized servers - "friendly" (Node.js for general API) and "smart" (Python for ML/AI features)
+- **Configuration**: Centralized YAML configuration system shared across all services
+- **Communication**: RESTful APIs with CORS support for cross-origin requests
 
 ### Current Structure
 ```
@@ -43,22 +50,44 @@ niney-life-pickr/
 │       ├── android/            # Android native code
 │       └── ios/                # iOS native code
 └── servers/
-    └── friendly/               # Node.js backend service
+    ├── friendly/               # Node.js backend service
+    │   ├── src/
+    │   │   ├── app.ts          # Express app configuration
+    │   │   ├── server.ts       # Server entry point
+    │   │   ├── routes/         # API route definitions
+    │   │   ├── controllers/    # Request handlers
+    │   │   ├── services/       # Business logic
+    │   │   ├── middlewares/    # Custom middleware
+    │   │   ├── utils/          # Utility functions
+    │   │   └── types/          # TypeScript type definitions
+    │   └── dist/               # Compiled JavaScript output
+    └── smart/                  # Python ML/AI backend service
         ├── src/
-        │   ├── app.ts          # Express app configuration
-        │   ├── server.ts       # Server entry point
-        │   ├── routes/         # API route definitions
-        │   ├── controllers/    # Request handlers
-        │   ├── services/       # Business logic
-        │   ├── middlewares/    # Custom middleware
-        │   ├── utils/          # Utility functions
-        │   └── types/          # TypeScript type definitions
-        └── dist/               # Compiled JavaScript output
+        │   ├── api/            # FastAPI endpoints
+        │   ├── core/           # Core functionality
+        │   ├── models/         # ML models (future)
+        │   ├── services/       # Business logic (future)
+        │   ├── app.py          # FastAPI application
+        │   └── main.py         # Entry point
+        ├── tests/
+        │   ├── unit/           # Unit tests
+        │   └── integration/    # Integration tests
+        └── scripts/            # Development and production scripts
 ```
 
 ### Planned Architecture
-- **servers/smart**: Python backend with ML/AI capabilities
 - **packages/**: Shared code between applications
+
+## Quick Start Commands
+
+### First-Time Setup
+```bash
+# Install dependencies for all projects
+cd apps/web && npm install
+cd ../mobile && npm install
+cd ../../servers/friendly && npm install
+cd ../smart && python -m venv .venv && activate.bat && pip install -e ".[dev]"
+```
 
 ## Key Commands
 
@@ -66,6 +95,7 @@ niney-life-pickr/
 ```bash
 cd apps/web
 npm run dev        # Start development server on port 3000
+npm run dev:clean  # Kill existing dev server and start fresh (Windows)
 npm run build      # Build for production with TypeScript checking
 npm run preview    # Preview production build
 npm run lint       # Run ESLint
@@ -83,6 +113,11 @@ npm run test:e2e:report  # Show test report
 ### Mobile Application Development
 ```bash
 cd apps/mobile
+
+# Prerequisites for Android
+# Ensure Android emulator is running or device is connected
+adb devices        # Should show at least one device
+
 npm start          # Start Metro bundler
 npm run android    # Run on Android device/emulator
 npm run ios        # Run on iOS device/simulator (macOS only)
@@ -121,6 +156,46 @@ npm run test:ui    # Open Vitest UI
 npm run test:coverage  # Run tests with coverage report
 npm run test:unit      # Run unit tests only
 npm run test:integration  # Run integration tests only
+```
+
+### Smart Server (Python ML/AI Backend)
+```bash
+cd servers/smart
+
+# Virtual environment activation (Windows)
+activate.bat              # Activate .venv
+deactivate.bat            # Deactivate .venv
+
+# Virtual environment activation (Mac/Linux)
+source .venv/bin/activate # Activate .venv
+deactivate                # Deactivate .venv
+
+# Development
+python scripts/dev.py     # Start development server (port 5000)
+python scripts/start.py   # Start production server
+
+# Install dependencies (inside virtual environment)
+pip install -e .          # Install base dependencies
+pip install -e ".[dev]"   # Install with development tools
+pip install -e ".[ml]"    # Install with ML libraries (optional)
+
+# Testing with pytest
+pytest                    # Run all tests
+pytest tests/unit         # Run unit tests only
+pytest tests/integration  # Run integration tests only
+pytest --cov=src          # Run with coverage report
+pytest -m unit            # Run tests marked as unit
+pytest -m integration     # Run tests marked as integration
+
+# Code quality
+black src tests           # Format code
+isort src tests           # Sort imports
+ruff check src tests      # Lint code
+mypy src                  # Type checking
+
+# API Documentation
+# Visit http://localhost:5000/docs for Swagger UI
+# Visit http://localhost:5000/redoc for ReDoc
 ```
 
 ## Technology Stack
@@ -163,7 +238,28 @@ npm run test:integration  # Run integration tests only
 - **Supertest** for HTTP endpoint testing
 - **c8** for code coverage reporting
 
+### Smart Server (Python ML/AI Backend)
+- **Python 3.10+** with type hints
+- **FastAPI 0.115+** async web framework
+- **Uvicorn** ASGI server with hot reload
+- **Pydantic v2** for data validation
+- **PyYAML** for configuration parsing
+- **pytest** for unit and integration testing
+- **pytest-asyncio** for async test support
+- **pytest-cov** for coverage reporting
+- **Black** for code formatting
+- **Ruff** for linting
+- **mypy** for static type checking
+- **Optional ML libraries**: numpy, pandas, scikit-learn, tensorflow, torch, transformers
+
 ## Configuration System
+
+### Configuration Loading Order
+All services load configuration in this specific order (later overrides earlier):
+1. Default values in code
+2. `config/base.yml` - Base configuration
+3. `config/{environment}.yml` - Environment-specific config (test/production)
+4. Environment variables - Final override
 
 ### YAML-based Configuration
 - Configuration files stored in root `config/` directory
@@ -185,21 +281,29 @@ Environment variables override YAML configuration:
 ### Port Configuration
 - Web app: 3000 (development), 8080 (production)
 - Friendly server: 4000 (0 for tests - random port)
-- Smart server (planned): 5000
+- Smart server: 5000
 - `strictPort: true` ensures exact port usage
 
-## TypeScript Configuration
+## Critical Implementation Details
 
-### Build Configuration
+### TypeScript Configuration
+
+#### Build Configuration
 - **Development**: Uses `tsconfig.json` (includes test files for IDE support)
 - **Production Build**: Uses `tsconfig.build.json` (excludes test files)
 - **Path Aliases**: Configured in both TypeScript and test runners
   - Server: `@routes`, `@controllers`, `@services`, `@middlewares`, `@utils`, `@types`
   - Mobile: `@/*` for src directory access
 
-### IDE Support
+#### IDE Support
 - Test files included in main tsconfig for proper IDE type checking
 - Some imports may require `@ts-ignore` comments due to IDE limitations with `esModuleInterop`
+
+### Python Module Resolution (Smart Server)
+- Project uses editable install (`pip install -e .`) for module resolution
+- IntelliJ/PyCharm: Mark `servers/smart` as Sources Root
+- Uses `.env` file for PYTHONPATH configuration
+- Scripts in `scripts/` directory add parent to sys.path for imports
 
 ## Development Workflow
 
@@ -211,6 +315,8 @@ Environment variables override YAML configuration:
 
 ### Mobile Development Setup
 #### Android Requirements
+- **CRITICAL**: Android emulator or physical device MUST be running before Maestro tests
+- Android Studio with SDK
 - Android Studio with SDK
 - ANDROID_HOME environment variable
 - Path includes: `%ANDROID_HOME%\platform-tools`
@@ -228,6 +334,11 @@ Environment variables override YAML configuration:
 - Requires device/emulator to be running before test execution
 
 ## Testing Strategy
+
+### Test Execution Order
+1. **Unit Tests First**: Run unit tests during development for quick feedback
+2. **Integration Tests**: Run after unit tests pass to verify API contracts
+3. **E2E Tests**: Run before commits to verify user flows
 
 ### Hybrid Testing Approach (Jest + E2E)
 - **Unit/Integration Tests (Jest/Vitest)**: Business logic, utilities, components
@@ -262,26 +373,77 @@ Environment variables override YAML configuration:
   - `counter-test.yaml`: Counter functionality
   - `navigation-test.yaml`: Menu navigation
 
-### Server Testing (Vitest + Supertest)
+### Server Testing
 
-#### Unit Testing
+#### Friendly Server (Vitest + Supertest)
+##### Unit Testing
 - Tests in `servers/friendly/src/__tests__/unit/`
 - Mock external dependencies
 - Test individual functions and modules
 - Isolated testing environment
 
-#### Integration Testing
+##### Integration Testing
 - Tests in `servers/friendly/src/__tests__/integration/`
 - Test API endpoints with Supertest
 - Test middleware integration
 - Database interaction testing (when implemented)
 - Coverage threshold: 80% for all metrics (branches, functions, lines, statements)
 
-#### Test Configuration
+##### Test Configuration
 - Custom setup file with environment variables
 - Automatic mock reset and restoration
 - 10-second timeouts for tests and hooks
 - Path aliases support in test files
+
+#### Smart Server (pytest)
+##### Unit Testing
+- Tests in `servers/smart/tests/unit/`
+- Mock external dependencies and ML models
+- Test configuration loading and utilities
+- Isolated testing with fixtures
+
+##### Integration Testing
+- Tests in `servers/smart/tests/integration/`
+- Test FastAPI endpoints with TestClient
+- Async test support with pytest-asyncio
+- API endpoint validation
+- Health check and ML endpoint testing
+
+##### Test Configuration
+- pytest markers for test categorization (unit, integration, slow)
+- Async test mode auto-detection
+- Coverage reporting with pytest-cov
+- Fixtures for test clients and mock data
+
+### Running Single Tests
+
+#### Web (Playwright)
+```bash
+cd apps/web
+npx playwright test tests/e2e/home.spec.ts  # Run specific test file
+npx playwright test -g "should display"      # Run tests matching pattern
+```
+
+#### Mobile (Jest)
+```bash
+cd apps/mobile
+npm test -- App.test.tsx                     # Run specific test file
+npm test -- --testNamePattern="renders"      # Run tests matching pattern
+```
+
+#### Friendly Server (Vitest)
+```bash
+cd servers/friendly
+npm test -- src/__tests__/unit/config.test.ts  # Run specific test file
+npm test -- -t "should load"                   # Run tests matching pattern
+```
+
+#### Smart Server (pytest)
+```bash
+cd servers/smart
+pytest tests/unit/test_config.py              # Run specific test file
+pytest -k "test_default"                       # Run tests matching pattern
+```
 
 ### Test Coverage Focus
 - Critical user paths (E2E)
@@ -322,9 +484,11 @@ Environment variables override YAML configuration:
 - ✅ Maestro E2E testing for mobile app
 - ✅ Node.js "friendly" backend service structure
 - ✅ Vitest + Supertest testing for backend
+- ✅ Python "smart" backend service with FastAPI
+- ✅ pytest testing environment for smart server
 - 🔲 Mobile app feature parity with web
 - 🔲 Backend API implementation
-- 🔲 Python "smart" backend service with ML capabilities
+- 🔲 ML model integration in smart server
 - 🔲 Database integration
 - 🔲 Authentication system
 - 🔲 Real-time features
