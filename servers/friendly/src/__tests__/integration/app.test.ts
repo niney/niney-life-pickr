@@ -1,25 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import app from '../../app';
+import { buildApp } from '../../app';
+import { FastifyInstance } from 'fastify';
 
 describe('App Integration Tests', () => {
-  let server: any;
+  let app: FastifyInstance;
 
-  beforeAll(() => {
-    // Start server on random port for testing
-    server = app.listen(0);
+  beforeAll(async () => {
+    // Build and prepare app for testing
+    app = await buildApp();
+    await app.ready();
   });
 
-  afterAll(() => {
-    // Close server after tests
-    if (server) {
-      server.close();
-    }
+  afterAll(async () => {
+    // Close app after tests
+    await app.close();
   });
 
   describe('GET /', () => {
     it('should return server info', async () => {
-      const response = await request(app).get('/');
+      const response = await request(app.server).get('/');
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('name', 'Niney Life Pickr Friendly Server');
@@ -31,28 +31,28 @@ describe('App Integration Tests', () => {
 
   describe('404 Handler', () => {
     it('should return 404 for unknown routes', async () => {
-      const response = await request(app).get('/unknown-route');
+      const response = await request(app.server).get('/unknown-route');
 
       expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Not Found');
+      expect(response.body).toHaveProperty('result', false);
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('Cannot GET /unknown-route');
+      expect(response.body.message).toContain('Route GET /unknown-route not found');
     });
 
     it('should handle POST requests to unknown routes', async () => {
-      const response = await request(app)
+      const response = await request(app.server)
         .post('/unknown-route')
         .send({ test: 'data' });
 
       expect(response.status).toBe(404);
-      expect(response.body.message).toContain('Cannot POST /unknown-route');
+      expect(response.body.message).toContain('Route POST /unknown-route not found');
     });
   });
 
   describe('Middleware', () => {
     it('should parse JSON body', async () => {
       const testData = { test: 'data', number: 123 };
-      const response = await request(app)
+      const response = await request(app.server)
         .post('/api/test-echo') // This endpoint doesn't exist, but we can test parsing
         .send(testData)
         .set('Content-Type', 'application/json');
@@ -62,7 +62,7 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle CORS headers', async () => {
-      const response = await request(app)
+      const response = await request(app.server)
         .get('/')
         .set('Origin', 'http://localhost:3000');
 
@@ -70,7 +70,7 @@ describe('App Integration Tests', () => {
     });
 
     it('should have security headers from Helmet', async () => {
-      const response = await request(app).get('/');
+      const response = await request(app.server).get('/');
 
       // Check for some common Helmet headers
       expect(response.headers).toHaveProperty('x-dns-prefetch-control');

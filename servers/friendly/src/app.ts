@@ -121,15 +121,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(scalarApiReference, {
     routePrefix: '/reference',
     configuration: {
+      url: '/docs/json',
       theme: 'purple',
       darkMode: true,
       hideModels: false,
-      hideDownloadButton: false,
-      spec: {
-        url: '/docs/json'
-      }
+      hideDownloadButton: false
     }
-  } as any);
+  });
 
   // Global error handler
   app.setErrorHandler((error, request, reply) => {
