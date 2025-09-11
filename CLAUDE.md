@@ -357,6 +357,48 @@ To add new schema changes:
 2. Server automatically applies on next startup
 3. Migration history tracked in `migrations` table
 
+### API Response Standardization (Friendly Server)
+
+#### Response Structure
+All API endpoints return a standardized response format for consistency and type safety:
+
+```typescript
+// Success Response
+{
+  "result": true,
+  "message": "Success message",
+  "data": { /* response data */ },
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+
+// Error Response
+{
+  "result": false,
+  "message": "Error description",
+  "statusCode": 400,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### Response Helpers
+Located in `src/utils/response.utils.ts`:
+- `ResponseHelper.success()` - 200 OK
+- `ResponseHelper.created()` - 201 Created
+- `ResponseHelper.validationError()` - 400 Bad Request
+- `ResponseHelper.unauthorized()` - 401 Unauthorized
+- `ResponseHelper.forbidden()` - 403 Forbidden
+- `ResponseHelper.notFound()` - 404 Not Found
+- `ResponseHelper.conflict()` - 409 Conflict
+- `ResponseHelper.error()` - Custom error with status code
+
+#### Type Definitions
+Response types in `src/types/response.types.ts`:
+- `ApiResponse<T>` - Base response interface
+- `SuccessResponse<T>` - Success with typed data
+- `ErrorResponse` - Error with status code
+- `AuthResponseData` - Auth endpoint responses
+- `UserListResponseData` - User list responses
+
 ### TypeScript Configuration
 
 #### Build Configuration

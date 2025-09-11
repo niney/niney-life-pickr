@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import userService, { CreateUserDto } from '../services/userService';
+import { ResponseHelper } from '../utils/response.utils';
+import { AuthResponseData, UserListResponseData } from '../types/response.types';
 
 const router = Router();
 
@@ -10,53 +12,68 @@ const router = Router();
 router.post('/register', async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email, username, password } = req.body;
-    
+
     // Validate input
     if (!email || !username || !password) {
-      return res.status(400).json({
-        error: 'Missing required fields: email, username, password'
-      });
+      return ResponseHelper.validationError(
+        res,
+        'Missing required fields: email, username, password'
+      );
     }
-    
+
     // Simple validation
     if (password.length < 6) {
-      return res.status(400).json({
-        error: 'Password must be at least 6 characters long'
-      });
+      return ResponseHelper.validationError(
+        res,
+        'Password must be at least 6 characters long'
+      );
     }
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        error: 'Invalid email format'
-      });
+      return ResponseHelper.validationError(
+        res,
+        'Invalid email format'
+      );
     }
-    
+
     // Create user
     const userData: CreateUserDto = {
       email,
       username,
       password
     };
-    
+
     const user = await userService.createUser(userData);
-    
-    return res.status(201).json({
-      message: 'User created successfully',
-      user
-    });
+
+    const responseData: AuthResponseData = {
+      user: {
+        id: user.id!,
+        email: user.email,
+        username: user.username,
+        provider: user.provider,
+        created_at: user.created_at,
+        is_active: user.is_active
+      }
+    };
+
+    return ResponseHelper.created(
+      res,
+      responseData,
+      'User registered successfully'
+    );
   } catch (error: any) {
     console.error('Registration error:', error);
-    
+
     if (error.message.includes('already exists')) {
-      return res.status(409).json({
-        error: error.message
-      });
+      return ResponseHelper.conflict(res, error.message);
     }
-    
-    return res.status(500).json({
-      error: 'Failed to register user'
-    });
+
+    return ResponseHelper.error(
+      res,
+      'Failed to register user',
+      500
+    );
   }
 });
 
@@ -67,31 +84,47 @@ router.post('/register', async (req: Request, res: Response): Promise<Response> 
 router.post('/login', async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
-      return res.status(400).json({
-        error: 'Email and password are required'
-      });
+      return ResponseHelper.validationError(
+        res,
+        'Email and password are required'
+      );
     }
-    
+
     const user = await userService.verifyPassword(email, password);
-    
+
     if (!user) {
-      return res.status(401).json({
-        error: 'Invalid email or password'
-      });
+      return ResponseHelper.unauthorized(
+        res,
+        'Invalid email or password'
+      );
     }
-    
-    // For now, just return user data (no JWT yet)
-    return res.json({
-      message: 'Login successful',
-      user
-    });
-  } catch (error) {
+
+    const responseData: AuthResponseData = {
+      user: {
+        id: user.id!,
+        email: user.email,
+        username: user.username,
+        provider: user.provider,
+        last_login: user.last_login,
+        is_active: user.is_active
+      }
+      // token will be added here when JWT is implemented
+    };
+
+    return ResponseHelper.success(
+      res,
+      responseData,
+      'Login successful'
+    );
+  } catch (error: any) {
     console.error('Login error:', error);
-    return res.status(500).json({
-      error: 'Failed to login'
-    });
+    return ResponseHelper.error(
+      res,
+      'Failed to login',
+      500
+    );
   }
 });
 
@@ -102,12 +135,32 @@ router.post('/login', async (req: Request, res: Response): Promise<Response> => 
 router.get('/users', async (_req: Request, res: Response): Promise<Response> => {
   try {
     const users = await userService.getAllUsers();
-    return res.json({ users });
-  } catch (error) {
+
+    const responseData: UserListResponseData = {
+      users: users.map(user => ({
+        id: user.id!,
+        email: user.email,
+        username: user.username,
+        provider: user.provider,
+        created_at: user.created_at,
+        last_login: user.last_login,
+        is_active: user.is_active
+      })),
+      count: users.length
+    };
+
+    return ResponseHelper.success(
+      res,
+      responseData,
+      'Users fetched successfully'
+    );
+  } catch (error: any) {
     console.error('Error fetching users:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch users'
-    });
+    return ResponseHelper.error(
+      res,
+      'Failed to fetch users',
+      500
+    );
   }
 });
 
