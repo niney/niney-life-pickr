@@ -22,7 +22,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL || 'info',
-      transport: process.env.NODE_ENV === 'development' 
+      transport: process.env.NODE_ENV === 'development'
         ? {
             target: 'pino-pretty',
             options: {
@@ -66,7 +66,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       },
       servers: [
         {
-          url: process.env.NODE_ENV === 'production' 
+          url: process.env.NODE_ENV === 'production'
             ? 'https://api.nineylifepickr.com'
             : `http://localhost:${process.env.PORT || 4000}`,
           description: process.env.NODE_ENV === 'production' ? 'Production' : 'Development'
@@ -111,8 +111,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     },
     staticCSP: false,
     transformStaticCSP: (header) => header,
-    transformSpecification: (swaggerObject) => { 
-      return swaggerObject 
+    transformSpecification: (swaggerObject) => {
+      return swaggerObject
     },
     transformSpecificationClone: true
   });
@@ -129,13 +129,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
         url: '/docs/json'
       }
     }
-  });
+  } as any);
 
   // Global error handler
   app.setErrorHandler((error, request, reply) => {
     const statusCode = error.statusCode || 500;
     const message = error.message || 'Internal Server Error';
-    
+
     app.log.error({
       err: error,
       req: request.raw,
