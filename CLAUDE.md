@@ -201,7 +201,7 @@ mypy src                  # Type checking
 - **API Service Classes**: BaseApiService with fetch wrapper, AuthService
 - **Validation Utilities**: Form validation rules and helpers
 - **Storage Abstraction**: Platform-agnostic storage interface
-- **Shared Styles**: Authentication styles for web and mobile
+- **Shared Authentication Styles**: Tailwind CSS classes for web components
 
 ### Web Application
 - **React 19.1.1** with TypeScript 5.8.3
@@ -404,22 +404,22 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 ## Shared Styles System
 
 ### Authentication Styles
-The shared package provides a comprehensive style system for authentication screens that works across web and mobile platforms:
+The shared package provides Tailwind CSS class strings for web components and mobile-specific styles:
 
 ```typescript
 // packages/shared/src/styles/auth.styles.ts
 export const authStyles = {
-  container: { /* Wrappers and content containers */ },
-  typography: { /* Text styles and labels */ },
-  form: { /* Form wrappers and field groups */ },
-  input: { /* Input field base and variants */ },
-  button: { /* Button styles */ },
-  alert: { /* Error and success messages */ },
-  mobile: { /* React Native specific styles */ }
+  container: { /* Tailwind classes for containers */ },
+  typography: { /* Tailwind classes for text */ },
+  form: { /* Tailwind classes for forms */ },
+  input: { /* Tailwind classes for inputs */ },
+  button: { /* Tailwind classes for buttons */ },
+  alert: { /* Tailwind classes for alerts */ },
+  mobile: { /* NativeWind classes for React Native */ }
 }
 ```
 
-### Helper Functions
+### Shared Resources
 - `getInputStyles(position, hasError)` - For grouped inputs (login)
 - `getRegisterInputStyles(hasError)` - For individual inputs (register)
 - `getButtonStyles()` - For primary buttons
@@ -558,25 +558,24 @@ cd apps/mobile && npm run test:e2e:studio
 
 ### ✅ Completed
 - Web application with React + Vite + TypeScript
-- **Shared package (@niney/shared) for code reuse between web and mobile**
-- **Shared authentication styles system**
-- **Web authentication UI (login, registration, home with protected routes)**
-- **React Router DOM integration for navigation**
+- Shared package (@niney/shared) for code reuse between web and mobile
+- Web authentication UI (login, registration, home with protected routes)
+- React Router DOM integration for navigation
 - Tailwind CSS v4 with PostCSS integration
 - PWA setup with offline capabilities
 - YAML-based configuration system
 - Windows-compatible development scripts
 - E2E testing with Playwright for web
 - React Native mobile app with navigation
-- **NativeWind integration for Tailwind CSS in React Native**
+- NativeWind integration for Tailwind CSS in React Native
 - Maestro E2E testing for mobile app
-- **Fastify-based backend service with comprehensive API documentation**
-- **SQLite database integration with automated migrations**
-- **Complete authentication system (registration, login, user management)**
-- **OpenAPI 3.0 specification with multiple documentation formats**
-- **Standardized API response format with TypeScript validation**
-- **Multiple API documentation interfaces (Swagger UI, Scalar, AI-friendly)**
-- **Route-specific documentation generation (auth, health, api)**
+- Fastify-based backend service with comprehensive API documentation
+- SQLite database integration with automated migrations
+- Complete authentication system (registration, login, user management)
+- OpenAPI 3.0 specification with multiple documentation formats
+- Standardized API response format with TypeScript validation
+- Multiple API documentation interfaces (Swagger UI, Scalar, AI-friendly)
+- Route-specific documentation generation (auth, health, api)
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
@@ -584,6 +583,7 @@ cd apps/mobile && npm run test:e2e:studio
 ### 🔲 In Progress
 - JWT token authentication implementation
 - Mobile app feature parity with web
+- Shared design system between web and mobile
 - Backend business logic implementation
 - ML model integration in smart server
 - Real-time features
