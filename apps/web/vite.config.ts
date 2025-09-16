@@ -5,6 +5,11 @@ import { config } from './src/config'
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      'react-native': 'react-native-web',
+    },
+  },
   plugins: [
     react(),
     VitePWA({

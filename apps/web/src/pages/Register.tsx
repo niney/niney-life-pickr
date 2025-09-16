@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authService } from '../services/auth.service'
-import { 
+import {
   Validator,
-  authStyles,
-  getRegisterInputStyles,
-  getButtonStyles,
   formFields,
   authText
 } from '@niney/shared'
+import { Button, Input, Alert } from '@niney/shared/src/components'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -34,8 +32,7 @@ export default function Register() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+  const handleChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }))
     // Clear error for this field when user starts typing
     if (errors[name]) {
@@ -43,8 +40,7 @@ export default function Register() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     setError('')
 
     if (!validateForm()) {
@@ -78,121 +74,121 @@ export default function Register() {
   }
 
   return (
-    <div className={authStyles.container.wrapper}>
-      <div className={authStyles.container.content}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        {/* Header Section */}
         <div>
-          <h2 className={`mt-6 ${authStyles.typography.title}`}>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
             {authText.register.title}
           </h2>
-          <p className={`mt-2 ${authStyles.typography.subtitle}`}>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             {authText.register.subtitle}
           </p>
-          <p className={`mt-2 ${authStyles.typography.subtitle}`}>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             {authText.register.hasAccount}{' '}
-            <Link to="/login" className={authStyles.typography.link}>
+            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
               {authText.register.loginLink}
             </Link>
           </p>
         </div>
-        <form className={authStyles.form.wrapper} onSubmit={handleSubmit}>
-          <div className={authStyles.form.fieldGroup}>
+
+        {/* Form Section */}
+        <div className="mt-8 space-y-6">
+          <div className="space-y-4">
             <div>
-              <label htmlFor="email" className={authStyles.typography.labelVisible}>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {formFields.email.label}
               </label>
-              <input
-                id="email"
-                name="email"
-                type={formFields.email.type}
-                autoComplete={formFields.email.autoComplete}
-                required
-                className={`mt-1 ${getRegisterInputStyles(!!errors.email)}`}
-                placeholder={formFields.email.placeholder}
-                value={formData.email}
-                onChange={handleChange}
-              />
+              <div className="mt-1">
+                <Input
+                  type="email"
+                  placeholder={formFields.email.placeholder}
+                  value={formData.email}
+                  onChangeText={(value) => handleChange('email', value)}
+                  hasError={!!errors.email}
+                  position="single"
+                />
+              </div>
               {errors.email && (
-                <p className={`mt-1 ${authStyles.typography.errorText}`}>{errors.email}</p>
+                <p className="mt-2 text-sm text-red-600">{errors.email}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="username" className={authStyles.typography.labelVisible}>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {formFields.username.label}
               </label>
-              <input
-                id="username"
-                name="username"
-                type={formFields.username.type}
-                autoComplete={formFields.username.autoComplete}
-                required
-                className={`mt-1 ${getRegisterInputStyles(!!errors.username)}`}
-                placeholder={formFields.username.placeholder}
-                value={formData.username}
-                onChange={handleChange}
-              />
+              <div className="mt-1">
+                <Input
+                  type="text"
+                  placeholder={formFields.username.placeholder}
+                  value={formData.username}
+                  onChangeText={(value) => handleChange('username', value)}
+                  hasError={!!errors.username}
+                  position="single"
+                />
+              </div>
               {errors.username && (
-                <p className={`mt-1 ${authStyles.typography.errorText}`}>{errors.username}</p>
+                <p className="mt-2 text-sm text-red-600">{errors.username}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="password" className={authStyles.typography.labelVisible}>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {formFields.newPassword.label}
               </label>
-              <input
-                id="password"
-                name="password"
-                type={formFields.newPassword.type}
-                autoComplete={formFields.newPassword.autoComplete}
-                required
-                className={`mt-1 ${getRegisterInputStyles(!!errors.password)}`}
-                placeholder={formFields.newPassword.placeholder}
-                value={formData.password}
-                onChange={handleChange}
-              />
+              <div className="mt-1">
+                <Input
+                  type="password"
+                  placeholder={formFields.newPassword.placeholder}
+                  value={formData.password}
+                  onChangeText={(value) => handleChange('password', value)}
+                  hasError={!!errors.password}
+                  position="single"
+                />
+              </div>
               {errors.password && (
-                <p className={`mt-1 ${authStyles.typography.errorText}`}>{errors.password}</p>
+                <p className="mt-2 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className={authStyles.typography.labelVisible}>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {formFields.confirmPassword.label}
               </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={formFields.confirmPassword.type}
-                autoComplete={formFields.confirmPassword.autoComplete}
-                required
-                className={`mt-1 ${getRegisterInputStyles(!!errors.confirmPassword)}`}
-                placeholder={formFields.confirmPassword.placeholder}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
+              <div className="mt-1">
+                <Input
+                  type="password"
+                  placeholder={formFields.confirmPassword.placeholder}
+                  value={formData.confirmPassword}
+                  onChangeText={(value) => handleChange('confirmPassword', value)}
+                  hasError={!!errors.confirmPassword}
+                  position="single"
+                />
+              </div>
               {errors.confirmPassword && (
-                <p className={`mt-1 ${authStyles.typography.errorText}`}>{errors.confirmPassword}</p>
+                <p className="mt-2 text-sm text-red-600">{errors.confirmPassword}</p>
               )}
             </div>
           </div>
 
           {error && (
-            <div className={authStyles.alert.error}>
-              <div className={authStyles.alert.errorText}>{error}</div>
-            </div>
+            <Alert variant="error">
+              {error}
+            </Alert>
           )}
 
-          <div>
-            <button
-              type="submit"
+          <div className="mt-6">
+            <Button
               disabled={isLoading}
-              className={getButtonStyles()}
+              loading={isLoading}
+              variant="primary"
+              onPress={handleSubmit}
             >
               {isLoading ? authText.register.loadingButton : authText.register.submitButton}
-            </button>
+            </Button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )

@@ -1,15 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authService } from '../services/auth.service'
-import { 
-  StorageService, 
+import {
+  StorageService,
   WebStorageAdapter,
-  authStyles,
-  getInputStyles,
-  getButtonStyles,
   formFields,
   authText
 } from '@niney/shared'
+import { Button, Input, Alert } from '@niney/shared/src/components'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -19,8 +17,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     setError('')
     setIsLoading(true)
 
@@ -47,75 +44,70 @@ export default function Login() {
   }
 
   return (
-    <div className={authStyles.container.wrapper}>
-      <div className={authStyles.container.content}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        {/* Header Section */}
         <div>
-          <h2 className={`mt-6 ${authStyles.typography.title}`}>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
             {authText.login.title}
           </h2>
-          <p className={`mt-2 ${authStyles.typography.subtitle}`}>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             {authText.login.subtitle}
           </p>
-          <p className={`mt-2 ${authStyles.typography.subtitle}`}>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             {authText.login.noAccount}{' '}
-            <Link to="/register" className={authStyles.typography.link}>
+            <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
               {authText.login.registerLink}
             </Link>
           </p>
         </div>
-        <form className={authStyles.form.wrapper} onSubmit={handleSubmit}>
-          <input type="hidden" name="remember" value="true" />
-          <div className={authStyles.form.inputGroup}>
+
+        {/* Form Section */}
+        <div className="mt-8 space-y-6">
+          <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email-address" className={authStyles.typography.label}>
+              <label htmlFor="email" className="sr-only">
                 {formFields.email.label}
               </label>
-              <input
-                id="email-address"
-                name={formFields.email.name}
-                type={formFields.email.type}
-                autoComplete={formFields.email.autoComplete}
-                required
-                className={getInputStyles('top')}
+              <Input
+                type="email"
+                position="top"
                 placeholder={formFields.email.placeholder}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChangeText={setEmail}
               />
             </div>
             <div>
-              <label htmlFor="password" className={authStyles.typography.label}>
+              <label htmlFor="password" className="sr-only">
                 {formFields.password.label}
               </label>
-              <input
-                id="password"
-                name={formFields.password.name}
-                type={formFields.password.type}
-                autoComplete={formFields.password.autoComplete}
-                required
-                className={getInputStyles('bottom')}
+              <Input
+                type="password"
+                position="bottom"
                 placeholder={formFields.password.placeholder}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChangeText={setPassword}
               />
             </div>
           </div>
 
           {error && (
-            <div className={authStyles.alert.error}>
-              <div className={authStyles.alert.errorText}>{error}</div>
-            </div>
+            <Alert variant="error">
+              {error}
+            </Alert>
           )}
 
           <div>
-            <button
-              type="submit"
+            <Button
               disabled={isLoading}
-              className={getButtonStyles()}
+              loading={isLoading}
+              variant="primary"
+              onPress={handleSubmit}
             >
               {isLoading ? authText.login.loadingButton : authText.login.submitButton}
-            </button>
+            </Button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )

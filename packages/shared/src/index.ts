@@ -18,12 +18,5 @@ export * from './services'
 // Utils
 export * from './utils'
 
-// Styles
-export { 
-  authStyles, 
-  getInputStyles, 
-  getRegisterInputStyles, 
-  getButtonStyles,
-  formFields,
-  authText
-} from './styles/auth.styles'
+// Text constants
+export { formFields, authText } from './styles'
