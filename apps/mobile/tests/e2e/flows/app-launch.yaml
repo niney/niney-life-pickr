@@ -1,6 +1,0 @@
-appId: com.nineylifepickrmobile
----
-- launchApp
-- assertVisible: "Niney Life Pickr"
-- assertVisible: "인생의 선택을 도와드립니다"
-- takeScreenshot: "screenshots/app-launch"

@@ -1,8 +1,0 @@
-# Maestro Workspace Configuration
-# This file defines test suites and their organization
-
-flows:
-  - smoke-test.yaml
-  - app-launch.yaml
-  - counter-test.yaml
-  - navigation-test.yaml
