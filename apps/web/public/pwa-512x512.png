@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="512" height="512" rx="85" fill="#007AFF"/>
+<path d="M128 256C128 185.31 185.31 128 256 128C326.69 128 384 185.31 384 256C384 326.69 326.69 384 256 384C185.31 384 128 326.69 128 256Z" fill="white"/>
+<path d="M256 192C220.65 192 192 220.65 192 256C192 291.35 220.65 320 256 320C291.35 320 320 291.35 320 256C320 220.65 291.35 192 256 192Z" fill="#007AFF"/>
+<text x="256" y="440" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="48" font-weight="bold">Life Pickr</text>
+</svg>
