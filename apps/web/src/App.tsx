@@ -5,6 +5,9 @@ import type { AppConfig } from './utils/config'
 
 function App() {
   const [appInfo, setAppInfo] = useState<AppConfig['app'] | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   // 컴포넌트 마운트 시 설정 로드
   useEffect(() => {
@@ -20,6 +23,31 @@ function App() {
     loadAppConfig();
   }, [])
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!email || !password) {
+      alert('이메일과 비밀번호를 모두 입력해주세요.')
+      return
+    }
+
+    setIsLoading(true)
+    
+    // 로그인 시뮬레이션
+    setTimeout(() => {
+      setIsLoading(false)
+      alert('로그인이 완료되었습니다!')
+    }, 1000)
+  }
+
+  const handleForgotPassword = () => {
+    alert('비밀번호 찾기 기능을 구현할 예정입니다.')
+  }
+
+  const handleSignUp = () => {
+    alert('회원가입 페이지로 이동합니다.')
+  }
+
   return (
     <div className="app">
       <div className="container">
@@ -34,13 +62,57 @@ function App() {
         </header>
 
         <main className="main">
-          <div className="card">
-            <h2>환영합니다!</h2>
-            <p>더 나은 라이프스타일을 위한 선택을 도와드립니다.</p>
+          <div className="login-card">
+            <h2>로그인</h2>
+            <p>계정에 로그인하여 시작하세요</p>
             
-            <div className="actions">
-              <button className="btn btn-primary">시작하기</button>
-              <button className="btn btn-secondary">더 알아보기</button>
+            <form onSubmit={handleLogin} className="login-form">
+              <div className="form-group">
+                <label htmlFor="email">이메일</label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="이메일을 입력하세요"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="password">비밀번호</label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  required
+                />
+              </div>
+
+              <button 
+                type="button" 
+                className="forgot-password"
+                onClick={handleForgotPassword}
+              >
+                비밀번호를 잊으셨나요?
+              </button>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary login-btn"
+                disabled={isLoading}
+              >
+                {isLoading ? '로그인 중...' : '로그인'}
+              </button>
+            </form>
+
+            <div className="signup-link">
+              <span>계정이 없으신가요? </span>
+              <button type="button" onClick={handleSignUp} className="link-btn">
+                회원가입
+              </button>
             </div>
           </div>
         </main>

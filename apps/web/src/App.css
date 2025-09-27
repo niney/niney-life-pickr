@@ -60,29 +60,118 @@ body {
   padding: 2rem;
 }
 
-.card {
+.login-card {
   text-align: center;
 }
 
-.card h2 {
+.login-card h2 {
   font-size: 1.8rem;
   color: #2d3748;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   font-weight: 600;
 }
 
-.card p {
+.login-card p {
   font-size: 1rem;
   color: #4a5568;
   margin-bottom: 2rem;
   line-height: 1.6;
 }
 
-.actions {
+.login-form {
   display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #fff;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input::placeholder {
+  color: #a0aec0;
+}
+
+.forgot-password {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: right;
+  padding: 0;
+  margin-bottom: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.forgot-password:hover {
+  color: #5a67d8;
+  text-decoration: underline;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.login-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-btn:disabled:hover {
+  background: #a0aec0;
+  transform: none;
+}
+
+.signup-link {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.link-btn:hover {
+  color: #5a67d8;
+  text-decoration: underline;
 }
 
 .btn {
@@ -151,14 +240,20 @@ body {
     flex: 1;
     display: flex;
     align-items: center;
+    padding: 1.5rem;
   }
   
-  .actions {
-    flex-direction: column;
-    align-items: center;
+  .login-card {
+    width: 100%;
   }
   
-  .btn {
-    width: 200px;
+  .form-group input {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+  
+  .login-btn {
+    padding: 1rem;
+    font-size: 1.1rem;
   }
 }
