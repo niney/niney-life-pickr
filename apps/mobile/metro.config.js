@@ -14,6 +14,9 @@ const config = {
     path.resolve(__dirname, '../..'),
   ],
   resolver: {
+    alias: {
+      '@shared': path.resolve(__dirname, '../shared'),
+    },
     // 상위 디렉토리의 node_modules도 해결할 수 있도록 설정
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),

@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InputField } from '../../../shared/components';
+import { InputField } from '@shared/components';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');

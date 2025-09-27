@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { getAppInfo } from './utils/config'
 import type { AppConfig } from './utils/config'
-import { InputField } from '../../shared/components'
+import { InputField } from '@shared/components'
 
 function App() {
   const [appInfo, setAppInfo] = useState<AppConfig['app'] | null>(null)
