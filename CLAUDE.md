@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Niney Life Pickr is a life decision-making application built as a multi-platform solution with web (React + Vite + TypeScript), mobile (React Native), and backend services (Node.js Fastify + Python FastAPI).
+Niney Life Pickr is a life decision-making application with backend services (Node.js Fastify + Python FastAPI). The web frontend and shared packages are currently being rebuilt from scratch.
 
 ## Architecture
 
@@ -15,42 +15,7 @@ niney-life-pickr/
 │   ├── base.yml                # Base configuration for all environments
 │   ├── test.yml                # Test environment overrides
 │   └── production.yml          # Production-specific overrides
-├── packages/
-│   └── shared/                 # Shared code between web and mobile
-│       ├── src/
-│       │   ├── types/          # Common TypeScript types
-│       │   ├── services/       # API service classes
-│       │   ├── utils/          # Shared utility functions
-│       │   ├── constants/      # Shared constants
-│       │   └── styles/         # Modular style system (common, web styles)
-│       └── dist/               # Compiled JavaScript output
-├── apps/
-│   ├── web/                    # React + Vite PWA application
-│   │   ├── src/
-│   │   │   ├── components/     # Reusable UI components
-│   │   │   ├── config/         # TypeScript config loader
-│   │   │   ├── pages/          # Page components (Login, Register, Home)
-│   │   │   ├── hooks/          # Custom React hooks
-│   │   │   ├── services/       # Web-specific API services
-│   │   │   ├── utils/          # Utility functions
-│   │   │   └── types/          # TypeScript type definitions
-│   │   ├── scripts/            # Utility scripts
-│   │   │   └── kill-dev.cjs    # Windows dev server kill script
-│   │   ├── tests/e2e/          # Playwright E2E tests
-│   │   └── public/             # Static assets including manifest.json
-│   └── mobile/                 # React Native mobile application
-│       ├── src/
-│       │   ├── screens/        # Screen components
-│       │   ├── navigation/     # React Navigation setup
-│       │   ├── components/     # Reusable UI components
-│       │   ├── services/       # Mobile-specific API services
-│       │   ├── hooks/          # Custom React hooks
-│       │   ├── utils/          # Utility functions
-│       │   └── types/          # TypeScript type definitions
-│       ├── tests/e2e/flows/    # Maestro E2E test flows
-│       ├── scripts/             # Cross-platform Maestro runner
-│       ├── android/            # Android native code
-│       └── ios/                # iOS native code
+├── apps/                       # Future location for rebuilt applications
 └── servers/
     ├── friendly/               # Node.js backend service (Fastify)
     │   ├── src/
@@ -85,55 +50,6 @@ niney-life-pickr/
 ```
 
 ## Key Commands
-
-### Shared Package Development
-```bash
-cd packages/shared
-npm run build      # Build TypeScript to JavaScript
-npm run dev        # Watch mode for development
-npm run type-check # TypeScript type checking without building
-npm run clean      # Clean build directory
-```
-
-### Web Application Development
-```bash
-cd apps/web
-npm run dev        # Start development server on port 3000
-npm run build      # Build for production with TypeScript checking
-npm run preview    # Preview production build
-npm run lint       # Run ESLint
-npm run kill       # Kill dev server process on Windows (reads port from config)
-npm run dev:clean  # Kill existing dev server and start fresh
-
-# E2E Testing with Playwright
-npm run test:e2e         # Run all E2E tests
-npm run test:e2e:ui      # Open Playwright UI mode
-npm run test:e2e:debug   # Run tests in debug mode
-npm run test:e2e:headed  # Run tests with browser visible
-npm run test:e2e:report  # Show test report
-```
-
-### Mobile Application Development
-```bash
-cd apps/mobile
-npm start          # Start Metro bundler
-npm run android    # Run on Android device/emulator
-npm run ios        # Run on iOS device/simulator (macOS only)
-npm run lint       # Run ESLint
-npm test           # Run Jest unit tests
-
-# E2E Testing with Maestro
-npm run test:e2e         # Run all Maestro E2E tests
-npm run test:e2e:smoke   # Run smoke test only
-npm run test:e2e:studio  # Open Maestro Studio for visual test creation
-npm run test:e2e:record  # Record new test flows
-npm run test:e2e:cloud   # Run tests on Maestro Cloud
-
-# Platform-specific
-cd android && ./gradlew.bat clean  # Clean Android build (Windows)
-cd android && ./gradlew clean      # Clean Android build (Mac/Linux)
-cd ios && pod install              # Install iOS dependencies (macOS only)
-```
 
 ### Friendly Server (Node.js Backend)
 ```bash
@@ -195,39 +111,8 @@ mypy src                  # Type checking
 
 ## Technology Stack
 
-### Shared Package
-- **TypeScript 5.8.3** with ES2020 target
-- **Centralized Types**: User, ApiResponse, LoginRequest, etc.
-- **API Service Classes**: BaseApiService with fetch wrapper, AuthService
-- **Validation Utilities**: Form validation rules and helpers
-- **Storage Abstraction**: Platform-agnostic storage interface
-- **Modular Style System**: Separated common constants, web-specific styles (Tailwind v4)
-
-### Web Application
-- **React 19.1.1** with TypeScript 5.8.3
-- **Vite 7.1.2** for fast development and building
-- **React Router DOM 7.8.2** for client-side routing
-- **@niney/shared** local package for shared code
-- **Tailwind CSS v4.1.13** with @tailwindcss/postcss for styling
-- **PWA Support** via vite-plugin-pwa with auto-update and offline capabilities
-- **PostCSS** configuration using @tailwindcss/postcss plugin
-- **js-yaml** for YAML configuration parsing
-- **Playwright** for E2E testing with @axe-core/playwright for accessibility testing
-
-### Mobile Application
-- **React Native 0.81.1** with TypeScript 5.8.3
-- **React Navigation v7** for navigation (stack + bottom tabs)
-- **NativeWind 2.0.11** for Tailwind CSS v3 support (Note: Limited compatibility)
-- **React Native Elements v3.4.3** for UI components
-- **React Native Reanimated v4.1.0** for animations
-- **React Native Vector Icons v10.3.0** for icons
-- **React Native Worklets v0.5.1** for Reanimated support
-- **Maestro** for E2E testing with YAML-based test flows
-- **Testing Library React Native** for unit testing
-- **Node.js**: Requires >=20
-
 ### Friendly Server (Node.js Backend)
-- **Fastify 5.6.0** high-performance web framework (migrated from Express)
+- **Fastify 5.6.0** high-performance web framework
 - **TypeScript 5.9.2** with strict type checking
 - **SQLite3 5.1.7** lightweight file-based database
 - **bcrypt 6.0.0** for password hashing
@@ -246,7 +131,7 @@ mypy src                  # Type checking
 - **Python 3.10+** with type hints
 - **FastAPI 0.115+** async web framework
 - **Uvicorn** ASGI server with hot reload
-- **Pydantic v2** for data validation
+- **Pydantic v2** for data validation and settings management
 - **PyYAML** for configuration parsing
 - **pytest** for unit and integration testing
 - **pytest-asyncio** for async test support
@@ -312,7 +197,6 @@ The friendly server provides comprehensive API documentation in multiple formats
 - `base.yml`: Default configuration for development
 - `test.yml`: Test environment overrides (port: 0, error logging, wildcard CORS)
 - `production.yml`: Production overrides (merged with base)
-- TypeScript loaders in each app load and parse configuration
 - Server loads environment-specific config automatically based on NODE_ENV
 
 ### Environment Variables
@@ -322,10 +206,8 @@ Environment variables override YAML configuration:
 - `HOST`: Server host address
 - `LOG_LEVEL`: debug | info | warn | error
 - `CORS_ORIGIN`: Allowed CORS origins
-- `VITE_PORT`, `VITE_HOST`: Web app overrides
 
 ### Port Configuration
-- Web app: 3000 (development), 8080 (production)
 - Friendly server: 4000 (0 for tests - random port)
 - Smart server: 5000
 - `strictPort: true` ensures exact port usage
@@ -401,38 +283,6 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 - Bearer token authentication configured in OpenAPI spec
 - Response types include token field for future implementation
 
-## Shared Styles System
-
-### Modular Style Architecture
-The shared package provides a modular style system with clear separation:
-
-```typescript
-// packages/shared/src/styles/
-├── common.styles.ts    # Shared constants (colors, text, form fields)
-├── web.styles.ts       # Web-specific Tailwind v4 classes
-├── auth.styles.ts      # Legacy backward compatibility
-└── index.ts           # Central exports
-```
-
-### Common Resources (Web & Mobile)
-- `colors` - HEX color constants
-- `formFields` - Form field configurations
-- `authText` - UI text in Korean
-- `spacing`, `fontSize`, `borderRadius` - Numeric constants
-
-### Web-Specific Styles (Tailwind v4)
-- `webStyles.container`, `webStyles.typography`, `webStyles.form`
-- `getInputStyles(position, hasError)` - Grouped inputs
-- `getRegisterInputStyles(hasError)` - Individual inputs
-- `getButtonStyles(variant)` - Button variants
-- Supports dark mode, hover states, responsive breakpoints
-
-### Mobile Considerations
-- NativeWind v2 based on Tailwind v3 (limited compatibility)
-- No dark mode support (`dark:` prefix not available)
-- No hover states or complex pseudo-classes
-- Avoid `space-y-*`, `min-h-*`, `sr-only` utilities
-
 ## API Response Standardization
 
 All API endpoints use a consistent response format:
@@ -477,7 +327,6 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 - **Test Configuration**: Tests use `buildApp()` function for proper Fastify initialization
 - **Path Aliases**: Configured in both TypeScript and test runners
   - Friendly Server: `@routes`, `@controllers`, `@services`, `@middlewares`, `@utils`, `@types`
-  - Mobile: `@/*` for src directory access
 
 ## Development Workflow
 
@@ -488,32 +337,6 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
   - Handles multiple processes on the same port
 - `npm run kill`: Terminates server process on configured port
 - `npm run dev:clean`: Kills existing server then starts fresh
-
-### iOS .gitignore Configuration
-```bash
-# Xcode workspace (auto-generated by CocoaPods)
-*.xcworkspace/
-!*.xcworkspace/contents.xcworkspacedata
-!*.xcworkspace/xcshareddata/
-```
-
-### Mobile Development Setup
-#### Android Requirements
-- Android Studio with SDK
-- ANDROID_HOME environment variable
-- Path includes: `%ANDROID_HOME%\platform-tools`
-- JDK 17-20 (React Native requirement)
-- **Critical**: Android emulator or physical device MUST be running before Maestro tests
-
-#### iOS Requirements (macOS only)
-- Xcode with iOS Simulator
-- CocoaPods: `cd ios && pod install`
-- Apple Developer account for device testing
-
-### Cross-Platform Maestro Testing
-- Uses `scripts/maestro.js` for Windows/Mac/Linux compatibility
-- Automatically detects and uses correct Maestro executable
-- Requires device/emulator to be running before test execution
 
 ## Testing Strategy
 
@@ -527,14 +350,10 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
     - User listing and management
     - Performance and concurrent request handling
 
-### Hybrid Testing Approach
-- **Unit/Integration Tests**: Business logic, utilities, components
-  - Mobile: Jest with React Native Testing Library
+### Testing Approach
+- **Unit/Integration Tests**: Business logic, utilities, services
   - Friendly Server: Vitest with 80% coverage threshold
   - Smart Server: pytest with async support
-- **E2E Tests**: Critical user flows and cross-platform verification
-  - Web: Playwright (Chromium, Mobile Chrome, Mobile Safari)
-  - Mobile: Maestro (YAML-based flows)
 
 ### Test Running Examples
 
@@ -547,43 +366,19 @@ npm test -- src/__tests__/integration/auth.routes.test.ts
 # Run specific test suite
 npm run test:auth  # Auth routes tests only
 
-# Jest (Mobile)
-npm test -- UserService.test.ts
-
 # pytest (Smart Server)
 pytest tests/unit/test_config.py
-
-# Playwright (Web)
-npm run test:e2e -- --grep "login"
 ```
 
 #### Debug tests
 ```bash
 # Vitest UI
 cd servers/friendly && npm run test:ui
-
-# Playwright debug mode
-cd apps/web && npm run test:e2e:debug
-
-# Maestro Studio
-cd apps/mobile && npm run test:e2e:studio
 ```
 
 ## Current Implementation Status
 
 ### ✅ Completed
-- Web application with React + Vite + TypeScript
-- Shared package (@niney/shared) for code reuse between web and mobile
-- Web authentication UI (login, registration, home with protected routes)
-- React Router DOM integration for navigation
-- Tailwind CSS v4 with PostCSS integration
-- PWA setup with offline capabilities
-- YAML-based configuration system
-- Windows-compatible development scripts
-- E2E testing with Playwright for web
-- React Native mobile app with navigation
-- NativeWind integration for Tailwind CSS in React Native
-- Maestro E2E testing for mobile app
 - Fastify-based backend service with comprehensive API documentation
 - SQLite database integration with automated migrations
 - Complete authentication system (registration, login, user management)
@@ -594,11 +389,12 @@ cd apps/mobile && npm run test:e2e:studio
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
+- YAML-based configuration system
 
 ### 🔲 In Progress
+- Web application rebuild (React + Vite + TypeScript)
+- Shared package rebuild for code reuse
 - JWT token authentication implementation
-- Mobile app feature parity with web
-- Unified style system for mobile (currently web-only)
 - Backend business logic implementation
 - ML model integration in smart server
 - Real-time features
@@ -662,41 +458,26 @@ open http://localhost:4000/reference
 curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.txt
 ```
 
-### Troubleshooting TypeScript Errors
-
-If you encounter "unused parameter" warnings:
-- Prefix unused parameters with underscore: `_request`
-- Remove unused imports from file headers
-- Use `npm run type-check` to verify without building
-
-For module resolution issues:
-- Check path aliases in tsconfig.json
-- Verify `esModuleInterop` is enabled
-- Use `@ts-ignore` sparingly for problematic imports
-
 ## Code Style and Quality
 
 ### ESLint Configuration
-- Web app uses new flat config format (`eslint.config.js`)
-- Mobile and server use traditional `.eslintrc` format
+- Friendly server uses traditional `.eslintrc` format
 - TypeScript-specific rules enabled
 - Run `npm run lint:fix` to auto-fix issues
 
 ### Commit Message Convention
 Prefix commits with the affected scope:
-- `[web]` - Web application changes
-- `[mobile]` - Mobile application changes
 - `[friendly]` - Node.js backend changes
 - `[smart]` - Python backend changes
-- `[shared]` - Shared package changes
 - `[config]` - Configuration file changes
+- `[web]` - Future web application changes
+- `[shared]` - Future shared package changes
 
 Examples:
 ```
-[shared] refactor: Modularize styles into common, web-specific files
-[mobile] fix: Remove incompatible Tailwind v4 classes for NativeWind v2
 [friendly] feat: Add Swagger documentation with AI prompt generation
-[web] fix: Resolve hydration mismatch in PWA mode
+[smart] fix: Update FastAPI configuration for development
+[config] update: Add new environment variables for JWT
 ```
 
 ## Performance Considerations
@@ -708,7 +489,5 @@ Examples:
 - Connection pooling prepared for future database scaling
 
 ### Build Optimization
-- Vite dynamic configuration from YAML files
-- PWA runtime caching for Google Fonts (1-year cache)
 - Conditional minification based on environment
 - Tree-shaking enabled for production builds
