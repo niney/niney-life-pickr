@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/react-native": "^0.72.8",
     "js-yaml": "^4.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-native-web": "^0.21.1",
     "react-router-dom": "^7.9.3"
   },
   "devDependencies": {

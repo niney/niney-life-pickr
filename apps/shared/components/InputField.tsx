@@ -4,7 +4,7 @@ import {
   Text,
   TextInput as RNTextInput,
   StyleSheet,
-  TextInputProps as RNTextInputProps,
+  type TextInputProps as RNTextInputProps,
 } from 'react-native';
 
 export interface InputFieldProps extends Omit<RNTextInputProps, 'style'> {
@@ -37,7 +37,7 @@ const InputField: React.FC<InputFieldProps> = ({
           {required && <Text style={styles.required}> *</Text>}
         </Text>
       )}
-      
+
       <RNTextInput
         style={[
           styles.input,
@@ -47,7 +47,7 @@ const InputField: React.FC<InputFieldProps> = ({
         placeholderTextColor="#999"
         {...textInputProps}
       />
-      
+
       {hasError && (
         <Text style={[styles.errorText, errorStyle]}>
           {error}

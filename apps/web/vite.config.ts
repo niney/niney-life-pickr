@@ -53,6 +53,19 @@ export default defineConfig({
     port: webConfig.port || 3000,
     strictPort: true,
   },
+  resolve: {
+    alias: {
+      'react-native': 'react-native-web',
+    },
+    extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js'],
+  },
+  define: {
+    __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    include: ['react-native-web'],
+  },
   plugins: [
     react(),
     ...(pwaConfig.enabled ? [
