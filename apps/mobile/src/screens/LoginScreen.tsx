@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -11,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { InputField } from '../../../shared/components';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -48,6 +48,7 @@ const LoginScreen: React.FC = () => {
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {/* 헤더 */}
           <View style={styles.header}>
@@ -57,33 +58,27 @@ const LoginScreen: React.FC = () => {
 
           {/* 로그인 폼 */}
           <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>이메일</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="이메일을 입력하세요"
-                placeholderTextColor="#999"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
+            <InputField
+              label="이메일"
+              placeholder="이메일을 입력하세요"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>비밀번호</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="비밀번호를 입력하세요"
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
+            <InputField
+              label="비밀번호"
+              placeholder="비밀번호를 입력하세요"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
 
             <TouchableOpacity
               style={styles.forgotPasswordButton}
@@ -103,25 +98,6 @@ const LoginScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* 구분선 */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>또는</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* 소셜 로그인 */}
-          <View style={styles.socialLogin}>
-            <TouchableOpacity style={[styles.socialButton, styles.googleButton]}>
-              <Text style={styles.socialButtonText}>Google로 계속하기</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.socialButton, styles.appleButton]}>
-              <Text style={[styles.socialButtonText, styles.appleButtonText]}>
-                Apple로 계속하기
-              </Text>
-            </TouchableOpacity>
-          </View>
 
           {/* 회원가입 링크 */}
           <View style={styles.signUpContainer}>
@@ -147,12 +123,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    justifyContent: 'center',
+    minHeight: '100%',
   },
   header: {
     alignItems: 'center',
     marginBottom: 48,
-    marginTop: 32,
   },
   title: {
     fontSize: 32,
@@ -167,24 +143,6 @@ const styles = StyleSheet.create({
   },
   form: {
     marginBottom: 32,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    height: 52,
-    borderWidth: 1,
-    borderColor: '#e1e1e1',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
@@ -220,52 +178,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 32,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e1e1e1',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: '#999',
-  },
-  socialLogin: {
-    marginBottom: 32,
-  },
-  socialButton: {
-    height: 52,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  googleButton: {
-    backgroundColor: '#fff',
-    borderColor: '#e1e1e1',
-  },
-  appleButton: {
-    backgroundColor: '#000',
-    borderColor: '#000',
-  },
-  socialButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  appleButtonText: {
-    color: '#fff',
-  },
   signUpContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 32,
   },
   signUpText: {
     fontSize: 14,
