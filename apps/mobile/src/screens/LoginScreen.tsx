@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InputField } from '@shared/components';
+import { InputField } from 'shared/components';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -22,7 +22,7 @@ const LoginScreen: React.FC = () => {
       Alert.alert('오류', '이메일과 비밀번호를 모두 입력해주세요.');
       return;
     }
-    
+
     setIsLoading(true);
     // 여기에 실제 로그인 로직을 구현할 수 있습니다
     setTimeout(() => {
