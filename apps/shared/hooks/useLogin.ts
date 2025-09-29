@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert } from '../utils';
 import { AUTH_CONSTANTS } from '../constants';
 
 export interface LoginHookReturn {
@@ -20,7 +20,7 @@ export const useLogin = (): LoginHookReturn => {
 
   const handleLogin = () => {
     if (!email || !password) {
-      Alert.alert(AUTH_CONSTANTS.ERRORS.errorTitle, AUTH_CONSTANTS.ERRORS.emptyFields);
+      Alert.error(AUTH_CONSTANTS.ERRORS.errorTitle, AUTH_CONSTANTS.ERRORS.emptyFields);
       return;
     }
 
@@ -28,19 +28,19 @@ export const useLogin = (): LoginHookReturn => {
     // 여기에 실제 로그인 로직을 구현할 수 있습니다
     setTimeout(() => {
       setIsLoading(false);
-      Alert.alert(AUTH_CONSTANTS.SUCCESS.successTitle, AUTH_CONSTANTS.SUCCESS.loginSuccess);
+      Alert.success(AUTH_CONSTANTS.SUCCESS.successTitle, AUTH_CONSTANTS.SUCCESS.loginSuccess);
     }, 1000);
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
+    Alert.show(
       AUTH_CONSTANTS.MESSAGES.forgotPasswordTitle,
       AUTH_CONSTANTS.MESSAGES.forgotPasswordMessage
     );
   };
 
   const handleSignUp = () => {
-    Alert.alert(AUTH_CONSTANTS.MESSAGES.signUpTitle, AUTH_CONSTANTS.MESSAGES.signUpMessage);
+    Alert.show(AUTH_CONSTANTS.MESSAGES.signUpTitle, AUTH_CONSTANTS.MESSAGES.signUpMessage);
   };
 
   return {

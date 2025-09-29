@@ -43,8 +43,9 @@ niney-life-pickr/
 │       │   ├── Button.tsx      # Cross-platform button component
 │       │   ├── InputField.tsx  # Cross-platform input field
 │       │   └── index.ts        # Component barrel exports
-│       ├── constants/          # Shared constants and strings
-│       │   ├── constants.ts    # APP_CONSTANTS for all text/config
+│       ├── constants/          # Shared constants and strings (domain-separated)
+│       │   ├── app.constants.ts     # APP_INFO_CONSTANTS for app-wide config
+│       │   ├── auth.constants.ts    # AUTH_CONSTANTS for authentication
 │       │   └── index.ts        # Constants barrel exports
 │       ├── hooks/              # Shared React hooks
 │       │   ├── useLogin.ts     # Login logic hook
@@ -52,6 +53,7 @@ niney-life-pickr/
 │       ├── types/              # Shared TypeScript types
 │       │   └── index.ts        # Types barrel exports
 │       ├── utils/              # Shared utility functions
+│       │   ├── alert.utils.ts  # Cross-platform Alert implementation
 │       │   └── index.ts        # Utils barrel exports
 │       ├── index.ts            # Main barrel export file
 │       └── package.json
@@ -193,6 +195,7 @@ mypy src                  # Type checking
 - **Cross-platform components** (Button, InputField)
 - **Shared hooks** (useLogin) for business logic
 - **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS) with domain separation
+- **Cross-platform Alert utility** that works on both web and mobile
 - **React Native** base for maximum compatibility
 - **TypeScript** for type definitions
 - **Clean separation** of concerns (components/hooks/constants/types/utils)
@@ -489,14 +492,22 @@ The shared module uses the Barrel Export Pattern for clean, organized imports:
 import { Button, InputField } from '@shared/components'
 import { useLogin } from '@shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from '@shared/constants'
+import { Alert } from '@shared/utils'
 
 // Mobile app imports (using 'shared' from metro.config.js)
 import { Button, InputField } from 'shared/components'
 import { useLogin } from 'shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from 'shared/constants'
+import { Alert } from 'shared/utils'
 
 // Each folder has its own index.ts barrel export
 // This maintains clean separation of concerns
+
+// Alert utility usage (cross-platform)
+Alert.show('Title', 'Message')
+Alert.error('Error', 'Something went wrong')
+Alert.success('Success', 'Operation completed')
+Alert.confirm('Confirm', 'Are you sure?', onConfirm, onCancel)
 ```
 
 **Important**: Do NOT import non-components from the components folder. Each module type has its own dedicated folder and barrel export.
