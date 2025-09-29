@@ -38,13 +38,22 @@ niney-life-pickr/
 │   │   ├── android/            # Android-specific code
 │   │   ├── ios/                # iOS-specific code
 │   │   └── package.json
-│   └── shared/                 # Shared components between web and mobile
-│       ├── components/
+│   └── shared/                 # Shared code between web and mobile (Barrel Export Pattern)
+│       ├── components/         # Cross-platform UI components
 │       │   ├── Button.tsx      # Cross-platform button component
 │       │   ├── InputField.tsx  # Cross-platform input field
-│       │   └── index.ts        # Component exports
+│       │   └── index.ts        # Component barrel exports
+│       ├── constants/          # Shared constants and strings
+│       │   ├── constants.ts    # APP_CONSTANTS for all text/config
+│       │   └── index.ts        # Constants barrel exports
+│       ├── hooks/              # Shared React hooks
+│       │   ├── useLogin.ts     # Login logic hook
+│       │   └── index.ts        # Hooks barrel exports
 │       ├── types/              # Shared TypeScript types
+│       │   └── index.ts        # Types barrel exports
 │       ├── utils/              # Shared utility functions
+│       │   └── index.ts        # Utils barrel exports
+│       ├── index.ts            # Main barrel export file
 │       └── package.json
 └── servers/
     ├── friendly/               # Node.js backend service (Fastify)
@@ -179,11 +188,14 @@ mypy src                  # Type checking
 - **React Native Safe Area Context** for device-safe layouts
 - **Shared components** from apps/shared
 
-### Shared Components
+### Shared Module Architecture
+- **Barrel Export Pattern** for clean imports
 - **Cross-platform components** (Button, InputField)
+- **Shared hooks** (useLogin) for business logic
+- **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS) with domain separation
 - **React Native** base for maximum compatibility
 - **TypeScript** for type definitions
-- **No external dependencies** for simplicity
+- **Clean separation** of concerns (components/hooks/constants/types/utils)
 
 ### Friendly Server (Node.js Backend)
 - **Fastify 5.6.0** high-performance web framework
@@ -468,13 +480,26 @@ cd servers/friendly && npm run test:ui
 - **Block List**: Excludes shared/node_modules
 - **Module Resolution**: Maps 'shared' to '../shared'
 
-### Shared Components Usage
+### Shared Module Import Pattern (Barrel Exports)
+
+The shared module uses the Barrel Export Pattern for clean, organized imports:
+
 ```typescript
-// Import from shared in both web and mobile
-import { Button, InputField } from '@shared/components';
-// or
-import { Button, InputField } from 'shared/components';
+// Web app imports (using @shared alias from vite.config.ts)
+import { Button, InputField } from '@shared/components'
+import { useLogin } from '@shared/hooks'
+import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from '@shared/constants'
+
+// Mobile app imports (using 'shared' from metro.config.js)
+import { Button, InputField } from 'shared/components'
+import { useLogin } from 'shared/hooks'
+import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from 'shared/constants'
+
+// Each folder has its own index.ts barrel export
+// This maintains clean separation of concerns
 ```
+
+**Important**: Do NOT import non-components from the components folder. Each module type has its own dedicated folder and barrel export.
 
 ## Current Implementation Status
 
@@ -493,8 +518,9 @@ import { Button, InputField } from 'shared/components';
 
 - Web application with React Native Web
 - Mobile application with React Native
-- Shared component system between web and mobile
-- Unified login UI across platforms
+- Shared component system using Barrel Export Pattern
+- Unified login UI across platforms with shared hooks and constants
+- Clean module separation (components/hooks/constants/types/utils)
 
 ### 🔲 In Progress
 - JWT token authentication implementation
