@@ -21,10 +21,3 @@ body {
 [data-focusable="true"]:focus {
   outline: none;
 }
-
-/* 모바일 반응형 */
-@media (max-width: 768px) {
-  #root {
-    padding: 8px;
-  }
-}
