@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Niney Life Pickr is a life decision-making application with backend services (Node.js Fastify + Python FastAPI). The web frontend and shared packages are currently being rebuilt from scratch.
+Niney Life Pickr is a cross-platform life decision-making application with:
+- Web application (React with React Native Web + Vite)
+- Mobile application (React Native)
+- Shared components between web and mobile
+- Backend services (Node.js Fastify + Python FastAPI)
 
 ## Architecture
 
@@ -15,7 +19,33 @@ niney-life-pickr/
 │   ├── base.yml                # Base configuration for all environments
 │   ├── test.yml                # Test environment overrides
 │   └── production.yml          # Production-specific overrides
-├── apps/                       # Future location for rebuilt applications
+├── apps/
+│   ├── web/                    # Web application (React Native Web)
+│   │   ├── src/
+│   │   │   ├── components/     # Web-specific components
+│   │   │   │   └── Login.tsx   # Login component using shared components
+│   │   │   ├── App.tsx         # Main app component
+│   │   │   ├── main.tsx        # Entry point
+│   │   │   └── index.css       # Global styles
+│   │   ├── vite.config.ts      # Vite configuration with React Native Web
+│   │   └── package.json
+│   ├── mobile/                 # React Native mobile app
+│   │   ├── src/
+│   │   │   ├── screens/
+│   │   │   │   └── LoginScreen.tsx  # Mobile login screen
+│   │   │   └── App.tsx         # Main mobile app
+│   │   ├── metro.config.js     # Metro bundler configuration
+│   │   ├── android/            # Android-specific code
+│   │   ├── ios/                # iOS-specific code
+│   │   └── package.json
+│   └── shared/                 # Shared components between web and mobile
+│       ├── components/
+│       │   ├── Button.tsx      # Cross-platform button component
+│       │   ├── InputField.tsx  # Cross-platform input field
+│       │   └── index.ts        # Component exports
+│       ├── types/              # Shared TypeScript types
+│       ├── utils/              # Shared utility functions
+│       └── package.json
 └── servers/
     ├── friendly/               # Node.js backend service (Fastify)
     │   ├── src/
@@ -50,6 +80,28 @@ niney-life-pickr/
 ```
 
 ## Key Commands
+
+### Web Application
+```bash
+cd apps/web
+npm run dev        # Start development server (port 3000)
+npm run build      # Build for production
+npm run preview    # Preview production build
+npm run lint       # Run ESLint
+```
+
+### Mobile Application
+```bash
+cd apps/mobile
+npm start          # Start Metro bundler
+npm run android    # Run on Android
+npm run ios        # Run on iOS
+npm run lint       # Run ESLint
+npm test           # Run tests
+
+# Reset Metro cache if needed
+npx react-native start --reset-cache
+```
 
 ### Friendly Server (Node.js Backend)
 ```bash
@@ -110,6 +162,28 @@ mypy src                  # Type checking
 ```
 
 ## Technology Stack
+
+### Web Application
+- **React 19.1.1** with React Native Web 0.21.1
+- **Vite 7.1.7** build tool with HMR
+- **TypeScript 5.8.3** for type safety
+- **React Router DOM 7.9.3** for routing
+- **PWA support** with vite-plugin-pwa
+- **Shared components** from apps/shared
+
+### Mobile Application
+- **React Native 0.81.4** framework
+- **React 19.1.0** core library
+- **TypeScript 5.8.3** for type safety
+- **Metro** bundler for JavaScript bundling
+- **React Native Safe Area Context** for device-safe layouts
+- **Shared components** from apps/shared
+
+### Shared Components
+- **Cross-platform components** (Button, InputField)
+- **React Native** base for maximum compatibility
+- **TypeScript** for type definitions
+- **No external dependencies** for simplicity
 
 ### Friendly Server (Node.js Backend)
 - **Fastify 5.6.0** high-performance web framework
@@ -208,6 +282,7 @@ Environment variables override YAML configuration:
 - `CORS_ORIGIN`: Allowed CORS origins
 
 ### Port Configuration
+- Web app: 3000
 - Friendly server: 4000 (0 for tests - random port)
 - Smart server: 5000
 - `strictPort: true` ensures exact port usage
@@ -378,6 +453,31 @@ cd servers/friendly && npm run test:ui
 
 ## Current Implementation Status
 
+## Web and Mobile Configuration
+
+### Web App (Vite)
+- **Config Loading**: Reads from `config/base.yml`
+- **React Native Web Alias**: Maps `react-native` to `react-native-web`
+- **Shared Components**: Alias `@shared` points to `apps/shared`
+- **PWA Manifest**: Auto-generated from config
+- **Extensions Resolution**: Prioritizes `.web.tsx` files
+
+### Mobile App (Metro)
+- **Shared Components**: Configured via `extraNodeModules`
+- **Watch Folders**: Includes `apps/shared` directory
+- **Block List**: Excludes shared/node_modules
+- **Module Resolution**: Maps 'shared' to '../shared'
+
+### Shared Components Usage
+```typescript
+// Import from shared in both web and mobile
+import { Button, InputField } from '@shared/components';
+// or
+import { Button, InputField } from 'shared/components';
+```
+
+## Current Implementation Status
+
 ### ✅ Completed
 - Fastify-based backend service with comprehensive API documentation
 - SQLite database integration with automated migrations
@@ -391,9 +491,12 @@ cd servers/friendly && npm run test:ui
 - pytest testing environment for smart server
 - YAML-based configuration system
 
+- Web application with React Native Web
+- Mobile application with React Native
+- Shared component system between web and mobile
+- Unified login UI across platforms
+
 ### 🔲 In Progress
-- Web application rebuild (React + Vite + TypeScript)
-- Shared package rebuild for code reuse
 - JWT token authentication implementation
 - Backend business logic implementation
 - ML model integration in smart server
@@ -467,14 +570,18 @@ curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.
 
 ### Commit Message Convention
 Prefix commits with the affected scope:
+- `[web]` - Web application changes
+- `[mobile]` - Mobile application changes
+- `[shared]` - Shared components/utilities changes
 - `[friendly]` - Node.js backend changes
 - `[smart]` - Python backend changes
 - `[config]` - Configuration file changes
-- `[web]` - Future web application changes
-- `[shared]` - Future shared package changes
 
 Examples:
 ```
+[web] feat: Add login component with shared components
+[mobile] fix: Update metro configuration for shared folder
+[shared] feat: Create cross-platform Button component
 [friendly] feat: Add Swagger documentation with AI prompt generation
 [smart] fix: Update FastAPI configuration for development
 [config] update: Add new environment variables for JWT
