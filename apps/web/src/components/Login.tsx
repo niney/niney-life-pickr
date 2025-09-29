@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
-import { InputField } from '@shared/components'
+import { InputField, Button } from '@shared/components'
 
 interface LoginProps {
   onLoginSuccess?: () => void
@@ -70,15 +70,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <Text style={styles.forgotPasswordText}>비밀번호를 잊으셨나요?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+        <Button
+          title={isLoading ? '로그인 중...' : '로그인'}
           onPress={handleLogin}
-          disabled={isLoading}
-        >
-          <Text style={styles.loginButtonText}>
-            {isLoading ? '로그인 중...' : '로그인'}
-          </Text>
-        </TouchableOpacity>
+          loading={isLoading}
+          variant="primary"
+        />
       </View>
 
       <View style={styles.signupLink}>
@@ -119,22 +116,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#667eea',
     fontWeight: '500',
-  },
-  loginButton: {
-    width: '100%',
-    height: 52,
-    backgroundColor: '#667eea',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginButtonDisabled: {
-    backgroundColor: '#a0aec0',
-  },
-  loginButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
   },
   signupLink: {
     flexDirection: 'row',

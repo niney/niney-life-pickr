@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { InputField } from 'shared/components';
+import { InputField, Button } from 'shared/components';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -87,15 +87,12 @@ const LoginScreen: React.FC = () => {
               <Text style={styles.forgotPasswordText}>비밀번호를 잊으셨나요?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+            <Button
+              title={isLoading ? '로그인 중...' : '로그인'}
               onPress={handleLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.loginButtonText}>
-                {isLoading ? '로그인 중...' : '로그인'}
-              </Text>
-            </TouchableOpacity>
+              loading={isLoading}
+              variant="primary"
+            />
           </View>
 
 
@@ -152,31 +149,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',
-  },
-  loginButton: {
-    height: 52,
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#007AFF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  loginButtonDisabled: {
-    backgroundColor: '#ccc',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  loginButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
   },
   signUpContainer: {
     flexDirection: 'row',
