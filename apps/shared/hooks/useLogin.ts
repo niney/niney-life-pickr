@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert } from '../utils';
 import { AUTH_CONSTANTS } from '../constants';
+import { apiService } from '../services';
 
 export interface LoginHookReturn {
   email: string;
@@ -8,28 +9,53 @@ export interface LoginHookReturn {
   password: string;
   setPassword: (password: string) => void;
   isLoading: boolean;
-  handleLogin: () => void;
+  handleLogin: (onSuccess?: () => void) => void;
   handleForgotPassword: () => void;
   handleSignUp: () => void;
 }
 
 export const useLogin = (): LoginHookReturn => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('niney@ks.com');
+  const [password, setPassword] = useState('tester');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async (onSuccess?: () => void) => {
     if (!email || !password) {
       Alert.error(AUTH_CONSTANTS.ERRORS.errorTitle, AUTH_CONSTANTS.ERRORS.emptyFields);
       return;
     }
 
     setIsLoading(true);
-    // 여기에 실제 로그인 로직을 구현할 수 있습니다
-    setTimeout(() => {
+
+    try {
+      // 실제 API 호출
+      const response = await apiService.login({ email, password });
+
+      if (response.result) {
+        // 로그인 성공
+        Alert.success(AUTH_CONSTANTS.SUCCESS.successTitle, AUTH_CONSTANTS.SUCCESS.loginSuccess);
+
+        // 사용자 정보 저장 (향후 상태 관리 라이브러리 사용 가능)
+        console.log('Logged in user:', response.data?.user);
+
+        // 성공 콜백 호출
+        if (onSuccess) {
+          // Alert 표시 후 화면 전환을 위한 짧은 지연
+          setTimeout(() => {
+            onSuccess();
+          }, 500);
+        }
+      }
+    } catch (error: any) {
+      // 로그인 실패
+      console.error('Login failed:', error);
+      Alert.error(
+        AUTH_CONSTANTS.ERRORS.errorTitle,
+        error.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.'
+      );
+    } finally {
       setIsLoading(false);
-      Alert.success(AUTH_CONSTANTS.SUCCESS.successTitle, AUTH_CONSTANTS.SUCCESS.loginSuccess);
-    }, 1000);
+    }
   };
 
   const handleForgotPassword = () => {

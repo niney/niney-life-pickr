@@ -29,14 +29,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   } = useLogin()
 
   const handleLogin = () => {
-    handleLoginBase()
-    // onLoginSuccess는 로그인 성공 후에 호출되어야 하므로
-    // 실제 구현 시에는 handleLoginBase를 확장해야 합니다
-    if (email && password) {
-      setTimeout(() => {
-        onLoginSuccess?.()
-      }, 1100)
-    }
+    handleLoginBase(onLoginSuccess)
   }
 
   return (

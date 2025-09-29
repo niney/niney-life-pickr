@@ -21,3 +21,9 @@ body {
 [data-focusable="true"]:focus {
   outline: none;
 }
+
+/* React Router Link 스타일 초기화 */
+a {
+  text-decoration: none;
+  color: inherit;
+}

@@ -48,8 +48,11 @@ niney-life-pickr/
 │       │   ├── auth.constants.ts    # AUTH_CONSTANTS for authentication
 │       │   └── index.ts        # Constants barrel exports
 │       ├── hooks/              # Shared React hooks
-│       │   ├── useLogin.ts     # Login logic hook
+│       │   ├── useLogin.ts     # Login logic hook with API integration
 │       │   └── index.ts        # Hooks barrel exports
+│       ├── services/           # API service layer
+│       │   ├── api.service.ts  # Backend API communication
+│       │   └── index.ts        # Services barrel exports
 │       ├── types/              # Shared TypeScript types
 │       │   └── index.ts        # Types barrel exports
 │       ├── utils/              # Shared utility functions
@@ -193,12 +196,13 @@ mypy src                  # Type checking
 ### Shared Module Architecture
 - **Barrel Export Pattern** for clean imports
 - **Cross-platform components** (Button, InputField)
-- **Shared hooks** (useLogin) for business logic
+- **Shared hooks** (useLogin) for business logic with API integration
+- **API Service layer** for backend communication
 - **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS) with domain separation
 - **Cross-platform Alert utility** that works on both web and mobile
 - **React Native** base for maximum compatibility
 - **TypeScript** for type definitions
-- **Clean separation** of concerns (components/hooks/constants/types/utils)
+- **Clean separation** of concerns (components/hooks/constants/services/types/utils)
 
 ### Friendly Server (Node.js Backend)
 - **Fastify 5.6.0** high-performance web framework
@@ -493,12 +497,14 @@ import { Button, InputField } from '@shared/components'
 import { useLogin } from '@shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from '@shared/constants'
 import { Alert } from '@shared/utils'
+import { apiService } from '@shared/services'
 
 // Mobile app imports (using 'shared' from metro.config.js)
 import { Button, InputField } from 'shared/components'
 import { useLogin } from 'shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from 'shared/constants'
 import { Alert } from 'shared/utils'
+import { apiService } from 'shared/services'
 
 // Each folder has its own index.ts barrel export
 // This maintains clean separation of concerns
@@ -508,6 +514,10 @@ Alert.show('Title', 'Message')
 Alert.error('Error', 'Something went wrong')
 Alert.success('Success', 'Operation completed')
 Alert.confirm('Confirm', 'Are you sure?', onConfirm, onCancel)
+
+// API Service usage
+await apiService.login({ email, password })
+await apiService.register({ email, username, password })
 ```
 
 **Important**: Do NOT import non-components from the components folder. Each module type has its own dedicated folder and barrel export.
@@ -527,11 +537,13 @@ Alert.confirm('Confirm', 'Are you sure?', onConfirm, onCancel)
 - pytest testing environment for smart server
 - YAML-based configuration system
 
-- Web application with React Native Web
+- Web application with React Native Web and React Router
 - Mobile application with React Native
 - Shared component system using Barrel Export Pattern
 - Unified login UI across platforms with shared hooks and constants
-- Clean module separation (components/hooks/constants/types/utils)
+- API integration with backend authentication
+- Cross-platform Alert utility
+- Clean module separation (components/hooks/constants/services/types/utils)
 
 ### 🔲 In Progress
 - JWT token authentication implementation

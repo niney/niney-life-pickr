@@ -1,28 +1,33 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
-import { View, StyleSheet } from 'react-native'
 import Login from './components/Login'
+import Home from './components/Home'
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const handleLoginSuccess = () => {
-    setIsLoggedIn(true)
+    setIsAuthenticated(true)
   }
 
   return (
-    <View style={styles.container}>
-      <Login onLoginSuccess={handleLoginSuccess} />
-    </View>
+    <BrowserRouter>
+      <Routes>
+        {!isAuthenticated ? (
+          <>
+            <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </>
+        ) : (
+          <>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
+      </Routes>
+    </BrowserRouter>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-})
 
 export default App
