@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert } from '../utils';
+import { Alert, storage } from '../utils';
 import { AUTH_CONSTANTS } from '../constants';
 import { apiService } from '../services';
 
@@ -35,15 +35,20 @@ export const useLogin = (): LoginHookReturn => {
         // 로그인 성공
         Alert.success(AUTH_CONSTANTS.SUCCESS.successTitle, AUTH_CONSTANTS.SUCCESS.loginSuccess);
 
-        // 사용자 정보 저장 (향후 상태 관리 라이브러리 사용 가능)
-        console.log('Logged in user:', response.data?.user);
+        // 사용자 정보 저장
+        if (response.data?.user) {
+          await storage.setUserInfo(response.data.user);
+          console.log('Logged in user:', response.data.user);
+        }
+
+        // JWT 토큰 저장 (향후 구현 시)
+        if (response.data?.token) {
+          await storage.setAuthToken(response.data.token);
+        }
 
         // 성공 콜백 호출
         if (onSuccess) {
-          // Alert 표시 후 화면 전환을 위한 짧은 지연
-          setTimeout(() => {
-            onSuccess();
-          }, 500);
+          onSuccess();
         }
       }
     } catch (error: any) {

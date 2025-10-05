@@ -49,6 +49,7 @@ niney-life-pickr/
 │       │   └── index.ts        # Constants barrel exports
 │       ├── hooks/              # Shared React hooks
 │       │   ├── useLogin.ts     # Login logic hook with API integration
+│       │   ├── useAuth.ts      # Authentication state management hook
 │       │   └── index.ts        # Hooks barrel exports
 │       ├── services/           # API service layer
 │       │   ├── api.service.ts  # Backend API communication
@@ -57,6 +58,7 @@ niney-life-pickr/
 │       │   └── index.ts        # Types barrel exports
 │       ├── utils/              # Shared utility functions
 │       │   ├── alert.utils.ts  # Cross-platform Alert implementation
+│       │   ├── storage.utils.ts # Cross-platform storage (localStorage/AsyncStorage)
 │       │   └── index.ts        # Utils barrel exports
 │       ├── index.ts            # Main barrel export file
 │       └── package.json
@@ -196,10 +198,13 @@ mypy src                  # Type checking
 ### Shared Module Architecture
 - **Barrel Export Pattern** for clean imports
 - **Cross-platform components** (Button, InputField)
-- **Shared hooks** (useLogin) for business logic with API integration
-- **API Service layer** for backend communication
+- **Shared hooks** (useLogin, useAuth) for business logic with API integration
+- **API Service layer** for backend communication with platform-specific URL handling
 - **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS) with domain separation
-- **Cross-platform Alert utility** that works on both web and mobile
+- **Cross-platform utilities**:
+  - Alert utility for web and mobile
+  - Storage utility (localStorage for web, AsyncStorage for mobile)
+- **AsyncStorage 2.2.0** for persistent mobile storage
 - **React Native** base for maximum compatibility
 - **TypeScript** for type definitions
 - **Clean separation** of concerns (components/hooks/constants/services/types/utils)
@@ -296,15 +301,24 @@ The friendly server provides comprehensive API documentation in multiple formats
 Environment variables override YAML configuration:
 - `NODE_ENV`: development | test | production
 - `PORT`: Server port number
-- `HOST`: Server host address
+- `HOST`: Server host address (0.0.0.0 for network access)
 - `LOG_LEVEL`: debug | info | warn | error
 - `CORS_ORIGIN`: Allowed CORS origins
+- `LOCAL_IP`: Local network IP for mobile device access (optional)
 
 ### Port Configuration
 - Web app: 3000
 - Friendly server: 4000 (0 for tests - random port)
 - Smart server: 5000
 - `strictPort: true` ensures exact port usage
+
+### Network Access
+- **Default**: `HOST=0.0.0.0` allows access from any network interface
+- **Local IP Detection**: Server automatically detects and displays local network IP
+- **Mobile Access**:
+  - Android emulator: Uses `10.0.2.2:4000` to access host machine
+  - iOS simulator: Uses `localhost:4000`
+  - Physical devices: Use local network IP (e.g., `192.168.0.100:4000`)
 
 ## Database System
 
@@ -343,7 +357,7 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 
 ## Authentication System
 
-### Current Implementation
+### Backend Implementation
 - **Registration**: `POST /api/auth/register`
   - Email/username uniqueness validation
   - Password strength requirements (minimum 6 characters)
@@ -364,6 +378,32 @@ FOREIGN KEY (user_id) REFERENCES users(id)
   - User count and details
   - Consistent ordering by ID
 
+### Frontend Authentication State
+- **useAuth Hook** (`apps/shared/hooks/useAuth.ts`):
+  - 로그인 상태 관리 (user, isAuthenticated, isLoading)
+  - 초기 로드 시 storage에서 자동 복원
+  - login/logout/checkAuth 함수 제공
+  - 웹과 모바일에서 공통 사용
+
+- **useLogin Hook** (`apps/shared/hooks/useLogin.ts`):
+  - 로그인 폼 로직 (email, password, isLoading)
+  - API 호출 및 에러 처리
+  - 성공 시 storage에 자동 저장
+  - 콜백 지원 (onSuccess)
+
+### Storage & Session Management
+- **Cross-platform Storage** (`apps/shared/utils/storage.utils.ts`):
+  - Web: localStorage
+  - Mobile: AsyncStorage
+  - 통일된 async API (setItem, getItem, removeItem, setObject, getObject)
+  - 인증 전용 메서드 (setUserInfo, getUserInfo, setAuthToken, getAuthToken, logout)
+  - Storage Keys: `auth_token`, `user_info`, `last_login`
+
+- **Session Persistence**:
+  - 로그인 시 사용자 정보 storage에 저장
+  - 앱/페이지 재시작 시 자동 복원
+  - 로그아웃 시 모든 인증 데이터 삭제
+
 ### Security Features
 - **Password Hashing**: bcrypt with configurable salt rounds
 - **SQL Injection Protection**: Parameterized queries throughout
@@ -376,6 +416,7 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 - Session table ready for token storage
 - Bearer token authentication configured in OpenAPI spec
 - Response types include token field for future implementation
+- Storage utility already supports token storage/retrieval
 
 ## API Response Standardization
 
@@ -494,16 +535,16 @@ The shared module uses the Barrel Export Pattern for clean, organized imports:
 ```typescript
 // Web app imports (using @shared alias from vite.config.ts)
 import { Button, InputField } from '@shared/components'
-import { useLogin } from '@shared/hooks'
+import { useLogin, useAuth } from '@shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from '@shared/constants'
-import { Alert } from '@shared/utils'
+import { Alert, storage, STORAGE_KEYS } from '@shared/utils'
 import { apiService } from '@shared/services'
 
 // Mobile app imports (using 'shared' from metro.config.js)
 import { Button, InputField } from 'shared/components'
-import { useLogin } from 'shared/hooks'
+import { useLogin, useAuth } from 'shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from 'shared/constants'
-import { Alert } from 'shared/utils'
+import { Alert, storage, STORAGE_KEYS } from 'shared/utils'
 import { apiService } from 'shared/services'
 
 // Each folder has its own index.ts barrel export
@@ -515,9 +556,20 @@ Alert.error('Error', 'Something went wrong')
 Alert.success('Success', 'Operation completed')
 Alert.confirm('Confirm', 'Are you sure?', onConfirm, onCancel)
 
+// Storage utility usage (cross-platform)
+await storage.setItem('key', 'value')
+const value = await storage.getItem('key')
+await storage.setUserInfo(user)
+const user = await storage.getUserInfo()
+await storage.logout()
+
 // API Service usage
 await apiService.login({ email, password })
 await apiService.register({ email, username, password })
+
+// Authentication hooks usage
+const { isAuthenticated, isLoading, user, login, logout } = useAuth()
+const { email, password, handleLogin } = useLogin()
 ```
 
 **Important**: Do NOT import non-components from the components folder. Each module type has its own dedicated folder and barrel export.
@@ -525,6 +577,7 @@ await apiService.register({ email, username, password })
 ## Current Implementation Status
 
 ### ✅ Completed
+**Backend:**
 - Fastify-based backend service with comprehensive API documentation
 - SQLite database integration with automated migrations
 - Complete authentication system (registration, login, user management)
@@ -536,13 +589,25 @@ await apiService.register({ email, username, password })
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
 - YAML-based configuration system
+- Network access support (0.0.0.0 binding, local IP detection)
 
+**Frontend:**
 - Web application with React Native Web and React Router
 - Mobile application with React Native
 - Shared component system using Barrel Export Pattern
 - Unified login UI across platforms with shared hooks and constants
 - API integration with backend authentication
-- Cross-platform Alert utility
+- Cross-platform utilities (Alert, Storage)
+- **Authentication state management:**
+  - useAuth hook for global auth state
+  - useLogin hook for login logic
+  - Cross-platform storage (localStorage/AsyncStorage)
+  - Session persistence (로그인 유지)
+  - Auto-restore on app restart
+- **Routing & Navigation:**
+  - Web: React Router with protected routes
+  - Mobile: Conditional rendering based on auth state
+  - Loading states during auth check
 - Clean module separation (components/hooks/constants/services/types/utils)
 
 ### 🔲 In Progress

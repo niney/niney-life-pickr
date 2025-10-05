@@ -13,17 +13,25 @@ import { InputField, Button } from 'shared/components';
 import { useLogin } from 'shared/hooks';
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from 'shared/constants';
 
-const LoginScreen: React.FC = () => {
+interface LoginScreenProps {
+  onLoginSuccess?: () => void;
+}
+
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const {
     email,
     setEmail,
     password,
     setPassword,
     isLoading,
-    handleLogin,
+    handleLogin: handleLoginBase,
     handleForgotPassword,
     handleSignUp,
   } = useLogin();
+
+  const handleLogin = async () => {
+    await handleLoginBase(onLoginSuccess);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
