@@ -2,6 +2,7 @@ import buildApp from './app';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
+import os from 'os';
 import db from './db/database';
 import migrator from './db/migrate';
 
@@ -57,19 +58,47 @@ async function startServer() {
     
     // Start server
     await app.listen({ port: PORT, host: HOST });
-    
+
+    // Get local network IP
+    const getLocalNetworkIP = (): string | null => {
+      const networkInterfaces = os.networkInterfaces();
+      for (const name of Object.keys(networkInterfaces)) {
+        const interfaces = networkInterfaces[name];
+        if (!interfaces) continue;
+
+        for (const iface of interfaces) {
+          // Skip internal (loopback) and non-IPv4 addresses
+          if (iface.family === 'IPv4' && !iface.internal) {
+            return iface.address;
+          }
+        }
+      }
+      return null;
+    };
+
+    const localIP = getLocalNetworkIP();
+
+    // Build access URLs
+    let accessUrls = `Local:   http://localhost:${PORT}`;
+    if (HOST === '0.0.0.0' && localIP) {
+      accessUrls += `\nNetwork: http://${localIP}:${PORT}`;
+    } else if (HOST !== '0.0.0.0' && HOST !== 'localhost' && HOST !== '127.0.0.1') {
+      accessUrls += `\nNetwork: http://${HOST}:${PORT}`;
+    }
+
     console.log(`
 ╔════════════════════════════════════════════╗
 ║   Niney Life Pickr Friendly Server        ║
 ║   Node.js Backend Service                  ║
 ╠════════════════════════════════════════════╣
 ║   Status: ✅ Running                       ║
-║   Port: ${PORT}                              
-║   Host: ${HOST}                              
-║   Environment: ${process.env.NODE_ENV || 'development'}                   
+║   Port: ${PORT}
+║   Host: ${HOST}
+║   Environment: ${process.env.NODE_ENV || 'development'}
 ╚════════════════════════════════════════════╝
 
-Server is running at http://${HOST}:${PORT}
+${accessUrls}
+
 Press Ctrl+C to stop
     `);
 
