@@ -104,6 +104,14 @@ npm run dev        # Start development server (port 3000)
 npm run build      # Build for production
 npm run preview    # Preview production build
 npm run lint       # Run ESLint
+
+# E2E Testing with Playwright
+npm run test:e2e           # Run E2E tests (headless)
+npm run test:e2e:ui        # Run E2E tests with UI mode (recommended)
+npm run test:e2e:headed    # Run E2E tests in headed mode
+npm run test:e2e:debug     # Run E2E tests in debug mode
+npm run test:e2e:report    # Show test report
+npm run test:e2e:codegen   # Generate test code with Playwright codegen
 ```
 
 ### Mobile Application
@@ -185,6 +193,7 @@ mypy src                  # Type checking
 - **TypeScript 5.8.3** for type safety
 - **React Router DOM 7.9.3** for routing
 - **PWA support** with vite-plugin-pwa
+- **Playwright** for E2E testing (Chromium, Mobile Chrome, Mobile Safari)
 - **Shared components** from apps/shared
 
 ### Mobile Application
@@ -476,6 +485,12 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 ## Testing Strategy
 
 ### Test Organization
+- **Web E2E Tests** (`apps/web/e2e/`):
+  - Playwright E2E tests for user flows
+  - Login flow test: Alert handling, navigation verification
+  - Test browsers: Chromium, Mobile Chrome, Mobile Safari
+  - Important: React Native Web buttons render as `<div>`, use `getByText()` instead of `getByRole('button')`
+
 - **Friendly Server Tests**:
   - Unit tests: `src/__tests__/unit/`
   - Integration tests: `src/__tests__/integration/`
@@ -486,6 +501,8 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
     - Performance and concurrent request handling
 
 ### Testing Approach
+- **E2E Tests**: User flows, integration testing
+  - Web: Playwright with auto-starting dev server
 - **Unit/Integration Tests**: Business logic, utilities, services
   - Friendly Server: Vitest with 80% coverage threshold
   - Smart Server: pytest with async support
@@ -494,6 +511,12 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 
 #### Run a single test file
 ```bash
+# Playwright E2E (Web)
+cd apps/web
+npm run test:e2e -- login.spec.ts           # Run specific test file
+npm run test:e2e:ui                         # Interactive UI mode
+npm run test:e2e:headed -- login.spec.ts    # Watch test execution
+
 # Vitest (Friendly Server)
 npm test -- src/__tests__/unit/userService.test.ts
 npm test -- src/__tests__/integration/auth.routes.test.ts
@@ -507,6 +530,9 @@ pytest tests/unit/test_config.py
 
 #### Debug tests
 ```bash
+# Playwright E2E
+cd apps/web && npm run test:e2e:debug
+
 # Vitest UI
 cd servers/friendly && npm run test:ui
 ```
@@ -608,6 +634,9 @@ const { email, password, handleLogin } = useLogin()
   - Web: React Router with protected routes
   - Mobile: Conditional rendering based on auth state
   - Loading states during auth check
+- **Testing:**
+  - Playwright E2E tests for web application
+  - Login flow with alert handling
 - Clean module separation (components/hooks/constants/services/types/utils)
 
 ### 🔲 In Progress
