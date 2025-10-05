@@ -2,8 +2,22 @@
  * API Service for backend communication
  */
 
+import { Platform } from 'react-native';
+
 // API 기본 설정
-const API_BASE_URL = 'http://localhost:4000';
+const API_PORT = 4000;
+
+const getDefaultApiUrl = (): string => {
+  // 안드로이드 에뮬레이터는 10.0.2.2를 사용해야 호스트의 localhost에 접근 가능
+  if (Platform.OS === 'android') {
+    return `http://10.0.2.2:${API_PORT}`;
+  }
+
+  // 나머지는 localhost 사용 (웹, iOS)
+  return `http://localhost:${API_PORT}`;
+}
+
+const API_BASE_URL = getDefaultApiUrl();
 
 // API 응답 타입
 export interface ApiResponse<T = any> {
@@ -59,29 +73,23 @@ class ApiService {
     endpoint: string,
     options?: RequestInit
   ): Promise<ApiResponse<T>> {
-    try {
-      const url = `${this.baseUrl}${endpoint}`;
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options?.headers,
-        },
-      });
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        // 서버에서 에러 응답이 왔을 때
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-
-      return data as ApiResponse<T>;
-    } catch (error) {
-      // 네트워크 에러 또는 기타 에러
-      console.error('API request failed:', error);
-      throw error;
+    if (!response.ok) {
+      // 서버에서 에러 응답이 왔을 때
+      throw new Error(data.message || `HTTP error! status: ${response.status}`);
     }
+
+    return data as ApiResponse<T>;
   }
 
   /**
