@@ -93,6 +93,7 @@ export interface RestaurantInfo {
   menuItems?: MenuItem[];
   savedToDb?: boolean;
   restaurantId?: number;
+  jobId?: string;
   reviewJobId?: string;
 }
 
@@ -146,6 +147,25 @@ export interface ReviewInfo {
   reviewText: string | null;
   emotionKeywords: string[];
   visitInfo: VisitInfo;
+}
+
+export interface ReviewData {
+  id: number;
+  userName: string | null;
+  visitKeywords: string[];
+  waitTime: string | null;
+  reviewText: string | null;
+  emotionKeywords: string[];
+  visitInfo: VisitInfo;
+  crawledAt: string;
+  createdAt: string;
+}
+
+export interface ReviewListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  reviews: ReviewData[];
 }
 
 export interface ReviewCrawlProgress {
@@ -249,6 +269,15 @@ class ApiService {
    */
   async getRestaurants(limit: number = 20, offset: number = 0): Promise<ApiResponse<RestaurantListResponse>> {
     return this.request<RestaurantListResponse>(`/api/restaurants?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Place ID로 리뷰 조회
+   */
+  async getReviewsByPlaceId(placeId: string, limit: number = 20, offset: number = 0): Promise<ApiResponse<ReviewListResponse>> {
+    return this.request<ReviewListResponse>(`/api/restaurants/place/${placeId}/reviews?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }

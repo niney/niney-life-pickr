@@ -850,9 +850,15 @@ const { email, password, handleLogin } = useLogin()
 - **UI Components (Web):**
   - Header: Hamburger menu, theme toggle (🌙/☀️), profile dropdown
   - Drawer: Slide-out sidebar with user info and navigation
-  - Restaurant: Category cards, crawling interface
+  - Restaurant: Category cards, crawling interface, review display
+    - **Desktop/Mobile Layout Separation**: 완전히 분리된 조건부 렌더링
+    - **Desktop**: 왼쪽 390px 고정(레스토랑 목록) + 오른쪽 flex(리뷰 패널)
+    - **Mobile**: 전체 화면 토글 (목록 ↔ 리뷰)
+    - **URL-based Navigation**: `/restaurant/:placeId` 라우팅, 브라우저 뒤로가기 지원
+    - **Review API Integration**: Place ID 기반 리뷰 조회, Socket.io 실시간 크롤링
   - Responsive layout with theme-aware styling
   - Theme colors: `background`, `surface`, `primary`, `text`, `textSecondary`, `border` (no `card` - use `surface`)
+  - Light mode: 레스토랑/리뷰 카드 배경 `#ffffff`
 - **Authentication state management:**
   - useAuth hook for global auth state
   - useLogin hook for login logic
@@ -956,6 +962,29 @@ open http://localhost:4000/reference
 curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.txt
 ```
 
+## React Native Web 제약사항 및 해결 패턴
+
+### StyleSheet 제약사항
+- **Media queries 불가**: `@media` 쿼리는 StyleSheet.create()에서 동작하지 않음
+  - 해결: `window.innerWidth` + resize 이벤트 리스너로 isMobile state 관리
+- **고정 width 문제**: StyleSheet의 숫자 width가 제대로 적용되지 않는 경우
+  - 해결: 인라인 스타일 사용 `style={{ width: 390, minWidth: 390, maxWidth: 390 }}`
+- **position absolute/fixed**: React Native Web에서 제한적
+  - 해결: HTML div 요소 사용 (모바일 전체 화면 패널)
+
+### 반응형 레이아웃 패턴
+```typescript
+// 조건부 렌더링으로 데스크탑/모바일 완전 분리
+{isMobile ? (
+  <MobileLayout />
+) : (
+  <DesktopLayout />
+)}
+
+// 인라인 스타일로 고정 너비 적용
+<ScrollView style={[styles.panel, { width: 390, minWidth: 390, maxWidth: 390 }]} />
+```
+
 ## Code Style and Quality
 
 ### ESLint Configuration
@@ -964,6 +993,8 @@ curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.
 - Run `npm run lint:fix` to auto-fix issues
 
 ### Commit Message Convention
+**IMPORTANT: 커밋 메시지는 반드시 한글로 작성**
+
 Prefix commits with the affected scope:
 - `[web]` - Web application changes
 - `[mobile]` - Mobile application changes
@@ -974,12 +1005,12 @@ Prefix commits with the affected scope:
 
 Examples:
 ```
-[web] feat: Add login component with shared components
-[mobile] fix: Update metro configuration for shared folder
-[shared] feat: Create cross-platform Button component
-[friendly] feat: Add Swagger documentation with AI prompt generation
-[smart] fix: Update FastAPI configuration for development
-[config] update: Add new environment variables for JWT
+[web] 데스크탑/모바일 레이아웃 분리 및 리뷰 기능 추가
+[mobile] 공유 폴더 사용을 위한 Metro 설정 업데이트
+[shared] 크로스 플랫폼 Button 컴포넌트 생성
+[friendly] Place ID 기반 리뷰 조회 API 추가
+[smart] 개발 환경을 위한 FastAPI 설정 수정
+[config] JWT를 위한 환경 변수 추가
 ```
 
 ## Performance Considerations

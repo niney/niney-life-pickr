@@ -14,6 +14,8 @@ export type {
   RestaurantData,
   RestaurantListResponse,
   ReviewInfo,
+  ReviewData,
+  ReviewListResponse,
   VisitInfo,
   ReviewCrawlProgress,
   ReviewCrawlStatus,
