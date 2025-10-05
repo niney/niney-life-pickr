@@ -71,8 +71,10 @@ niney-life-pickr/
     │   │   │   ├── auth.routes.ts   # Authentication endpoints
     │   │   │   ├── health.routes.ts # Health check endpoints
     │   │   │   ├── api.routes.ts    # General API endpoints
-    │   │   │   └── docs.routes.ts   # API documentation endpoints
+    │   │   │   ├── docs.routes.ts   # API documentation endpoints
+    │   │   │   └── crawler.routes.ts # Naver Map crawler endpoints
     │   │   ├── services/       # Business logic
+    │   │   │   └── naver-crawler.service.ts # Puppeteer-based web crawler
     │   │   ├── db/             # Database layer
     │   │   │   ├── database.ts # SQLite connection manager
     │   │   │   ├── migrate.ts  # Migration runner
@@ -242,6 +244,7 @@ mypy src                  # Type checking
 - **pino** structured logging with pino-pretty for development
 - **Vitest** for unit and integration testing
 - **Supertest** for HTTP endpoint testing
+- **Puppeteer 24.23.0** for web crawling and automation
 
 ### Smart Server (Python ML/AI Backend)
 - **Python 3.10+** with type hints
@@ -279,7 +282,7 @@ The friendly server provides comprehensive API documentation in multiple formats
 
 #### Route-Specific Documentation Generation
 - **Endpoint**: `GET /api/docs/generate/:routeName`
-- Generates documentation for specific routes (auth, health, api)
+- Generates documentation for specific routes (auth, health, api, crawler)
 - Creates separate folders in `generated-docs/` directory (gitignored)
 - Outputs two formats per route:
   - `{routeName}-api-doc.md` - Markdown documentation with examples
@@ -302,7 +305,7 @@ The friendly server provides comprehensive API documentation in multiple formats
 ### Documentation Features
 - **Auto-generated Examples**: TypeBox schemas automatically generate JSON examples
 - **JWT Authentication**: Ready for Bearer token implementation
-- **Tag-based Organization**: Endpoints organized by functional areas (auth, health, api, users)
+- **Tag-based Organization**: Endpoints organized by functional areas (auth, health, api, users, crawler)
 - **Response Standardization**: Consistent error/success response format across all endpoints
 - **Schema Validation**: Request/response validation with detailed error messages
 
@@ -435,6 +438,73 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 - Bearer token authentication configured in OpenAPI spec
 - Response types include token field for future implementation
 - Storage utility already supports token storage/retrieval
+
+## Naver Map Crawler Service
+
+### Overview
+Puppeteer-based web crawler for extracting restaurant information from Naver Map/Place URLs.
+
+### Architecture
+- **Service**: `servers/friendly/src/services/naver-crawler.service.ts`
+- **Routes**: `servers/friendly/src/routes/crawler.routes.ts`
+- **Types**: `servers/friendly/src/types/crawler.types.ts`
+
+### Key Features
+- **URL Support**: Handles multiple Naver URL formats
+  - `https://map.naver.com/p/entry/place/{id}`
+  - `https://m.place.naver.com/restaurant/{id}`
+  - `https://naver.me/{shortUrl}` (automatic redirect handling)
+- **Data Extraction**:
+  - Restaurant basic info (name, category, phone, address, coordinates)
+  - Menu items with descriptions and prices (auto-expands "more" buttons)
+  - Reviews with keywords, ratings, and visit info (auto-expands review list)
+- **Performance Optimization**:
+  - Blocks images/CSS/fonts for faster loading
+  - Creates new browser instance per crawl for stability
+  - Timing logs for performance monitoring
+
+### API Endpoints
+```bash
+# Single restaurant crawl
+POST /api/crawler/restaurant
+{
+  "url": "https://map.naver.com/p/entry/place/1234567890",
+  "crawlMenus": true  # optional, default: true
+}
+
+# Bulk crawl (max 5 URLs)
+POST /api/crawler/bulk
+{
+  "urls": ["url1", "url2", ...]
+}
+
+# Review crawl
+POST /api/crawler/reviews
+{
+  "url": "https://m.place.naver.com/restaurant/{id}/review/visitor?reviewSort=recent"
+}
+
+# Cleanup (deprecated - auto cleanup per crawl)
+POST /api/crawler/cleanup
+```
+
+### Important Implementation Notes
+- **Browser Management**: Each crawl creates and destroys its own browser instance
+- **Dynamic Loading**: Waits for elements to load text content (phone/address)
+- **URL Normalization**: Automatically converts all URLs to mobile format for consistent scraping
+- **Error Handling**: Graceful degradation when optional elements are missing
+- **TypeScript DOM Types**: Uses `lib: ["ES2022", "DOM"]` in tsconfig.json for page.evaluate() contexts
+
+### Response Helper Usage
+All endpoints use `ResponseHelper` utilities:
+```typescript
+// Success
+ResponseHelper.success(reply, data, message)
+
+// Errors
+ResponseHelper.validationError(reply, message)
+ResponseHelper.error(reply, message, statusCode)
+```
 
 ## API Response Standardization
 
@@ -652,7 +722,8 @@ const { email, password, handleLogin } = useLogin()
 - OpenAPI 3.0 specification with multiple documentation formats
 - Standardized API response format with TypeScript validation
 - Multiple API documentation interfaces (Swagger UI, Scalar, AI-friendly)
-- Route-specific documentation generation (auth, health, api)
+- Route-specific documentation generation (auth, health, api, crawler)
+- Naver Map crawler service with Puppeteer (restaurant info, menus, reviews)
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
@@ -733,6 +804,16 @@ curl http://localhost:4000/api/docs/markdown
 curl http://localhost:4000/api/docs/generate/auth
 curl http://localhost:4000/api/docs/generate/health
 curl http://localhost:4000/api/docs/generate/api
+curl http://localhost:4000/api/docs/generate/crawler
+
+# Naver Map crawler endpoints
+curl -X POST http://localhost:4000/api/crawler/restaurant \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://map.naver.com/p/entry/place/1234567890","crawlMenus":true}'
+
+curl -X POST http://localhost:4000/api/crawler/reviews \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://m.place.naver.com/restaurant/1234567890/review/visitor?reviewSort=recent"}'
 ```
 
 ### Database Operations

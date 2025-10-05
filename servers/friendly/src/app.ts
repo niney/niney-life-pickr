@@ -16,6 +16,7 @@ import healthRoutes from './routes/health.routes';
 import apiRoutes from './routes/api.routes';
 import authRoutes from './routes/auth.routes';
 import docsRoutes from './routes/docs.routes';
+import crawlerRoutes from './routes/crawler.routes';
 
 // Create Fastify app with TypeBox provider
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -76,7 +77,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
         { name: 'auth', description: 'Authentication endpoints' },
         { name: 'health', description: 'Health check endpoints' },
         { name: 'api', description: 'General API endpoints' },
-        { name: 'users', description: 'User management endpoints' }
+        { name: 'users', description: 'User management endpoints' },
+        { name: 'crawler', description: 'Naver Map restaurant crawler endpoints' }
       ],
       components: {
         securitySchemes: {
@@ -173,6 +175,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(apiRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(docsRoutes, { prefix: '/api/docs' });
+  await app.register(crawlerRoutes, { prefix: '/api/crawler' });
 
   return app;
 };

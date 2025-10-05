@@ -34,9 +34,9 @@ export default async function docsRoutes(fastify: FastifyInstance) {
     schema: {
       tags: ['api'],
       summary: 'Generate documentation for a specific route',
-      description: 'Generates and saves documentation for a specific route (auth, health, or api) in markdown, JSON, and text formats',
+      description: 'Generates and saves documentation for a specific route (auth, health, api, or crawler) in markdown, JSON, and text formats',
       params: Type.Object({
-        routeName: Type.String({ description: 'Name of the route to generate docs for (auth, health, api)' })
+        routeName: Type.String({ description: 'Name of the route to generate docs for (auth, health, api, crawler)' })
       }),
       response: {
         200: Type.Object({
@@ -52,7 +52,7 @@ export default async function docsRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { routeName } = request.params;
-      const validRoutes = ['auth', 'health', 'api'];
+      const validRoutes = ['auth', 'health', 'api', 'crawler'];
       
       if (!validRoutes.includes(routeName)) {
         return reply.status(400).send({
@@ -69,8 +69,9 @@ export default async function docsRoutes(fastify: FastifyInstance) {
         paths: Object.entries(spec.paths || {})
           .filter(([path]) => {
             if (routeName === 'health') return path.startsWith('/health');
-            if (routeName === 'api') return path === '/api' || (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/docs'));
+            if (routeName === 'api') return path === '/api' || (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/docs') && !path.startsWith('/api/crawler'));
             if (routeName === 'auth') return path.startsWith('/api/auth');
+            if (routeName === 'crawler') return path.startsWith('/api/crawler');
             return false;
           })
           .reduce((acc, [path, methods]) => ({ ...acc, [path]: methods }), {})
@@ -156,23 +157,33 @@ export default async function docsRoutes(fastify: FastifyInstance) {
   }, async () => {
     const spec = fastify.swagger();
     const endpoints = [];
-    
+
     // Parse OpenAPI spec to extract endpoint information
     for (const [path, methods] of Object.entries(spec.paths || {})) {
       for (const [method, operation] of Object.entries(methods as any)) {
         if (method === 'parameters') continue;
-        
+
         const op = operation as any;
+
+        // Parse parameters to match the expected schema
+        const parsedParameters = (op.parameters || []).map((param: any) => ({
+          name: param.name || '',
+          in: param.in || '',
+          required: param.required || false,
+          type: param.schema?.type || param.type || 'string',
+          description: param.description || undefined
+        }));
+
         const endpoint = {
           method: method.toUpperCase(),
           path,
           summary: op.summary || '',
           description: op.description || '',
-          parameters: op.parameters || [],
+          parameters: parsedParameters.length > 0 ? parsedParameters : undefined,
           requestBody: op.requestBody,
           responses: op.responses || {}
         };
-        
+
         endpoints.push(endpoint);
       }
     }
