@@ -105,7 +105,7 @@ export interface RestaurantCategory {
   count: number;
 }
 
-export interface Restaurant {
+export interface RestaurantData {
   id: number;
   place_id: string;
   name: string;
@@ -127,7 +127,7 @@ export interface RestaurantListResponse {
   total: number;
   limit: number;
   offset: number;
-  restaurants: Restaurant[];
+  restaurants: RestaurantData[];
 }
 
 // API 클래스

@@ -11,6 +11,6 @@ export type {
   RestaurantInfo,
   CrawlRestaurantRequest,
   RestaurantCategory,
-  Restaurant,
+  RestaurantData,
   RestaurantListResponse,
 } from './api.service';

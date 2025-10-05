@@ -5,7 +5,7 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { apiService } from '@shared/services'
-import type { RestaurantCategory, Restaurant } from '@shared/services'
+import type { RestaurantCategory, RestaurantData } from '@shared/services'
 import { Alert } from '@shared/utils'
 import Header from './Header'
 import Drawer from './Drawer'
@@ -21,7 +21,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<RestaurantCategory[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(false)
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([])
+  const [restaurants, setRestaurants] = useState<RestaurantData[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [total, setTotal] = useState(0)
   const colors = THEME_COLORS[theme]
