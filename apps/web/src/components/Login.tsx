@@ -4,8 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
 } from 'react-native'
 import { InputField, Button } from '@shared/components'
@@ -33,14 +31,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   }
 
   return (
-    <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
+    <View style={styles.wrapper}>
+      <View style={styles.container}>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* 헤더 */}
@@ -96,27 +90,26 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
     backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%',
+  },
+  container: {
     width: '100%',
     maxWidth: 480,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   scrollContainer: {
-    flexGrow: 1,
     paddingHorizontal: 32,
     paddingVertical: 48,
-    justifyContent: 'center',
-    minHeight: '100%',
   },
   header: {
     alignItems: 'center',
@@ -158,7 +151,8 @@ const styles = StyleSheet.create({
   signUpLink: {
     fontSize: 14,
     color: '#007AFF',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
 })
 
