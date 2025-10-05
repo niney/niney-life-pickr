@@ -112,7 +112,6 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
       })
 
       if (response.result && response.data) {
-        Alert.success('성공', '크롤링이 완료되었습니다 (메뉴 + 리뷰)')
         setUrl('')
 
         // 크롤링 완료 후 카테고리 및 레스토랑 목록 새로고침

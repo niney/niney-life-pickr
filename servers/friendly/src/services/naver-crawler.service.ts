@@ -588,7 +588,10 @@ class NaverCrawlerService {
   /**
    * 네이버플레이스 리뷰 크롤링
    */
-  async crawlReviews(url: string): Promise<ReviewInfo[]> {
+  async crawlReviews(
+    url: string,
+    onProgress?: (current: number, total: number, review: ReviewInfo) => void
+  ): Promise<ReviewInfo[]> {
     let startTime = Date.now();
     startTime = this.logTiming('리뷰 크롤링 시작', startTime);
 
@@ -876,6 +879,14 @@ class NaverCrawlerService {
 
       startTime = this.logTiming('리뷰 정보 추출 완료', startTime);
       console.log(`총 ${reviews.length}개의 리뷰 추출 완료`);
+
+      // 진행 상황 콜백 호출 (실시간 전송)
+      if (onProgress) {
+        const total = reviews.length;
+        for (let i = 0; i < reviews.length; i++) {
+          onProgress(i + 1, total, reviews[i]);
+        }
+      }
 
       return reviews;
 

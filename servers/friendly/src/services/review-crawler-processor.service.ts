@@ -61,6 +61,15 @@ export class ReviewCrawlerProcessor {
           savedToDb: reviews.length
         });
 
+        // 마지막 100% 진행 상황 보장
+        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
+          jobId,
+          current: reviews.length,
+          total: reviews.length,
+          percentage: 100
+        });
+
+        // 완료 이벤트
         io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, {
           jobId,
           totalReviews: reviews.length,
@@ -99,18 +108,14 @@ export class ReviewCrawlerProcessor {
     const io = getSocketIO();
     const reviews: ReviewInfo[] = [];
 
-    // 리뷰 크롤링 시작
-    const crawledReviews = await naverCrawlerService.crawlReviews(url);
-
-    // 리뷰 하나씩 처리
-    for (let i = 0; i < crawledReviews.length; i++) {
+    // 리뷰 크롤링 시작 (콜백으로 실시간 전송)
+    await naverCrawlerService.crawlReviews(url, async (current, total, review) => {
       // 중단 체크
       if (jobManager.isCancelled(jobId)) {
-        console.log(`[Job ${jobId}] 중단 감지 (리뷰 ${i}/${crawledReviews.length})`);
-        break;
+        console.log(`[Job ${jobId}] 중단 감지 (리뷰 ${current}/${total})`);
+        return;
       }
 
-      const review = crawledReviews[i];
       reviews.push(review);
 
       // 리뷰 해시 생성
@@ -126,37 +131,39 @@ export class ReviewCrawlerProcessor {
       try {
         await reviewRepository.upsertReview(restaurantId, review, reviewHash);
       } catch (dbError) {
-        console.error(`[Job ${jobId}] 리뷰 DB 저장 실패 (${i}):`, dbError);
+        console.error(`[Job ${jobId}] 리뷰 DB 저장 실패 (${current}):`, dbError);
       }
 
       // 진행 상황 업데이트
-      const current = i + 1;
-      const total = crawledReviews.length;
       const percentage = Math.floor((current / total) * 100);
 
       jobManager.updateProgress(jobId, current, total);
       await crawlJobRepository.updateProgress(jobId, current, total, percentage);
 
-      // Socket 이벤트: 진행 상황
-      io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
-        jobId,
-        current,
-        total,
-        percentage
-      });
+      // Socket 이벤트: 진행 상황 (10개마다 또는 마지막)
+      if (current % 10 === 0 || current === total) {
+        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
+          jobId,
+          current,
+          total,
+          percentage
+        });
+      }
 
-      // Socket 이벤트: 리뷰 아이템 (실시간 UI 업데이트)
-      io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_ITEM, {
-        jobId,
-        review,
-        index: i
-      });
+      // Socket 이벤트: 리뷰 아이템 (5개마다 전송으로 부담 감소)
+      if (current % 5 === 0 || current === total) {
+        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_ITEM, {
+          jobId,
+          review,
+          index: current - 1
+        });
+      }
 
       // 10개마다 로그
-      if ((i + 1) % 10 === 0) {
+      if (current % 10 === 0) {
         console.log(`[Job ${jobId}] 진행: ${current}/${total} (${percentage}%)`);
       }
-    }
+    });
 
     return reviews;
   }
