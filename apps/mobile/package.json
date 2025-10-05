@@ -7,7 +7,11 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "test:e2e": "maestro test .maestro",
+    "test:e2e:smoke": "maestro test .maestro/smoke.yaml",
+    "test:e2e:login": "maestro test .maestro/login.yaml",
+    "test:e2e:studio": "maestro studio"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

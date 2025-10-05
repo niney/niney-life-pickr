@@ -125,6 +125,12 @@ npm test           # Run tests
 
 # Reset Metro cache if needed
 npx react-native start --reset-cache
+
+# E2E Testing with Maestro
+npm run test:e2e         # Run all E2E tests
+npm run test:e2e:smoke   # Run smoke test
+npm run test:e2e:login   # Run login flow test
+npm run test:e2e:studio  # Open Maestro Studio (interactive mode)
 ```
 
 ### Friendly Server (Node.js Backend)
@@ -202,6 +208,7 @@ mypy src                  # Type checking
 - **TypeScript 5.8.3** for type safety
 - **Metro** bundler for JavaScript bundling
 - **React Native Safe Area Context** for device-safe layouts
+- **Maestro** for E2E testing (Android & iOS)
 - **Shared components** from apps/shared
 
 ### Shared Module Architecture
@@ -482,6 +489,22 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 - `npm run kill`: Terminates server process on configured port
 - `npm run dev:clean`: Kills existing server then starts fresh
 
+### Maestro Installation (Mobile E2E Testing)
+Maestro는 별도 설치가 필요합니다:
+
+```bash
+# macOS/Linux
+curl -Ls "https://get.maestro.mobile.dev" | bash
+
+# Windows (WSL2 필요)
+# WSL2에서 위 명령어 실행
+```
+
+설치 확인:
+```bash
+maestro --version
+```
+
 ## Testing Strategy
 
 ### Test Organization
@@ -490,6 +513,13 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
   - Login flow test: Alert handling, navigation verification
   - Test browsers: Chromium, Mobile Chrome, Mobile Safari
   - Important: React Native Web buttons render as `<div>`, use `getByText()` instead of `getByRole('button')`
+
+- **Mobile E2E Tests** (`apps/mobile/.maestro/`):
+  - Maestro E2E tests for React Native apps
+  - YAML-based test flows
+  - Tests: Smoke test, Login flow
+  - Supports Android & iOS platforms
+  - Test account: niney@ks.com / tester (defined in config.yaml)
 
 - **Friendly Server Tests**:
   - Unit tests: `src/__tests__/unit/`
@@ -503,6 +533,7 @@ Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
 ### Testing Approach
 - **E2E Tests**: User flows, integration testing
   - Web: Playwright with auto-starting dev server
+  - Mobile: Maestro with YAML-based flows
 - **Unit/Integration Tests**: Business logic, utilities, services
   - Friendly Server: Vitest with 80% coverage threshold
   - Smart Server: pytest with async support
@@ -517,6 +548,12 @@ npm run test:e2e -- login.spec.ts           # Run specific test file
 npm run test:e2e:ui                         # Interactive UI mode
 npm run test:e2e:headed -- login.spec.ts    # Watch test execution
 
+# Maestro E2E (Mobile)
+cd apps/mobile
+npm run test:e2e:smoke                      # Run smoke test
+npm run test:e2e:login                      # Run login flow test
+maestro test .maestro/login.yaml            # Run specific test directly
+
 # Vitest (Friendly Server)
 npm test -- src/__tests__/unit/userService.test.ts
 npm test -- src/__tests__/integration/auth.routes.test.ts
@@ -530,8 +567,11 @@ pytest tests/unit/test_config.py
 
 #### Debug tests
 ```bash
-# Playwright E2E
+# Playwright E2E (Web)
 cd apps/web && npm run test:e2e:debug
+
+# Maestro Studio (Mobile - Interactive)
+cd apps/mobile && npm run test:e2e:studio
 
 # Vitest UI
 cd servers/friendly && npm run test:ui
@@ -636,7 +676,8 @@ const { email, password, handleLogin } = useLogin()
   - Loading states during auth check
 - **Testing:**
   - Playwright E2E tests for web application
-  - Login flow with alert handling
+  - Maestro E2E tests for mobile application
+  - Login flow with alert handling (both platforms)
 - Clean module separation (components/hooks/constants/services/types/utils)
 
 ### 🔲 In Progress

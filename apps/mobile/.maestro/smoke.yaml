@@ -1,0 +1,17 @@
+appId: com.nineylifepickr
+---
+# Smoke Test - Basic App Launch
+
+- launchApp:
+    clearState: true
+
+# Verify app launches successfully
+- assertVisible: "Life Pickr"
+
+# Wait for initial loading to complete
+- waitForAnimationToEnd
+
+# Verify we're on login screen (when not authenticated)
+- assertVisible: "이메일을 입력하세요"
+- assertVisible: "비밀번호를 입력하세요"
+- assertVisible: "로그인"

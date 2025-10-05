@@ -1,0 +1,14 @@
+# Maestro Configuration
+appId: com.nineylifepickr
+
+# Environment variables for testing
+env:
+  TEST_EMAIL: niney@ks.com
+  TEST_PASSWORD: tester
+
+# Default settings
+onFlowStart:
+  - clearState
+
+onFlowComplete:
+  - stopApp
