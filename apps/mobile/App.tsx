@@ -5,9 +5,11 @@
  */
 
 import { StatusBar, StyleSheet, useColorScheme, View, Text, ActivityIndicator } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ThemeProvider } from 'shared/contexts';
 import LoginScreen from './src/screens/LoginScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import BottomTabNavigator from './src/navigation/BottomTabNavigator';
 import { useAuth } from 'shared/hooks';
 
 function App() {
@@ -15,22 +17,20 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <ThemeProvider>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading, logout, checkAuth } = useAuth();
+  const { isAuthenticated, isLoading, checkAuth } = useAuth();
 
   const handleLoginSuccess = async () => {
     // 로그인 성공 시 storage에서 다시 로드하여 화면 전환
     await checkAuth();
-  };
-
-  const handleLogout = async () => {
-    await logout();
   };
 
   // 로딩 중
@@ -46,7 +46,9 @@ function AppContent() {
   return (
     <View style={styles.container}>
       {isAuthenticated ? (
-        <HomeScreen onLogout={handleLogout} />
+        <NavigationContainer>
+          <BottomTabNavigator />
+        </NavigationContainer>
       ) : (
         <LoginScreen onLoginSuccess={handleLoginSuccess} />
       )}

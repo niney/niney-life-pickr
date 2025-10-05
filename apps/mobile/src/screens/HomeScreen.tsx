@@ -1,140 +1,90 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from 'shared/components';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useTheme } from 'shared/contexts';
 import { useAuth } from 'shared/hooks';
+import { THEME_COLORS } from 'shared/constants';
 
-interface HomeScreenProps {
-  onLogout: () => Promise<void>;
-}
-
-const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
+const HomeScreen: React.FC = () => {
+  const { theme } = useTheme();
   const { user } = useAuth();
-
-  const handleLogout = async () => {
-    await onLogout();
-  };
+  const colors = THEME_COLORS[theme];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* 헤더 */}
-        <View style={styles.header}>
-          <Text style={styles.title}>홈</Text>
-          <Text style={styles.subtitle}>로그인에 성공했습니다!</Text>
-
-          {/* 사용자 정보 */}
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.content}>
+        <View style={[styles.welcomeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.title, { color: colors.text }]}>환영합니다! 👋</Text>
           {user && (
-            <View style={styles.userInfo}>
-              <Text style={styles.userInfoLabel}>사용자 정보</Text>
-              <View style={styles.userInfoRow}>
-                <Text style={styles.userInfoKey}>이메일:</Text>
-                <Text style={styles.userInfoValue}>{user.email}</Text>
-              </View>
-              <View style={styles.userInfoRow}>
-                <Text style={styles.userInfoKey}>사용자명:</Text>
-                <Text style={styles.userInfoValue}>{user.username}</Text>
-              </View>
-            </View>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {user.username}님
+            </Text>
           )}
         </View>
 
-        {/* 콘텐츠 */}
-        <View style={styles.content}>
-          <Text style={styles.placeholderText}>
-            홈 화면 콘텐츠가 여기에 표시됩니다.
-          </Text>
+        <View style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>통계</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>저장한 맛집</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>방문 완료</Text>
+            </View>
+          </View>
         </View>
-
-        {/* 로그아웃 버튼 */}
-        <View style={styles.logoutButtonContainer}>
-          <Button
-            title="로그아웃"
-            onPress={handleLogout}
-            variant="secondary"
-          />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 24,
+  content: {
+    padding: 16,
+    paddingBottom: 100, // 하단 탭바 공간 확보
   },
-  header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    alignItems: 'center',
+  welcomeCard: {
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
   },
-  userInfo: {
-    marginTop: 24,
+  statsCard: {
     padding: 20,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  userInfoLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 12,
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
   },
-  userInfoRow: {
+  statsRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    justifyContent: 'space-around',
   },
-  userInfoKey: {
-    fontSize: 14,
-    color: '#666',
-    width: 80,
-  },
-  userInfoValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  statItem: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 48,
   },
-  placeholderText: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
+  statValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
-  logoutButtonContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
+  statLabel: {
+    fontSize: 14,
   },
 });
 
