@@ -6,4 +6,8 @@ export type {
   LoginRequest,
   LoginResponse,
   RegisterRequest,
+  MenuItem,
+  Coordinates,
+  RestaurantInfo,
+  CrawlRestaurantRequest,
 } from './api.service';

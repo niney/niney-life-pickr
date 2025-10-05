@@ -65,6 +65,41 @@ export interface RegisterRequest {
   password: string;
 }
 
+// 크롤링 관련 타입
+export interface MenuItem {
+  name: string;
+  description?: string;
+  price: string;
+  image?: string;
+}
+
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+export interface RestaurantInfo {
+  name: string;
+  address: string | null;
+  category: string | null;
+  phone: string | null;
+  description: string | null;
+  businessHours: string | null;
+  coordinates: Coordinates | null;
+  url: string;
+  placeId: string | null;
+  placeName: string | null;
+  crawledAt: string;
+  menuItems?: MenuItem[];
+  savedToDb?: boolean;
+  restaurantId?: number;
+}
+
+export interface CrawlRestaurantRequest {
+  url: string;
+  crawlMenus?: boolean;
+}
+
 // API 클래스
 class ApiService {
   private baseUrl: string;
@@ -125,6 +160,16 @@ class ApiService {
   async getUsers(): Promise<ApiResponse<{ users: User[]; count: number }>> {
     return this.request<{ users: User[]; count: number }>('/api/auth/users', {
       method: 'GET',
+    });
+  }
+
+  /**
+   * 네이버 맵 음식점 크롤링
+   */
+  async crawlRestaurant(request: CrawlRestaurantRequest): Promise<ApiResponse<RestaurantInfo>> {
+    return this.request<RestaurantInfo>('/api/crawler/restaurant', {
+      method: 'POST',
+      body: JSON.stringify(request),
     });
   }
 }
