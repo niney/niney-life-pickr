@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import db from './database';
+import seeder from './seed';
 
 interface Migration {
   id: number;
@@ -63,8 +64,11 @@ export class Migrator {
         console.log(`Migration ${file} applied successfully`);
       }
     }
-    
+
     console.log('All migrations completed');
+
+    // Run seeders after migrations
+    await seeder.seed();
   }
   
   async reset(): Promise<void> {
