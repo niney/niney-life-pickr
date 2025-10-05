@@ -10,4 +10,5 @@ export type {
   Coordinates,
   RestaurantInfo,
   CrawlRestaurantRequest,
+  RestaurantCategory,
 } from './api.service';

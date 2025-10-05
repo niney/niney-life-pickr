@@ -49,9 +49,12 @@ export interface RestaurantInput {
 }
 
 export interface MenuInput {
-  restaurant_id: number;
   name: string;
   description?: string | null;
   price: string;
   image?: string | null;
+}
+
+export interface MenuInsert extends MenuInput {
+  restaurant_id: number;
 }

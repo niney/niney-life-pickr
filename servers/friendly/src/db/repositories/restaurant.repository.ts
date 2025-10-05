@@ -151,6 +151,20 @@ export class RestaurantRepository {
     );
     return result?.count || 0;
   }
+
+  /**
+   * 카테고리별 음식점 개수 조회 (GROUP BY category)
+   */
+  async countByCategory(): Promise<Array<{ category: string; count: number }>> {
+    return await db.all<{ category: string; count: number }>(
+      `SELECT
+        COALESCE(category, 'Unknown') as category,
+        COUNT(*) as count
+       FROM restaurants
+       GROUP BY category
+       ORDER BY count DESC, category ASC`
+    );
+  }
 }
 
 export const restaurantRepository = new RestaurantRepository();

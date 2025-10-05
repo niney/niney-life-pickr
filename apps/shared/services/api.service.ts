@@ -100,6 +100,11 @@ export interface CrawlRestaurantRequest {
   crawlMenus?: boolean;
 }
 
+export interface RestaurantCategory {
+  category: string;
+  count: number;
+}
+
 // API 클래스
 class ApiService {
   private baseUrl: string;
@@ -170,6 +175,15 @@ class ApiService {
     return this.request<RestaurantInfo>('/api/crawler/restaurant', {
       method: 'POST',
       body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * 카테고리별 음식점 개수 조회
+   */
+  async getRestaurantCategories(): Promise<ApiResponse<RestaurantCategory[]>> {
+    return this.request<RestaurantCategory[]>('/api/restaurants/categories', {
+      method: 'GET',
     });
   }
 }

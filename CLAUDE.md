@@ -72,7 +72,8 @@ niney-life-pickr/
     │   │   │   ├── health.routes.ts # Health check endpoints
     │   │   │   ├── api.routes.ts    # General API endpoints
     │   │   │   ├── docs.routes.ts   # API documentation endpoints
-    │   │   │   └── crawler.routes.ts # Naver Map crawler endpoints
+    │   │   │   ├── crawler.routes.ts # Naver Map crawler endpoints
+    │   │   │   └── restaurant.routes.ts # Restaurant data management endpoints
     │   │   ├── services/       # Business logic
     │   │   │   ├── naver-crawler.service.ts # Puppeteer-based web crawler
     │   │   │   └── restaurant.service.ts    # Restaurant data management (crawler + DB)
@@ -557,6 +558,37 @@ ResponseHelper.validationError(reply, message)
 ResponseHelper.error(reply, message, statusCode)
 ```
 
+## Restaurant Data Management API
+
+### Overview
+Restaurant API provides access to crawled restaurant data with category aggregation and pagination support.
+
+### Endpoints
+- **GET /api/restaurants/categories** - Get restaurant count grouped by category
+  - Returns categories sorted by count (descending) then name (ascending)
+  - NULL categories appear as "Unknown"
+
+- **GET /api/restaurants** - List restaurants with pagination
+  - Query params: `limit` (default: 20), `offset` (default: 0)
+  - Returns total count and paginated results
+
+- **GET /api/restaurants/:id** - Get restaurant details with menus
+  - Returns restaurant info and associated menu items
+  - 404 if restaurant not found
+
+### Type System
+- **MenuInput**: Menu data without restaurant_id (used in saveMenus method)
+- **MenuInsert**: Extends MenuInput with restaurant_id (used for DB insertion)
+- This separation allows `restaurantRepository.saveMenus(restaurantId, menus)` to accept menus without explicit restaurant_id
+
+### Integration Tests
+All restaurant routes have comprehensive integration tests in `src/__tests__/integration/restaurant.routes.test.ts`:
+- Category aggregation (including NULL handling)
+- Pagination (limit, offset, default values)
+- Restaurant details with menus
+- Response format validation
+- Tests account for existing production data using `>=` comparisons
+
 ## API Response Standardization
 
 All API endpoints use a consistent response format:
@@ -657,6 +689,12 @@ maestro --version
     - Crawling + DB save integration
     - Database persistence verification (restaurants, menus)
     - Uses mocked crawler service for consistent test data
+  - Restaurant routes test: Integration tests for restaurant data management
+    - Category aggregation with NULL handling
+    - Pagination (limit, offset, defaults)
+    - Restaurant details with menus
+    - 404 handling for non-existent restaurants
+    - Tests use `>=` comparisons to account for production data
 
 ### Testing Approach
 - **E2E Tests**: User flows, integration testing
@@ -785,6 +823,11 @@ const { email, password, handleLogin } = useLogin()
   - RestaurantService integrating crawling + DB storage
   - RestaurantRepository with data access layer
   - Integration tests verifying DB persistence
+- **Restaurant Data Management API:**
+  - Category aggregation endpoint (GROUP BY with NULL handling)
+  - Paginated restaurant listing
+  - Restaurant detail view with menus
+  - Integration tests for all endpoints
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
@@ -807,7 +850,9 @@ const { email, password, handleLogin } = useLogin()
 - **UI Components (Web):**
   - Header: Hamburger menu, theme toggle (🌙/☀️), profile dropdown
   - Drawer: Slide-out sidebar with user info and navigation
+  - Restaurant: Category cards, crawling interface
   - Responsive layout with theme-aware styling
+  - Theme colors: `background`, `surface`, `primary`, `text`, `textSecondary`, `border` (no `card` - use `surface`)
 - **Authentication state management:**
   - useAuth hook for global auth state
   - useLogin hook for login logic
