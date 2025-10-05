@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import naverCrawlerService from '../services/naver-crawler.service';
+import restaurantService from '../services/restaurant.service';
 import { ResponseHelper } from '../utils/response.utils';
 
 /**
@@ -34,7 +35,9 @@ const RestaurantInfoSchema = Type.Object({
   placeId: Type.Union([Type.String(), Type.Null()], { description: '네이버 Place ID' }),
   placeName: Type.Union([Type.String(), Type.Null()], { description: '장소 이름' }),
   crawledAt: Type.String({ description: '크롤링 시간 (ISO 8601)' }),
-  menuItems: Type.Optional(Type.Array(MenuItemSchema, { description: '메뉴 목록' }))
+  menuItems: Type.Optional(Type.Array(MenuItemSchema, { description: '메뉴 목록' })),
+  savedToDb: Type.Optional(Type.Boolean({ description: 'DB 저장 여부' })),
+  restaurantId: Type.Optional(Type.Number({ description: 'DB에 저장된 음식점 ID' }))
 });
 
 // 방문 정보 스키마
@@ -58,6 +61,8 @@ const ReviewInfoSchema = Type.Object({
 const CrawlResultSchema = Type.Object({
   success: Type.Boolean({ description: '성공 여부' }),
   data: Type.Optional(RestaurantInfoSchema),
+  savedToDb: Type.Optional(Type.Boolean({ description: 'DB 저장 여부' })),
+  restaurantId: Type.Optional(Type.Number({ description: 'DB에 저장된 음식점 ID' })),
   url: Type.Optional(Type.String({ description: '원본 URL (실패 시)' })),
   error: Type.Optional(Type.String({ description: '에러 메시지 (실패 시)' }))
 });
@@ -67,6 +72,7 @@ const BulkCrawlResponseSchema = Type.Object({
   total: Type.Number({ description: '전체 URL 개수' }),
   successful: Type.Number({ description: '성공한 개수' }),
   failed: Type.Number({ description: '실패한 개수' }),
+  savedToDb: Type.Number({ description: 'DB에 저장된 개수' }),
   results: Type.Array(CrawlResultSchema, { description: '개별 크롤링 결과' })
 });
 
@@ -122,7 +128,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
     const { url, crawlMenus = true } = request.body as { url: string; crawlMenus?: boolean };
 
     // URL 검증
-    if (!url || typeof url !== 'string') {
+    if (!url) {
       return ResponseHelper.validationError(reply, 'URL is required');
     }
 
@@ -138,10 +144,14 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     try {
-      console.log('크롤링 시작:', url);
-      const restaurantInfo = await naverCrawlerService.crawlRestaurant(url, { crawlMenus });
+      console.log('크롤링 및 DB 저장 시작:', url);
+      const result = await restaurantService.crawlAndSaveRestaurant(url, { crawlMenus });
 
-      return ResponseHelper.success(reply, restaurantInfo, '식당 정보 크롤링 성공');
+      return ResponseHelper.success(reply, {
+        ...result.restaurantInfo,
+        savedToDb: result.savedToDb,
+        restaurantId: result.restaurantId
+      }, '식당 정보 크롤링 성공');
     } catch (error) {
       console.error('크롤링 에러:', error);
       return ResponseHelper.error(
@@ -225,17 +235,14 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     try {
-      console.log(`${validUrls.length}개 URL 크롤링 시작...`);
-      const results = await naverCrawlerService.crawlMultipleRestaurants(validUrls);
+      console.log(`${validUrls.length}개 URL 일괄 크롤링 및 DB 저장 시작...`);
+      const bulkResult = await restaurantService.crawlAndSaveMultiple(validUrls);
 
-      const response = {
-        total: results.length,
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length,
-        results
-      };
-
-      return ResponseHelper.success(reply, response, `${response.successful}/${response.total}개 크롤링 성공`);
+      return ResponseHelper.success(
+        reply,
+        bulkResult,
+        `${bulkResult.successful}/${bulkResult.total}개 크롤링 성공, ${bulkResult.savedToDb}개 DB 저장`
+      );
     } catch (error) {
       console.error('일괄 크롤링 에러:', error);
       return ResponseHelper.error(
@@ -288,7 +295,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
     const { url } = request.body as { url: string };
 
     // URL 검증
-    if (!url || typeof url !== 'string') {
+    if (!url) {
       return ResponseHelper.validationError(reply, 'URL is required');
     }
 
