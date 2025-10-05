@@ -125,11 +125,17 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    const { url, crawlMenus = true } = request.body as { url: string; crawlMenus?: boolean };
+    let { url, crawlMenus = true } = request.body as { url: string; crawlMenus?: boolean };
 
     // URL 검증
     if (!url) {
       return ResponseHelper.validationError(reply, 'URL is required');
+    }
+
+    // Place ID만 입력된 경우 (숫자로만 구성) 모바일 URL로 변환
+    if (/^\d+$/.test(url.trim())) {
+      url = `https://m.place.naver.com/restaurant/${url.trim()}/home`;
+      console.log('Place ID를 모바일 URL로 변환:', url);
     }
 
     // 네이버맵 URL 검증
@@ -139,7 +145,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
     if (!isValidUrl) {
       return ResponseHelper.validationError(
         reply,
-        'Invalid Naver Map URL. Expected: map.naver.com, m.place.naver.com, place.naver.com, or naver.me'
+        'Invalid Naver Map URL or Place ID. Expected: map.naver.com, m.place.naver.com, place.naver.com, naver.me, or numeric Place ID'
       );
     }
 
@@ -206,7 +212,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    const { urls } = request.body as { urls: string[] };
+    let { urls } = request.body as { urls: string[] };
 
     // URLs 검증
     if (!urls || !Array.isArray(urls)) {
@@ -222,6 +228,17 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
       return ResponseHelper.validationError(reply, 'At least 1 URL is required');
     }
 
+    // Place ID만 입력된 경우 모바일 URL로 변환
+    urls = urls.map(url => {
+      const trimmedUrl = url.trim();
+      if (/^\d+$/.test(trimmedUrl)) {
+        const convertedUrl = `https://m.place.naver.com/restaurant/${trimmedUrl}/home`;
+        console.log('Place ID를 모바일 URL로 변환:', trimmedUrl, '->', convertedUrl);
+        return convertedUrl;
+      }
+      return url;
+    });
+
     // 유효한 네이버맵 URL 필터링
     const validUrls = urls.filter((url: string) =>
       url.includes('map.naver.com') ||
@@ -231,7 +248,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
     );
 
     if (validUrls.length === 0) {
-      return ResponseHelper.validationError(reply, 'No valid Naver Map URLs found');
+      return ResponseHelper.validationError(reply, 'No valid Naver Map URLs or Place IDs found');
     }
 
     try {
