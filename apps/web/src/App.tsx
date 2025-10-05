@@ -2,8 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import Home from './components/Home'
 import { useAuth } from '@shared/hooks'
+import { ThemeProvider } from '@shared/contexts'
 
-function App() {
+function AppContent() {
   const { isAuthenticated, isLoading, logout } = useAuth()
 
   const handleLoginSuccess = async () => {
@@ -44,6 +45,14 @@ function App() {
         )}
       </Routes>
     </BrowserRouter>
+  )
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }
 

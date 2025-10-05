@@ -215,15 +215,17 @@ mypy src                  # Type checking
 - **Barrel Export Pattern** for clean imports
 - **Cross-platform components** (Button, InputField)
 - **Shared hooks** (useLogin, useAuth) for business logic with API integration
+- **Shared contexts** (ThemeContext) for global state management
 - **API Service layer** for backend communication with platform-specific URL handling
-- **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS) with domain separation
+- **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS, THEME_COLORS) with domain separation
 - **Cross-platform utilities**:
   - Alert utility for web and mobile
   - Storage utility (localStorage for web, AsyncStorage for mobile)
+  - Theme persistence with auto-restore
 - **AsyncStorage 2.2.0** for persistent mobile storage
 - **React Native** base for maximum compatibility
 - **TypeScript** for type definitions
-- **Clean separation** of concerns (components/hooks/constants/services/types/utils)
+- **Clean separation** of concerns (components/hooks/contexts/constants/services/types/utils)
 
 ### Friendly Server (Node.js Backend)
 - **Fastify 5.6.0** high-performance web framework
@@ -664,6 +666,16 @@ const { email, password, handleLogin } = useLogin()
 - Unified login UI across platforms with shared hooks and constants
 - API integration with backend authentication
 - Cross-platform utilities (Alert, Storage)
+- **Theme System:**
+  - ThemeContext with useTheme hook
+  - Light/Dark mode support
+  - Theme persistence in storage (app_theme key)
+  - Auto-restore on app startup
+  - Theme colors: THEME_COLORS constant with light/dark palettes
+- **UI Components (Web):**
+  - Header: Hamburger menu, theme toggle (🌙/☀️), profile dropdown
+  - Drawer: Slide-out sidebar with user info and navigation
+  - Responsive layout with theme-aware styling
 - **Authentication state management:**
   - useAuth hook for global auth state
   - useLogin hook for login logic
@@ -678,7 +690,7 @@ const { email, password, handleLogin } = useLogin()
   - Playwright E2E tests for web application
   - Maestro E2E tests for mobile application
   - Login flow with alert handling (both platforms)
-- Clean module separation (components/hooks/constants/services/types/utils)
+- Clean module separation (components/hooks/contexts/constants/services/types/utils)
 
 ### 🔲 In Progress
 - JWT token authentication implementation

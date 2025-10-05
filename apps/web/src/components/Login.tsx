@@ -8,7 +8,8 @@ import {
 } from 'react-native'
 import { InputField, Button } from '@shared/components'
 import { useLogin } from '@shared/hooks'
-import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from '@shared/constants'
+import { useTheme } from '@shared/contexts'
+import { APP_INFO_CONSTANTS, AUTH_CONSTANTS, THEME_COLORS } from '@shared/constants'
 
 interface LoginProps {
   onLoginSuccess?: () => void
@@ -26,12 +27,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     handleSignUp,
   } = useLogin()
 
+  const { theme } = useTheme()
+  const colors = THEME_COLORS[theme]
+
   const handleLogin = () => {
     handleLoginBase(onLoginSuccess)
   }
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
       <View style={styles.container}>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
@@ -39,8 +43,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         >
           {/* 헤더 */}
           <View style={styles.header}>
-            <Text style={styles.title}>{APP_INFO_CONSTANTS.title}</Text>
-            <Text style={styles.subtitle}>{APP_INFO_CONSTANTS.subtitle}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{APP_INFO_CONSTANTS.title}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{APP_INFO_CONSTANTS.subtitle}</Text>
           </View>
 
           {/* 로그인 폼 */}
@@ -71,7 +75,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               style={styles.forgotPasswordButton}
               onPress={handleForgotPassword}
             >
-              <Text style={styles.forgotPasswordText}>{AUTH_CONSTANTS.STRINGS.forgotPassword}</Text>
+              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>{AUTH_CONSTANTS.STRINGS.forgotPassword}</Text>
             </TouchableOpacity>
 
             <Button
@@ -84,9 +88,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           {/* 회원가입 링크 */}
           <View style={styles.signUpContainer}>
-            <Text style={styles.signUpText}>{AUTH_CONSTANTS.STRINGS.signUpQuestion}</Text>
+            <Text style={[styles.signUpText, { color: colors.textSecondary }]}>{AUTH_CONSTANTS.STRINGS.signUpQuestion}</Text>
             <TouchableOpacity onPress={handleSignUp}>
-              <Text style={styles.signUpLink}>{AUTH_CONSTANTS.STRINGS.signUp}</Text>
+              <Text style={[styles.signUpLink, { color: colors.primary }]}>{AUTH_CONSTANTS.STRINGS.signUp}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -98,7 +102,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     height: '100%',
@@ -118,12 +121,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
   },
   form: {
@@ -135,7 +136,6 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: '#007AFF',
     fontWeight: '500',
   },
   signUpContainer: {
@@ -146,11 +146,9 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    color: '#666',
   },
   signUpLink: {
     fontSize: 14,
-    color: '#007AFF',
     fontWeight: 'bold',
     marginLeft: 4,
   },
