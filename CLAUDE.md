@@ -74,13 +74,18 @@ niney-life-pickr/
     │   │   │   ├── docs.routes.ts   # API documentation endpoints
     │   │   │   └── crawler.routes.ts # Naver Map crawler endpoints
     │   │   ├── services/       # Business logic
-    │   │   │   └── naver-crawler.service.ts # Puppeteer-based web crawler
+    │   │   │   ├── naver-crawler.service.ts # Puppeteer-based web crawler
+    │   │   │   └── restaurant.service.ts    # Restaurant data management (crawler + DB)
     │   │   ├── db/             # Database layer
     │   │   │   ├── database.ts # SQLite connection manager
     │   │   │   ├── migrate.ts  # Migration runner
-    │   │   │   └── migrations/ # SQL migration files
+    │   │   │   ├── migrations/ # SQL migration files
+    │   │   │   └── repositories/ # Data access layer
+    │   │   │       └── restaurant.repository.ts # Restaurant/menu CRUD operations
     │   │   ├── utils/          # Utility functions
     │   │   └── types/          # TypeScript type definitions
+    │   │       ├── crawler.types.ts # Crawler service types
+    │   │       └── db.types.ts      # Database entity types
     │   ├── data/               # SQLite database file location
     │   └── dist/               # Compiled JavaScript output
     └── smart/                  # Python ML/AI backend service
@@ -368,6 +373,33 @@ token TEXT UNIQUE NOT NULL
 expires_at DATETIME NOT NULL
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 FOREIGN KEY (user_id) REFERENCES users(id)
+
+-- restaurants table (Naver Map crawler data)
+id INTEGER PRIMARY KEY AUTOINCREMENT
+place_id TEXT UNIQUE NOT NULL  -- Naver Place ID
+name TEXT NOT NULL
+place_name TEXT
+category TEXT
+phone TEXT
+address TEXT
+description TEXT
+business_hours TEXT
+lat REAL  -- Latitude
+lng REAL  -- Longitude
+url TEXT NOT NULL
+crawled_at DATETIME NOT NULL
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+
+-- menus table (Restaurant menu items)
+id INTEGER PRIMARY KEY AUTOINCREMENT
+restaurant_id INTEGER NOT NULL
+name TEXT NOT NULL
+description TEXT
+price TEXT NOT NULL
+image TEXT
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
 ```
 
 ### Migration System
@@ -442,12 +474,16 @@ FOREIGN KEY (user_id) REFERENCES users(id)
 ## Naver Map Crawler Service
 
 ### Overview
-Puppeteer-based web crawler for extracting restaurant information from Naver Map/Place URLs.
+Puppeteer-based web crawler for extracting restaurant information from Naver Map/Place URLs with automatic database persistence.
 
 ### Architecture
-- **Service**: `servers/friendly/src/services/naver-crawler.service.ts`
-- **Routes**: `servers/friendly/src/routes/crawler.routes.ts`
-- **Types**: `servers/friendly/src/types/crawler.types.ts`
+- **Crawler Service**: `servers/friendly/src/services/naver-crawler.service.ts` - Raw web scraping logic
+- **Restaurant Service**: `servers/friendly/src/services/restaurant.service.ts` - Integrates crawling with DB storage
+- **Repository**: `servers/friendly/src/db/repositories/restaurant.repository.ts` - Data access layer
+- **Routes**: `servers/friendly/src/routes/crawler.routes.ts` - API endpoints
+- **Types**:
+  - `servers/friendly/src/types/crawler.types.ts` - Crawler response types
+  - `servers/friendly/src/types/db.types.ts` - Database entity types
 
 ### Key Features
 - **URL Support**: Handles multiple Naver URL formats
@@ -488,12 +524,27 @@ POST /api/crawler/reviews
 POST /api/crawler/cleanup
 ```
 
+### Database Storage Implementation
+- **UPSERT Pattern**: Restaurant data is upserted based on `place_id` (no duplicates)
+- **Menu Replacement**: Menus are deleted and re-inserted on each crawl for freshness
+- **Service Layer Architecture**:
+  - `RestaurantService.crawlAndSaveRestaurant()` - Single restaurant crawl + save
+  - `RestaurantService.crawlAndSaveMultiple()` - Bulk crawl + save (sequential)
+- **Repository Pattern**:
+  - `upsertRestaurant()` - Insert or update restaurant by place_id
+  - `saveMenus()` - Replace all menus for a restaurant
+  - `findByPlaceId()`, `findMenusByRestaurantId()` - Query methods
+- **Response Fields**:
+  - `savedToDb: boolean` - Indicates if data was persisted
+  - `restaurantId: number` - Database ID of saved restaurant
+
 ### Important Implementation Notes
 - **Browser Management**: Each crawl creates and destroys its own browser instance
 - **Dynamic Loading**: Waits for elements to load text content (phone/address)
 - **URL Normalization**: Automatically converts all URLs to mobile format for consistent scraping
 - **Error Handling**: Graceful degradation when optional elements are missing
 - **TypeScript DOM Types**: Uses `lib: ["ES2022", "DOM"]` in tsconfig.json for page.evaluate() contexts
+- **Data Conversion**: Crawler types automatically converted to DB input types via service layer
 
 ### Response Helper Usage
 All endpoints use `ResponseHelper` utilities:
@@ -601,6 +652,11 @@ maestro --version
     - Login with case-insensitive email support
     - User listing and management
     - Performance and concurrent request handling
+  - Crawler routes test: Integration tests for Naver Map crawler with DB persistence
+    - URL validation (missing URL, invalid domain)
+    - Crawling + DB save integration
+    - Database persistence verification (restaurants, menus)
+    - Uses mocked crawler service for consistent test data
 
 ### Testing Approach
 - **E2E Tests**: User flows, integration testing
@@ -724,6 +780,11 @@ const { email, password, handleLogin } = useLogin()
 - Multiple API documentation interfaces (Swagger UI, Scalar, AI-friendly)
 - Route-specific documentation generation (auth, health, api, crawler)
 - Naver Map crawler service with Puppeteer (restaurant info, menus, reviews)
+- **Database persistence for crawler data:**
+  - Restaurants and menus tables with UPSERT pattern
+  - RestaurantService integrating crawling + DB storage
+  - RestaurantRepository with data access layer
+  - Integration tests verifying DB persistence
 - Vitest + Supertest testing for backend
 - Python "smart" backend service with FastAPI
 - pytest testing environment for smart server
@@ -824,6 +885,18 @@ cd servers/friendly && npm run db:reset
 # View database (requires SQLite CLI)
 sqlite3 servers/friendly/data/niney.db ".tables"
 sqlite3 servers/friendly/data/niney.db "SELECT * FROM users;"
+sqlite3 servers/friendly/data/niney.db "SELECT * FROM restaurants;"
+sqlite3 servers/friendly/data/niney.db "SELECT * FROM menus WHERE restaurant_id = 1;"
+
+# Check restaurant count
+sqlite3 servers/friendly/data/niney.db "SELECT COUNT(*) FROM restaurants;"
+
+# View restaurant with menus (JOIN query)
+sqlite3 servers/friendly/data/niney.db "
+SELECT r.name, r.category, r.phone, m.name as menu_name, m.price
+FROM restaurants r
+LEFT JOIN menus m ON r.id = m.restaurant_id
+WHERE r.place_id = 'test20848484';"
 ```
 
 ### Accessing API Documentation
