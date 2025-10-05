@@ -13,7 +13,14 @@ const getDefaultApiUrl = (): string => {
     return `http://10.0.2.2:${API_PORT}`;
   }
 
-  // 나머지는 localhost 사용 (웹, iOS)
+  // 웹 환경: 현재 브라우저의 호스트 사용 (localhost, IP, 도메인 자동 감지)
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:${API_PORT}`;
+  }
+
+  // iOS 및 기타: localhost 사용
   return `http://localhost:${API_PORT}`;
 }
 

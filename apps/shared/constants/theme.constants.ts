@@ -27,4 +27,4 @@ export const THEME_COLORS = {
   },
 };
 
-export const HEADER_HEIGHT = 60;
+export const HEADER_HEIGHT = 48;
