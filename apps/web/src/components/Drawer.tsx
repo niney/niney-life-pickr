@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@shared/contexts';
 import { useAuth } from '@shared/hooks';
 import { THEME_COLORS } from '@shared/constants';
@@ -11,9 +12,15 @@ interface DrawerProps {
 }
 
 const Drawer: React.FC<DrawerProps> = ({ visible, onClose, onLogout }) => {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const { user } = useAuth();
   const colors = THEME_COLORS[theme];
+
+  const handleNavigation = (path: string) => {
+    onClose();
+    navigate(path);
+  };
 
   const handleLogout = () => {
     onClose();
@@ -54,9 +61,14 @@ const Drawer: React.FC<DrawerProps> = ({ visible, onClose, onLogout }) => {
 
           {/* Menu Items */}
           <View style={styles.menuItems}>
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('/')}>
               <Text style={[styles.menuItemIcon, { color: colors.text }]}>🏠</Text>
               <Text style={[styles.menuItemText, { color: colors.text }]}>홈</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('/restaurant')}>
+              <Text style={[styles.menuItemIcon, { color: colors.text }]}>🍴</Text>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>맛집</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.menuItem}>

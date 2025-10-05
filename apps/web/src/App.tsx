@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import Home from './components/Home'
+import Restaurant from './components/Restaurant'
 import { useAuth } from '@shared/hooks'
 import { ThemeProvider } from '@shared/contexts'
 
@@ -39,6 +40,7 @@ function AppContent() {
         ) : (
           <>
             <Route path="/" element={<Home onLogout={logout} />} />
+            <Route path="/restaurant" element={<Restaurant onLogout={logout} />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
