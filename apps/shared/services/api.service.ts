@@ -105,6 +105,31 @@ export interface RestaurantCategory {
   count: number;
 }
 
+export interface Restaurant {
+  id: number;
+  place_id: string;
+  name: string;
+  place_name: string | null;
+  category: string | null;
+  phone: string | null;
+  address: string | null;
+  description: string | null;
+  business_hours: string | null;
+  lat: number | null;
+  lng: number | null;
+  url: string;
+  crawled_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RestaurantListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  restaurants: Restaurant[];
+}
+
 // API 클래스
 class ApiService {
   private baseUrl: string;
@@ -183,6 +208,15 @@ class ApiService {
    */
   async getRestaurantCategories(): Promise<ApiResponse<RestaurantCategory[]>> {
     return this.request<RestaurantCategory[]>('/api/restaurants/categories', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 음식점 목록 조회
+   */
+  async getRestaurants(limit: number = 20, offset: number = 0): Promise<ApiResponse<RestaurantListResponse>> {
+    return this.request<RestaurantListResponse>(`/api/restaurants?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }

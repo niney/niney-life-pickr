@@ -5,7 +5,7 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { apiService } from '@shared/services'
-import type { RestaurantCategory } from '@shared/services'
+import type { RestaurantCategory, Restaurant } from '@shared/services'
 import { Alert } from '@shared/utils'
 import Header from './Header'
 import Drawer from './Drawer'
@@ -21,6 +21,9 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<RestaurantCategory[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(false)
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([])
+  const [restaurantsLoading, setRestaurantsLoading] = useState(false)
+  const [total, setTotal] = useState(0)
   const colors = THEME_COLORS[theme]
 
   // 카테고리 목록 가져오기
@@ -38,9 +41,26 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     }
   }
 
-  // 컴포넌트 마운트 시 카테고리 가져오기
+  // 레스토랑 목록 가져오기
+  const fetchRestaurants = async () => {
+    setRestaurantsLoading(true)
+    try {
+      const response = await apiService.getRestaurants(20, 0)
+      if (response.result && response.data) {
+        setRestaurants(response.data.restaurants)
+        setTotal(response.data.total)
+      }
+    } catch (err) {
+      console.error('레스토랑 목록 조회 실패:', err)
+    } finally {
+      setRestaurantsLoading(false)
+    }
+  }
+
+  // 컴포넌트 마운트 시 카테고리 및 레스토랑 목록 가져오기
   useEffect(() => {
     fetchCategories()
+    fetchRestaurants()
   }, [])
 
   const handleCrawl = async () => {
@@ -59,8 +79,9 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
       if (response.result && response.data) {
         Alert.success('성공', '크롤링이 완료되었습니다')
         setUrl('')
-        // 크롤링 완료 후 카테고리 새로고침
+        // 크롤링 완료 후 카테고리 및 레스토랑 목록 새로고침
         fetchCategories()
+        fetchRestaurants()
       } else {
         throw new Error(response.message || '크롤링 실패')
       }
@@ -125,6 +146,37 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
             </View>
           ) : !categoriesLoading ? (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
+          ) : null}
+        </View>
+
+        {/* 레스토랑 목록 */}
+        <View style={styles.restaurantsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>레스토랑 목록 ({total})</Text>
+            {restaurantsLoading && <ActivityIndicator size="small" color={colors.text} />}
+          </View>
+
+          {restaurants.length > 0 ? (
+            <View style={styles.restaurantsList}>
+              {restaurants.map((restaurant) => (
+                <View
+                  key={restaurant.id}
+                  style={[styles.restaurantCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
+                  {restaurant.category && (
+                    <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>{restaurant.category}</Text>
+                  )}
+                  {restaurant.address && (
+                    <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {restaurant.address}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : !restaurantsLoading ? (
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
           ) : null}
         </View>
       </ScrollView>
@@ -206,6 +258,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
+  },
+  restaurantsSection: {
+    marginTop: 24,
+  },
+  restaurantsList: {
+    gap: 8,
+  },
+  restaurantCard: {
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  restaurantName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  restaurantCategory: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  restaurantAddress: {
+    fontSize: 13,
   },
 })
 
