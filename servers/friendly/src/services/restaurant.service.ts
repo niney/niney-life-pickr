@@ -2,6 +2,9 @@ import naverCrawlerService from './naver-crawler.service';
 import restaurantRepository from '../db/repositories/restaurant.repository';
 import { RestaurantInput, MenuInput } from '../types/db.types';
 import { RestaurantInfo, MenuItem } from '../types/crawler.types';
+import jobManager from './job-manager.service';
+import crawlJobRepository from '../db/repositories/crawl-job.repository';
+import reviewCrawlerProcessor from './review-crawler-processor.service';
 
 /**
  * Restaurant Service
@@ -48,16 +51,17 @@ export class RestaurantService {
   /**
    * 음식점 크롤링 및 DB 저장
    * @param url 네이버맵 URL
-   * @param options 크롤링 옵션 (crawlMenus 등)
+   * @param options 크롤링 옵션 (crawlMenus, crawlReviews 등)
    * @returns 크롤링 결과 및 DB 저장 여부
    */
   async crawlAndSaveRestaurant(
     url: string,
-    options: { crawlMenus?: boolean } = {}
+    options: { crawlMenus?: boolean; crawlReviews?: boolean } = {}
   ): Promise<{
     restaurantInfo: RestaurantInfo;
     savedToDb: boolean;
     restaurantId?: number;
+    reviewJobId?: string;
     error?: string;
   }> {
     try {
@@ -92,10 +96,50 @@ export class RestaurantService {
 
         console.log('[RestaurantService] DB 저장 완료:', restaurantId);
 
+        // 3. 리뷰 크롤링 시작 (옵션이 true인 경우)
+        let reviewJobId: string | undefined = undefined;
+        if (options.crawlReviews && restaurantInfo.placeId) {
+          try {
+            const { v4: uuidv4 } = await import('uuid');
+            reviewJobId = uuidv4();
+
+            // 리뷰 URL 생성
+            const reviewUrl = `https://m.place.naver.com/restaurant/${restaurantInfo.placeId}/review/visitor?reviewSort=recent`;
+
+            console.log('[RestaurantService] 리뷰 크롤링 Job 생성:', reviewJobId);
+
+            // Job 생성
+            jobManager.createJob(reviewJobId, {
+              restaurantId,
+              placeId: restaurantInfo.placeId,
+              url: reviewUrl
+            });
+
+            // DB에 Job 기록
+            await crawlJobRepository.create({
+              job_id: reviewJobId,
+              restaurant_id: restaurantId,
+              place_id: restaurantInfo.placeId,
+              url: reviewUrl,
+              status: 'pending'
+            });
+
+            // 백그라운드로 리뷰 크롤링 시작
+            reviewCrawlerProcessor.process(reviewJobId, restaurantInfo.placeId, reviewUrl, restaurantId)
+              .catch(err => console.error('[RestaurantService] 리뷰 크롤링 에러:', err));
+
+            console.log('[RestaurantService] 리뷰 크롤링 Job 시작됨:', reviewJobId);
+          } catch (reviewError) {
+            console.error('[RestaurantService] 리뷰 크롤링 Job 생성 실패:', reviewError);
+            // 리뷰 크롤링 실패해도 레스토랑 크롤링은 성공으로 처리
+          }
+        }
+
         return {
           restaurantInfo,
           savedToDb: true,
-          restaurantId
+          restaurantId,
+          reviewJobId
         };
       } catch (dbError) {
         // DB 저장 실패해도 크롤링 결과는 반환
@@ -182,6 +226,13 @@ export class RestaurantService {
       savedToDb: savedCount,
       results
     };
+  }
+
+  /**
+   * Place ID로 음식점 조회 (간단 버전)
+   */
+  async findByPlaceId(placeId: string) {
+    return await restaurantRepository.findByPlaceId(placeId);
   }
 
   /**

@@ -93,11 +93,13 @@ export interface RestaurantInfo {
   menuItems?: MenuItem[];
   savedToDb?: boolean;
   restaurantId?: number;
+  reviewJobId?: string;
 }
 
 export interface CrawlRestaurantRequest {
   url: string;
   crawlMenus?: boolean;
+  crawlReviews?: boolean;
 }
 
 export interface RestaurantCategory {
@@ -128,6 +130,36 @@ export interface RestaurantListResponse {
   limit: number;
   offset: number;
   restaurants: RestaurantData[];
+}
+
+// 리뷰 관련 타입
+export interface VisitInfo {
+  visitDate: string | null;
+  visitCount: string | null;
+  verificationMethod: string | null;
+}
+
+export interface ReviewInfo {
+  userName: string | null;
+  visitKeywords: string[];
+  waitTime: string | null;
+  reviewText: string | null;
+  emotionKeywords: string[];
+  visitInfo: VisitInfo;
+}
+
+export interface ReviewCrawlProgress {
+  current: number;
+  total: number;
+  percentage: number;
+}
+
+export interface ReviewCrawlStatus {
+  jobId?: string;
+  status: 'idle' | 'active' | 'completed' | 'failed' | 'cancelled';
+  progress?: ReviewCrawlProgress;
+  reviews?: ReviewInfo[];
+  error?: string;
 }
 
 // API 클래스

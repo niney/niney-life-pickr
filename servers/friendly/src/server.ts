@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import os from 'os';
 import db from './db/database';
 import migrator from './db/migrate';
+import { initializeSocketIO } from './socket/socket';
 
 // Load configuration based on environment
 const env = process.env.NODE_ENV || 'development';
@@ -55,9 +56,13 @@ async function startServer() {
     
     // Build Fastify app
     const app = await buildApp();
-    
+
     // Start server
     await app.listen({ port: PORT, host: HOST });
+
+    // Initialize Socket.io
+    initializeSocketIO(app);
+    console.log('✅ Socket.io initialized');
 
     // Get local network IP
     const getLocalNetworkIP = (): string | null => {

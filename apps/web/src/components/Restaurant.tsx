@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { apiService } from '@shared/services'
-import type { RestaurantCategory, RestaurantData } from '@shared/services'
+import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 import { Alert } from '@shared/utils'
+import { io, Socket } from 'socket.io-client'
 import Header from './Header'
 import Drawer from './Drawer'
 
@@ -24,7 +25,33 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const [restaurants, setRestaurants] = useState<RestaurantData[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [total, setTotal] = useState(0)
+  const [reviewCrawlStatus, setReviewCrawlStatus] = useState<ReviewCrawlStatus>({
+    status: 'idle',
+    reviews: []
+  })
+  const socketRef = useRef<Socket | null>(null)
   const colors = THEME_COLORS[theme]
+
+  // Socket.io 연결 설정
+  useEffect(() => {
+    const socket = io('http://localhost:4000', {
+      transports: ['websocket', 'polling']
+    })
+
+    socket.on('connect', () => {
+      console.log('[Socket.io] Connected:', socket.id)
+    })
+
+    socket.on('disconnect', () => {
+      console.log('[Socket.io] Disconnected')
+    })
+
+    socketRef.current = socket
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [])
 
   // 카테고리 목록 가져오기
   const fetchCategories = async () => {
@@ -70,23 +97,129 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     }
 
     setLoading(true)
+    // 리뷰 크롤링 시작 상태로 설정
+    setReviewCrawlStatus({
+      status: 'active',
+      progress: { current: 0, total: 0, percentage: 0 },
+      reviews: []
+    })
+
     try {
       const response = await apiService.crawlRestaurant({
         url: url.trim(),
         crawlMenus: true,
+        crawlReviews: true, // 리뷰 크롤링 활성화
       })
 
       if (response.result && response.data) {
-        Alert.success('성공', '크롤링이 완료되었습니다')
+        Alert.success('성공', '크롤링이 완료되었습니다 (메뉴 + 리뷰)')
         setUrl('')
+
         // 크롤링 완료 후 카테고리 및 레스토랑 목록 새로고침
         fetchCategories()
         fetchRestaurants()
+
+        // 리뷰 Job ID가 있으면 Socket 룸에 조인
+        if (response.data.reviewJobId && socketRef.current) {
+          const jobId = response.data.reviewJobId
+          console.log('[리뷰 크롤링] Job ID:', jobId)
+
+          // Job 룸에 조인
+          socketRef.current.emit('subscribe:job', jobId)
+
+          // 리뷰 크롤링 시작 이벤트
+          socketRef.current.on('review:started', (data: any) => {
+            console.log('[리뷰 크롤링] 시작:', data)
+            setReviewCrawlStatus({
+              status: 'active',
+              jobId: data.jobId,
+              progress: { current: 0, total: 0, percentage: 0 },
+              reviews: []
+            })
+          })
+
+          // 리뷰 크롤링 진행 상황
+          socketRef.current.on('review:progress', (data: any) => {
+            console.log('[리뷰 크롤링] 진행:', data)
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              status: 'active',
+              progress: {
+                current: data.current,
+                total: data.total,
+                percentage: data.percentage
+              }
+            }))
+          })
+
+          // 리뷰 아이템 수신 (실시간)
+          socketRef.current.on('review:item', (data: any) => {
+            console.log('[리뷰 크롤링] 아이템:', data.review)
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              reviews: [...(prev.reviews || []), data.review]
+            }))
+          })
+
+          // 리뷰 크롤링 완료
+          socketRef.current.on('review:completed', (data: any) => {
+            console.log('[리뷰 크롤링] 완료:', data)
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              status: 'completed'
+            }))
+            // 이벤트 리스너 제거
+            socketRef.current?.off('review:started')
+            socketRef.current?.off('review:progress')
+            socketRef.current?.off('review:item')
+            socketRef.current?.off('review:completed')
+            socketRef.current?.off('review:error')
+            socketRef.current?.off('review:cancelled')
+          })
+
+          // 리뷰 크롤링 에러
+          socketRef.current.on('review:error', (data: any) => {
+            console.error('[리뷰 크롤링] 에러:', data)
+            setReviewCrawlStatus({
+              status: 'failed',
+              error: data.error,
+              reviews: []
+            })
+            // 이벤트 리스너 제거
+            socketRef.current?.off('review:started')
+            socketRef.current?.off('review:progress')
+            socketRef.current?.off('review:item')
+            socketRef.current?.off('review:completed')
+            socketRef.current?.off('review:error')
+            socketRef.current?.off('review:cancelled')
+          })
+
+          // 리뷰 크롤링 취소
+          socketRef.current.on('review:cancelled', (data: any) => {
+            console.log('[리뷰 크롤링] 취소:', data)
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              status: 'cancelled'
+            }))
+            // 이벤트 리스너 제거
+            socketRef.current?.off('review:started')
+            socketRef.current?.off('review:progress')
+            socketRef.current?.off('review:item')
+            socketRef.current?.off('review:completed')
+            socketRef.current?.off('review:error')
+            socketRef.current?.off('review:cancelled')
+          })
+        }
       } else {
         throw new Error(response.message || '크롤링 실패')
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '크롤링 중 오류가 발생했습니다'
+      setReviewCrawlStatus({
+        status: 'failed',
+        error: errorMessage,
+        reviews: []
+      })
       Alert.error('크롤링 실패', errorMessage)
     } finally {
       setLoading(false)
@@ -148,6 +281,119 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
           ) : null}
         </View>
+
+        {/* 리뷰 크롤링 진행 상황 */}
+        {reviewCrawlStatus.status !== 'idle' && (
+          <View style={styles.reviewSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>리뷰 크롤링</Text>
+              {reviewCrawlStatus.status === 'active' && <ActivityIndicator size="small" color={colors.text} />}
+            </View>
+
+            {/* 진행 상황 */}
+            {reviewCrawlStatus.progress && (
+              <View style={[styles.progressContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.progressInfo}>
+                  <Text style={[styles.progressText, { color: colors.text }]}>
+                    {reviewCrawlStatus.progress.current} / {reviewCrawlStatus.progress.total}
+                  </Text>
+                  <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+                    {reviewCrawlStatus.progress.percentage}%
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      { width: `${reviewCrawlStatus.progress.percentage}%`, backgroundColor: colors.primary }
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* 상태 메시지 */}
+            {reviewCrawlStatus.status === 'completed' && (
+              <Text style={[styles.statusText, { color: '#28a745' }]}>✓ 크롤링 완료</Text>
+            )}
+            {reviewCrawlStatus.status === 'failed' && (
+              <Text style={[styles.statusText, { color: '#dc3545' }]}>✗ {reviewCrawlStatus.error || '크롤링 실패'}</Text>
+            )}
+          </View>
+        )}
+
+        {/* 리뷰 데이터 임시 표시 */}
+        {reviewCrawlStatus.reviews && reviewCrawlStatus.reviews.length > 0 && (
+          <View style={styles.reviewsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링된 리뷰 ({reviewCrawlStatus.reviews.length})</Text>
+            </View>
+
+            <View style={styles.reviewsList}>
+              {reviewCrawlStatus.reviews.map((review, index) => (
+                <View
+                  key={index}
+                  style={[styles.reviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.reviewHeader}>
+                    <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
+                    {review.visitInfo.visitDate && (
+                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                        {review.visitInfo.visitDate}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* 방문 키워드 */}
+                  {review.visitKeywords.length > 0 && (
+                    <View style={styles.keywordsContainer}>
+                      {review.visitKeywords.map((keyword, idx) => (
+                        <View key={idx} style={[styles.keyword, { backgroundColor: colors.border }]}>
+                          <Text style={[styles.keywordText, { color: colors.text }]}>{keyword}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* 리뷰 텍스트 */}
+                  {review.reviewText && (
+                    <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
+                  )}
+
+                  {/* 감정 키워드 */}
+                  {review.emotionKeywords.length > 0 && (
+                    <View style={styles.keywordsContainer}>
+                      {review.emotionKeywords.map((keyword, idx) => (
+                        <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
+                          <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* 방문 정보 */}
+                  <View style={styles.visitInfo}>
+                    {review.visitInfo.visitCount && (
+                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                        {review.visitInfo.visitCount}
+                      </Text>
+                    )}
+                    {review.visitInfo.verificationMethod && (
+                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                        • {review.visitInfo.verificationMethod}
+                      </Text>
+                    )}
+                    {review.waitTime && (
+                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                        • {review.waitTime}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* 레스토랑 목록 */}
         <View style={styles.restaurantsSection}>
@@ -281,6 +527,101 @@ const styles = StyleSheet.create({
   },
   restaurantAddress: {
     fontSize: 13,
+  },
+  // 리뷰 크롤링 진행 상황 스타일
+  reviewSection: {
+    marginTop: 24,
+  },
+  progressContainer: {
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  progressPercentage: {
+    fontSize: 14,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  // 리뷰 데이터 표시 스타일
+  reviewsSection: {
+    marginTop: 24,
+  },
+  reviewsList: {
+    gap: 12,
+  },
+  reviewCard: {
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reviewUserName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  reviewDate: {
+    fontSize: 13,
+  },
+  keywordsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  keyword: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  emotionKeyword: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  keywordText: {
+    fontSize: 12,
+  },
+  reviewText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  visitInfo: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  visitInfoText: {
+    fontSize: 12,
   },
 })
 
