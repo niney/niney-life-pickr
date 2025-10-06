@@ -26,7 +26,6 @@ interface RestaurantListProps {
   reviewCrawlStatus: ReviewCrawlStatus
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
-  selectedPlaceId: string | null
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
 }

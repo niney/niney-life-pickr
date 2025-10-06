@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantCategory, RestaurantData, ReviewData, ReviewCrawlStatus } from '@shared/services'
+import { useReviews } from '../hooks/useReviews'
 import Header from './Header'
 import Drawer from './Drawer'
 
@@ -21,14 +22,8 @@ interface RestaurantDesktopProps {
   reviewCrawlStatus: ReviewCrawlStatus
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
-  selectedPlaceId: string | null
-  selectedRestaurant: RestaurantData | null
-  reviews: ReviewData[]
-  reviewsLoading: boolean
-  reviewsTotal: number
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
-  handleBackToList: () => void
 }
 
 const RestaurantDesktop: React.FC<RestaurantDesktopProps> = ({
@@ -44,23 +39,46 @@ const RestaurantDesktop: React.FC<RestaurantDesktopProps> = ({
   reviewCrawlStatus,
   crawlProgress,
   dbProgress,
-  selectedPlaceId,
-  selectedRestaurant,
-  reviews,
-  reviewsLoading,
-  reviewsTotal,
   handleCrawl,
   handleRestaurantClick,
-  handleBackToList,
 }) => {
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
   const colors = THEME_COLORS[theme]
 
+  // 데스크탑용 사이드 패널 상태
+  const [localSelectedPlaceId, setLocalSelectedPlaceId] = useState<string | null>(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null)
+  
+  // 공통 리뷰 훅 사용
+  const { reviews, reviewsLoading, reviewsTotal, fetchReviews, clearReviews } = useReviews()
+
   const handleLogout = async () => {
     await onLogout()
     window.location.href = '/login'
   }
+
+  // 레스토랑 클릭 핸들러
+  const handleLocalRestaurantClick = (restaurant: RestaurantData) => {
+    setLocalSelectedPlaceId(restaurant.place_id)
+    setSelectedRestaurant(restaurant)
+    fetchReviews(restaurant.place_id)
+    handleRestaurantClick(restaurant)
+  }
+
+  // 뒤로가기 핸들러
+  const handleBackToList = () => {
+    setLocalSelectedPlaceId(null)
+    setSelectedRestaurant(null)
+    clearReviews()
+  }
+
+  // 크롤링 완료 시 리뷰 갱신
+  useEffect(() => {
+    if (reviewCrawlStatus.status === 'completed' && localSelectedPlaceId) {
+      fetchReviews(localSelectedPlaceId)
+    }
+  }, [reviewCrawlStatus.status])
 
   return (
     <div className="page-container" style={{ backgroundColor: colors.background }}>
@@ -191,11 +209,11 @@ const RestaurantDesktop: React.FC<RestaurantDesktopProps> = ({
                         styles.restaurantCard,
                         {
                           backgroundColor: theme === 'light' ? '#fff' : colors.surface,
-                          borderColor: selectedPlaceId === restaurant.place_id ? colors.primary : colors.border,
-                          borderWidth: selectedPlaceId === restaurant.place_id ? 2 : 1,
+                          borderColor: localSelectedPlaceId === restaurant.place_id ? colors.primary : colors.border,
+                          borderWidth: localSelectedPlaceId === restaurant.place_id ? 2 : 1,
                         }
                       ]}
-                      onPress={() => handleRestaurantClick(restaurant)}
+                      onPress={() => handleLocalRestaurantClick(restaurant)}
                     >
                       <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
                       {restaurant.category && (
@@ -217,7 +235,7 @@ const RestaurantDesktop: React.FC<RestaurantDesktopProps> = ({
         </View>
 
         {/* 오른쪽 패널: 리뷰 목록 */}
-        {selectedPlaceId && (
+        {localSelectedPlaceId && (
           <View style={[styles.rightPanel, { backgroundColor: colors.background }]}>
             <View style={[styles.reviewHeader, { borderBottomColor: colors.border }]}>
               <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>

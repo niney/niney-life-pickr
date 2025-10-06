@@ -21,7 +21,6 @@ interface RestaurantMobileProps {
   reviewCrawlStatus: ReviewCrawlStatus
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
-  selectedPlaceId: string | null
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
 }
@@ -39,7 +38,6 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
   reviewCrawlStatus,
   crawlProgress,
   dbProgress,
-  selectedPlaceId,
   handleCrawl,
   handleRestaurantClick,
 }) => {
@@ -82,7 +80,6 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
               reviewCrawlStatus={reviewCrawlStatus}
               crawlProgress={crawlProgress}
               dbProgress={dbProgress}
-              selectedPlaceId={selectedPlaceId}
               handleCrawl={handleCrawl}
               handleRestaurantClick={handleRestaurantClick}
             />

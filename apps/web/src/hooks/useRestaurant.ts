@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import { apiService } from '@shared/services'
 import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 import { Alert } from '@shared/utils'
 
 export const useRestaurant = () => {
-  const { placeId } = useParams<{ placeId?: string }>()
   const navigate = useNavigate()
   
   const [url, setUrl] = useState('')
@@ -22,13 +21,11 @@ export const useRestaurant = () => {
   })
   const [crawlProgress, setCrawlProgress] = useState<{ current: number; total: number; percentage: number } | null>(null)
   const [dbProgress, setDbProgress] = useState<{ current: number; total: number; percentage: number } | null>(null)
-
-  // 크롤링 진행 중인 placeId 추적용
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(placeId || null)
+  const [currentCrawlPlaceId, setCurrentCrawlPlaceId] = useState<string | null>(null)
 
   const socketRef = useRef<Socket | null>(null)
 
-  // Socket.io 연결 설정
+  // Socket.io 연결 - 크롤링 진행 상황 실시간 수신
   useEffect(() => {
     const socket = io('http://localhost:4000', {
       transports: ['websocket', 'polling']
@@ -49,107 +46,87 @@ export const useRestaurant = () => {
     }
   }, [])
 
-  // selectedPlaceId 변경 시 place room 구독/구독 해제
+  // 크롤링 중인 placeId가 변경될 때 room 구독
   useEffect(() => {
-    if (!socketRef.current) return
+    if (!socketRef.current || !currentCrawlPlaceId) return
 
-    if (selectedPlaceId) {
-      // 새로운 place room 구독
-      socketRef.current.emit('subscribe:place', selectedPlaceId)
-      console.log(`[Socket.io] Subscribed to place:${selectedPlaceId}`)
+    const socket = socketRef.current
+    const placeId = currentCrawlPlaceId
 
-      // Socket 이벤트 리스너 등록
-      const handleCrawlProgress = (data: any) => {
-        if (data.placeId === selectedPlaceId) {
-          console.log('[Socket.io] Crawl Progress:', data)
-          setCrawlProgress({
-            current: data.current,
-            total: data.total,
-            percentage: data.percentage
-          })
-          setReviewCrawlStatus(prev => ({
-            ...prev,
-            status: 'active'
-          }))
-        }
-      }
+    // place room 구독
+    socket.emit('subscribe:place', placeId)
+    console.log(`[Socket.io] Subscribed to place:${placeId}`)
 
-      const handleDbProgress = (data: any) => {
-        if (data.placeId === selectedPlaceId) {
-          console.log('[Socket.io] DB Progress:', data)
-          setDbProgress({
-            current: data.current,
-            total: data.total,
-            percentage: data.percentage
-          })
-          setReviewCrawlStatus(prev => ({
-            ...prev,
-            status: 'active'
-          }))
-        }
-      }
-
-      const handleCompleted = (data: any) => {
-        if (data.placeId === selectedPlaceId) {
-          console.log('[Socket.io] Completed:', data)
-          setReviewCrawlStatus({
-            status: 'completed',
-            reviews: []
-          })
-          setCrawlProgress(null)
-          setDbProgress(null)
-          Alert.success('크롤링 완료', `${data.totalReviews || 0}개의 리뷰를 수집했습니다`)
-          
-          // 데이터 갱신
-          fetchRestaurants()
-          fetchCategories()
-        }
-      }
-
-      const handleError = (data: any) => {
-        if (data.placeId === selectedPlaceId) {
-          console.error('[Socket.io] Error:', data)
-          const errorMessage = data.error || '크롤링 중 오류가 발생했습니다'
-          setReviewCrawlStatus({
-            status: 'failed',
-            error: errorMessage,
-            reviews: []
-          })
-          setCrawlProgress(null)
-          setDbProgress(null)
-          Alert.error('크롤링 실패', errorMessage)
-          
-          // 에러 발생 시에도 데이터 갱신 시도
-          fetchRestaurants()
-          fetchCategories()
-        }
-      }
-
-      socketRef.current.on('review:crawl_progress', handleCrawlProgress)
-      socketRef.current.on('review:db_progress', handleDbProgress)
-      socketRef.current.on('review:completed', handleCompleted)
-      socketRef.current.on('review:error', handleError)
-
-      return () => {
-        // 구독 해제 및 이벤트 리스너 제거
-        socketRef.current?.emit('unsubscribe:place', selectedPlaceId)
-        socketRef.current?.off('review:crawl_progress', handleCrawlProgress)
-        socketRef.current?.off('review:db_progress', handleDbProgress)
-        socketRef.current?.off('review:completed', handleCompleted)
-        socketRef.current?.off('review:error', handleError)
-        console.log(`[Socket.io] Unsubscribed from place:${selectedPlaceId}`)
+    // 진행 상황 이벤트 핸들러
+    const handleCrawlProgress = (data: any) => {
+      if (data.placeId === placeId) {
+        console.log('[Socket.io] Crawl Progress:', data)
+        setCrawlProgress({
+          current: data.current,
+          total: data.total,
+          percentage: data.percentage
+        })
+        setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
       }
     }
-  }, [selectedPlaceId])
 
-  // URL 파라미터로 placeId가 전달되면 크롤링 진행 추적용으로 설정
-  useEffect(() => {
-    if (placeId && placeId !== selectedPlaceId) {
-      setSelectedPlaceId(placeId)
-    } else if (!placeId && selectedPlaceId) {
-      setSelectedPlaceId(null)
+    const handleDbProgress = (data: any) => {
+      if (data.placeId === placeId) {
+        console.log('[Socket.io] DB Progress:', data)
+        setDbProgress({
+          current: data.current,
+          total: data.total,
+          percentage: data.percentage
+        })
+        setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
+      }
     }
-  }, [placeId])
+
+    const handleCompleted = (data: any) => {
+      if (data.placeId === placeId) {
+        console.log('[Socket.io] Completed:', data)
+        setReviewCrawlStatus({ status: 'completed', reviews: [] })
+        setCrawlProgress(null)
+        setDbProgress(null)
+        setCurrentCrawlPlaceId(null)
+        Alert.success('크롤링 완료', `${data.totalReviews || 0}개의 리뷰를 수집했습니다`)
+        
+        // 데이터 갱신
+        fetchRestaurants()
+        fetchCategories()
+      }
+    }
+
+    const handleError = (data: any) => {
+      if (data.placeId === placeId) {
+        console.error('[Socket.io] Error:', data)
+        const errorMessage = data.error || '크롤링 중 오류가 발생했습니다'
+        setReviewCrawlStatus({ status: 'failed', error: errorMessage, reviews: [] })
+        setCrawlProgress(null)
+        setDbProgress(null)
+        setCurrentCrawlPlaceId(null)
+        Alert.error('크롤링 실패', errorMessage)
+        
+        // 에러 발생 시에도 데이터 갱신
+        fetchRestaurants()
+        fetchCategories()
+      }
+    }
+
+    socket.on('review:crawl_progress', handleCrawlProgress)
+    socket.on('review:db_progress', handleDbProgress)
+    socket.on('review:completed', handleCompleted)
+    socket.on('review:error', handleError)
+
+    return () => {
+      socket.emit('unsubscribe:place', placeId)
+      socket.off('review:crawl_progress', handleCrawlProgress)
+      socket.off('review:db_progress', handleDbProgress)
+      socket.off('review:completed', handleCompleted)
+      socket.off('review:error', handleError)
+      console.log(`[Socket.io] Unsubscribed from place:${placeId}`)
+    }
+  }, [currentCrawlPlaceId])
 
   const fetchCategories = async () => {
     setCategoriesLoading(true)
@@ -198,11 +175,7 @@ export const useRestaurant = () => {
     }
 
     setLoading(true)
-    setReviewCrawlStatus({
-      status: 'active',
-      reviews: []
-    })
-    // 진행도 초기화 (0%로 시작)
+    setReviewCrawlStatus({ status: 'active', reviews: [] })
     setCrawlProgress({ current: 0, total: 0, percentage: 0 })
     setDbProgress({ current: 0, total: 0, percentage: 0 })
 
@@ -210,50 +183,29 @@ export const useRestaurant = () => {
       const response = await apiService.crawlRestaurant({ url, crawlMenus: true, crawlReviews: true })
 
       if (response.result && response.data) {
-        // 크롤링 시작 성공
-        console.log('[Crawl] Started successfully:', response.data)
-        
-        // placeId가 있으면 즉시 방 구독하여 진행도 수신
         const placeId = response.data.placeId
+        
         if (placeId) {
-          console.log('[Crawl] Subscribing to place:', placeId)
+          // Socket.io room 구독하여 실시간 진행 상황 수신
+          setCurrentCrawlPlaceId(placeId)
           
-          // 레스토랑 목록 먼저 갱신 (새로 등록된 레스토랑 표시)
+          // 목록 갱신 (새로 추가된 레스토랑 표시)
           await fetchRestaurants()
           await fetchCategories()
           
-          // 레스토랑 찾기
-          const newRestaurant = restaurants.find(r => r.place_id === placeId)
-          if (!newRestaurant) {
-            // 목록이 아직 갱신되지 않았다면 재시도
-            await new Promise(resolve => setTimeout(resolve, 500))
-            const refreshedResponse = await apiService.getRestaurants()
-            if (refreshedResponse.result && refreshedResponse.data) {
-              setRestaurants(refreshedResponse.data.restaurants)
-            }
-          }
-          
-          // 상세 화면으로 이동 (독립적으로 데이터 로드)
-          setSelectedPlaceId(placeId)
+          // 상세 화면으로 이동
           navigate(`/restaurant/${placeId}`)
         }
       } else {
-        fetchRestaurants()
-        fetchCategories()
-        setReviewCrawlStatus({
-          status: 'completed',
-          reviews: []
-        })
+        setReviewCrawlStatus({ status: 'completed', reviews: [] })
         setCrawlProgress(null)
         setDbProgress(null)
+        await fetchRestaurants()
+        await fetchCategories()
       }
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || err.message || '크롤링 중 오류가 발생했습니다'
-      setReviewCrawlStatus({
-        status: 'failed',
-        error: errorMessage,
-        reviews: []
-      })
+      setReviewCrawlStatus({ status: 'failed', error: errorMessage, reviews: [] })
       setCrawlProgress(null)
       setDbProgress(null)
       Alert.error('크롤링 실패', errorMessage)
@@ -274,7 +226,6 @@ export const useRestaurant = () => {
     reviewCrawlStatus,
     crawlProgress,
     dbProgress,
-    selectedPlaceId,
     handleCrawl,
     handleRestaurantClick,
   }
