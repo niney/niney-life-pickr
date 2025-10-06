@@ -3,25 +3,31 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
-import type { RestaurantData, ReviewData } from '@shared/services'
+import type { ReviewData } from '@shared/services'
+import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
 
-interface RestaurantDetailProps {
-  selectedRestaurant: RestaurantData | null
-  reviews: ReviewData[]
-  reviewsLoading: boolean
-  reviewsTotal: number
-  handleBackToList: () => void
-}
-
-const RestaurantDetail: React.FC<RestaurantDetailProps> = ({
-  selectedRestaurant,
-  reviews,
-  reviewsLoading,
-  reviewsTotal,
-  handleBackToList,
-}) => {
+const RestaurantDetail: React.FC = () => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
+  
+  // 독립적으로 데이터 로드
+  const {
+    restaurant,
+    restaurantLoading,
+    reviews,
+    reviewsLoading,
+    reviewsTotal,
+    handleBackToList,
+  } = useRestaurantDetail()
+
+  // 레스토랑 정보 로딩 중
+  if (restaurantLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    )
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -31,7 +37,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({
           <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 22, color: colors.text }} />
         </TouchableOpacity>
         <View style={styles.reviewHeaderInfo}>
-          <Text style={[styles.reviewTitle, { color: colors.text }]}>{selectedRestaurant?.name || '레스토랑'}</Text>
+          <Text style={[styles.reviewTitle, { color: colors.text }]}>{restaurant?.name || '레스토랑'}</Text>
           <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]}>리뷰 {reviewsTotal}개</Text>
         </View>
       </View>

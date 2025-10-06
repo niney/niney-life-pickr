@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
-import type { RestaurantCategory, RestaurantData, ReviewData, ReviewCrawlStatus } from '@shared/services'
+import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 import Header from '../Header'
 import Drawer from '../Drawer'
 import RestaurantList from './RestaurantList'
@@ -22,13 +22,8 @@ interface RestaurantMobileProps {
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
   selectedPlaceId: string | null
-  selectedRestaurant: RestaurantData | null
-  reviews: ReviewData[]
-  reviewsLoading: boolean
-  reviewsTotal: number
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
-  handleBackToList: () => void
 }
 
 const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
@@ -45,13 +40,8 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
   crawlProgress,
   dbProgress,
   selectedPlaceId,
-  selectedRestaurant,
-  reviews,
-  reviewsLoading,
-  reviewsTotal,
   handleCrawl,
   handleRestaurantClick,
-  handleBackToList,
 }) => {
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -99,19 +89,10 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
           }
         />
 
-        {/* 레스토랑 상세 화면 */}
+        {/* 레스토랑 상세 화면 - 독립적으로 데이터 로드 */}
         <Route
           path=":placeId"
-          element={
-            <RestaurantDetail
-              key={selectedPlaceId || 'detail'}
-              selectedRestaurant={selectedRestaurant}
-              reviews={reviews}
-              reviewsLoading={reviewsLoading}
-              reviewsTotal={reviewsTotal}
-              handleBackToList={handleBackToList}
-            />
-          }
+          element={<RestaurantDetail />}
         />
       </Routes>
 

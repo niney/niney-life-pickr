@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import { apiService } from '@shared/services'
-import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus, ReviewData } from '@shared/services'
+import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 import { Alert } from '@shared/utils'
 
 export const useRestaurant = () => {
@@ -23,14 +23,8 @@ export const useRestaurant = () => {
   const [crawlProgress, setCrawlProgress] = useState<{ current: number; total: number; percentage: number } | null>(null)
   const [dbProgress, setDbProgress] = useState<{ current: number; total: number; percentage: number } | null>(null)
 
-  // 리뷰 목록 state
+  // 크롤링 진행 중인 placeId 추적용
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(placeId || null)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null)
-  const [reviews, setReviews] = useState<ReviewData[]>([])
-  const [reviewsLoading, setReviewsLoading] = useState(false)
-  const [reviewsTotal, setReviewsTotal] = useState(0)
-  const [reviewsLimit] = useState(20)
-  const [reviewsOffset, setReviewsOffset] = useState(0)
 
   const socketRef = useRef<Socket | null>(null)
 
@@ -109,9 +103,6 @@ export const useRestaurant = () => {
           // 데이터 갱신
           fetchRestaurants()
           fetchCategories()
-          if (selectedPlaceId) {
-            fetchReviews(selectedPlaceId)
-          }
         }
       }
 
@@ -151,29 +142,14 @@ export const useRestaurant = () => {
     }
   }, [selectedPlaceId])
 
-  // URL 파라미터로 placeId가 전달되면 해당 레스토랑 정보 가져오기
+  // URL 파라미터로 placeId가 전달되면 크롤링 진행 추적용으로 설정
   useEffect(() => {
     if (placeId && placeId !== selectedPlaceId) {
-      // placeId가 있으면 리뷰 로드
       setSelectedPlaceId(placeId)
-      fetchReviews(placeId)
     } else if (!placeId && selectedPlaceId) {
-      // placeId가 없으면 (브라우저 뒤로가기) state 초기화
       setSelectedPlaceId(null)
-      setSelectedRestaurant(null)
-      setReviews([])
     }
   }, [placeId])
-
-  // 선택된 레스토랑 정보 가져오기
-  useEffect(() => {
-    if (selectedPlaceId && !selectedRestaurant) {
-      const restaurant = restaurants.find(r => r.place_id === selectedPlaceId)
-      if (restaurant) {
-        setSelectedRestaurant(restaurant)
-      }
-    }
-  }, [selectedPlaceId, restaurants])
 
   const fetchCategories = async () => {
     setCategoriesLoading(true)
@@ -206,35 +182,8 @@ export const useRestaurant = () => {
     return []
   }
 
-  const fetchReviews = async (placeId: string, offset: number = 0) => {
-    setReviewsLoading(true)
-    try {
-      const response = await apiService.getReviewsByPlaceId(placeId, reviewsLimit, offset)
-      if (response.result && response.data) {
-        setReviews(response.data.reviews)
-        setReviewsTotal(response.data.total)
-        setReviewsOffset(offset)
-      }
-    } catch (err) {
-      console.error('리뷰 조회 실패:', err)
-      Alert.error('조회 실패', '리뷰를 불러오는데 실패했습니다')
-    } finally {
-      setReviewsLoading(false)
-    }
-  }
-
   const handleRestaurantClick = (restaurant: RestaurantData) => {
-    setSelectedPlaceId(restaurant.place_id)
-    setSelectedRestaurant(restaurant)
     navigate(`/restaurant/${restaurant.place_id}`)
-    fetchReviews(restaurant.place_id)
-  }
-
-  const handleBackToList = () => {
-    setSelectedPlaceId(null)
-    setSelectedRestaurant(null)
-    setReviews([])
-    navigate('/restaurant')
   }
 
   useEffect(() => {
@@ -281,22 +230,12 @@ export const useRestaurant = () => {
             const refreshedResponse = await apiService.getRestaurants()
             if (refreshedResponse.result && refreshedResponse.data) {
               setRestaurants(refreshedResponse.data.restaurants)
-              const foundRestaurant = refreshedResponse.data.restaurants.find((r: RestaurantData) => r.place_id === placeId)
-              if (foundRestaurant) {
-                setSelectedRestaurant(foundRestaurant)
-              }
             }
-          } else {
-            setSelectedRestaurant(newRestaurant)
           }
           
-          // 방 구독 및 리뷰 패널 표시 (클릭한 것처럼 동작)
+          // 상세 화면으로 이동 (독립적으로 데이터 로드)
           setSelectedPlaceId(placeId)
           navigate(`/restaurant/${placeId}`)
-          
-          // 리뷰 초기화 (크롤링 중에는 빈 상태로 시작)
-          setReviews([])
-          setReviewsTotal(0)
         }
       } else {
         fetchRestaurants()
@@ -336,15 +275,7 @@ export const useRestaurant = () => {
     crawlProgress,
     dbProgress,
     selectedPlaceId,
-    selectedRestaurant,
-    reviews,
-    reviewsLoading,
-    reviewsTotal,
-    reviewsLimit,
-    reviewsOffset,
     handleCrawl,
     handleRestaurantClick,
-    handleBackToList,
-    fetchReviews,
   }
 }
