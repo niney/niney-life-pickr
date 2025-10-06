@@ -590,7 +590,8 @@ class NaverCrawlerService {
    */
   async crawlReviews(
     url: string,
-    onProgress?: (current: number, total: number, review: ReviewInfo) => void
+    onProgress?: (current: number, total: number, review: ReviewInfo) => void,
+    onCrawlProgress?: (current: number, total: number) => void
   ): Promise<ReviewInfo[]> {
     let startTime = Date.now();
     startTime = this.logTiming('리뷰 크롤링 시작', startTime);
@@ -663,6 +664,23 @@ class NaverCrawlerService {
       }
       startTime = this.logTiming('요소 대기 완료', startTime);
 
+      // 전체 리뷰 개수 추출
+      let totalReviewCount = 0;
+      try {
+        totalReviewCount = await page.evaluate(() => {
+          const countElement = document.querySelector('.place_section_count');
+          if (countElement) {
+            const text = countElement.textContent?.trim() || '';
+            const match = text.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 0;
+          }
+          return 0;
+        });
+        console.log(`전체 리뷰 개수: ${totalReviewCount}개`);
+      } catch (error) {
+        console.log('전체 리뷰 개수 추출 실패:', error);
+      }
+
       // 리뷰 목록 "더보기" 버튼을 반복 클릭
       console.log('리뷰 목록 더보기 버튼 클릭 시작...');
 
@@ -678,6 +696,11 @@ class NaverCrawlerService {
           });
 
           console.log(`현재 로드된 리뷰 개수: ${currentReviewCount}`);
+
+          // 리뷰가 증가했을 때 크롤링 진행 상황 콜백 호출
+          if (currentReviewCount !== previousReviewCount && onCrawlProgress) {
+            onCrawlProgress(currentReviewCount, totalReviewCount || currentReviewCount);
+          }
 
           if (currentReviewCount === previousReviewCount) {
             stableCount++;
@@ -751,6 +774,17 @@ class NaverCrawlerService {
       }
 
       console.log(`총 ${clickCount}번의 더보기 버튼 클릭 완료`);
+
+      // 크롤링 완료 후 최종 리뷰 개수 확인 및 콜백 호출
+      const loadedReviewCount = await page.evaluate(() => {
+        return document.querySelectorAll('#_review_list li.place_apply_pui').length;
+      });
+      console.log(`로드된 리뷰 개수: ${loadedReviewCount}개`);
+
+      // 최종 100% 진행 상황 콜백
+      if (onCrawlProgress) {
+        onCrawlProgress(loadedReviewCount, totalReviewCount || loadedReviewCount);
+      }
 
       // 감정 키워드 더보기 버튼 클릭
       console.log('감정 키워드 더보기 버튼 클릭 중...');

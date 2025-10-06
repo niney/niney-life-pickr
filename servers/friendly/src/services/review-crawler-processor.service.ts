@@ -60,14 +60,6 @@ export class ReviewCrawlerProcessor {
           savedToDb: reviews.length
         });
 
-        // 마지막 100% 진행 상황 보장
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
-          placeId,
-          current: reviews.length,
-          total: reviews.length,
-          percentage: 100
-        });
-
         // 완료 이벤트
         const completedData = {
           placeId,
@@ -110,7 +102,9 @@ export class ReviewCrawlerProcessor {
     const reviews: ReviewInfo[] = [];
 
     // 리뷰 크롤링 시작 (콜백으로 실시간 전송)
-    await naverCrawlerService.crawlReviews(url, async (current, total, review) => {
+    await naverCrawlerService.crawlReviews(
+      url,
+      async (current, total, review) => {
       // 중단 체크
       if (jobManager.isCancelled(jobId)) {
         console.log(`[Job ${jobId}] 중단 감지 (리뷰 ${current}/${total})`);
@@ -141,32 +135,34 @@ export class ReviewCrawlerProcessor {
       jobManager.updateProgress(jobId, current, total);
       await crawlJobRepository.updateProgress(jobId, current, total, percentage);
 
-      // Socket 이벤트: 진행 상황 (10개마다 또는 마지막) - place room만 사용
+      // Socket 이벤트: DB 저장 진행 상황 (10개마다 또는 마지막)
       if (current % 10 === 0 || current === total) {
-        const progressData = {
+        const dbProgressData = {
           placeId,
           current,
           total,
           percentage
         };
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, progressData);
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_DB_PROGRESS, dbProgressData);
+        console.log(`[Job ${jobId}] DB 저장 진행: ${current}/${total} (${percentage}%)`);
       }
-
-      // Socket 이벤트: 리뷰 아이템 (5개마다 전송으로 부담 감소) - place room만 사용
-      if (current % 5 === 0 || current === total) {
-        const reviewData = {
+    },
+      // 크롤링 진행 상황 콜백
+      (current, total) => {
+        const percentage = Math.floor((current / total) * 100);
+        
+        // Socket 이벤트: 크롤링 진행 상황
+        const crawlProgressData = {
           placeId,
-          review,
-          index: current - 1
+          current,
+          total,
+          percentage
         };
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_ITEM, reviewData);
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS, crawlProgressData);
+        
+        console.log(`[Job ${jobId}] 크롤링 진행: ${current}/${total} (${percentage}%)`);
       }
-
-      // 10개마다 로그
-      if (current % 10 === 0) {
-        console.log(`[Job ${jobId}] 진행: ${current}/${total} (${percentage}%)`);
-      }
-    });
+    );
 
     return reviews;
   }
