@@ -63,7 +63,7 @@ const RestaurantDesktop: React.FC<RestaurantDesktopProps> = ({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <div className="page-container" style={{ backgroundColor: colors.background }}>
       <Header onMenuPress={() => setDrawerVisible(true)} />
 
       <View style={styles.mainContainer}>
@@ -309,15 +309,11 @@ const RestaurantDesktop: React.FC<RestaurantDesktopProps> = ({
         onClose={() => setDrawerVisible(false)}
         onLogout={handleLogout}
       />
-    </View>
+    </div>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    height: '100%',
-  },
   mainContainer: {
     flex: 1,
     flexDirection: 'row',

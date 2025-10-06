@@ -1083,10 +1083,12 @@ curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.
 ## React Native Web 제약사항 및 해결 패턴
 
 ### StyleSheet 제약사항
+- **CSS 문자열 값 불가**: React Native Web의 `StyleSheet.create()`는 CSS 문자열 값(`'100vh'`, `'calc()'` 등)을 지원하지 않음
+  - ❌ `StyleSheet.create({ container: { minHeight: '100vh' } })` - TypeScript 에러
+  - ✅ 인라인 스타일 사용: `style={{ minHeight: '100vh' }}`
+  - ✅ 또는 HTML div 사용: `<div className="page-container">`
 - **Media queries 불가**: `@media` 쿼리는 StyleSheet.create()에서 동작하지 않음
   - 해결: `window.innerWidth` + resize 이벤트 리스너로 isMobile state 관리
-- **고정 width 문제**: StyleSheet의 숫자 width가 제대로 적용되지 않는 경우
-  - 해결: 인라인 스타일 사용 `style={{ width: 390, minWidth: 390, maxWidth: 390 }}`
 - **position absolute/fixed**: React Native Web에서 제한적
   - 해결: HTML div 요소 사용 (모바일 전체 화면 패널)
 
@@ -1099,9 +1101,76 @@ curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.
   <DesktopLayout />
 )}
 
-// 인라인 스타일로 고정 너비 적용
-<ScrollView style={[styles.panel, { width: 390, minWidth: 390, maxWidth: 390 }]} />
+// React Native View는 CSS 문자열 값 불가 - HTML div 사용
+<div className="page-container" style={{ backgroundColor: colors.background }}>
+  <Header />
+  <Content />
+</div>
 ```
+
+### iOS Safari 주소창 자동 최소화 패턴
+iOS Safari에서 스크롤 시 주소창이 자동으로 최소화되도록 하는 레이아웃 구조:
+
+**글로벌 CSS** (`apps/web/src/index.css`):
+```css
+/* body에 고정 높이 없음 - 콘텐츠에 따라 늘어남 */
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;  /* iOS 스크롤 최적화 */
+}
+
+#root {
+  min-height: 100vh;  /* 최소 높이만 지정 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 공통 레이아웃 클래스 */
+.page-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-scroll {
+  flex: 1;
+  padding: 16px;
+  overflow: auto;
+}
+
+.flex-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+```
+
+**컴포넌트 패턴**:
+```typescript
+// 페이지 컨테이너
+<div className="page-container" style={{ backgroundColor: colors.background }}>
+  <Header />
+  <div className="content-scroll">
+    {/* 스크롤 가능한 콘텐츠 */}
+  </div>
+</div>
+
+// 중첩 플렉스 레이아웃
+<div className="flex-container">
+  <View style={styles.header}>...</View>
+  <div className="content-scroll">
+    {/* 스크롤 가능한 콘텐츠 */}
+  </div>
+</div>
+```
+
+**핵심 원칙**:
+1. ❌ `height: 100%` 또는 `height: 100vh` 사용 금지 (고정 높이)
+2. ✅ `min-height: 100vh` 사용 (최소 높이, 콘텐츠에 따라 늘어남)
+3. ✅ Body 레벨 스크롤 발생 (내부 ScrollView 대신 일반 div)
+4. ✅ CSS 클래스 기반 레이아웃 (인라인 스타일 최소화)
 
 ## Code Style and Quality
 

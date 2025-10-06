@@ -23,7 +23,7 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <div className="page-container" style={{ backgroundColor: colors.background }}>
       <Header onMenuPress={() => setDrawerVisible(true)} />
 
       <View style={styles.content}>
@@ -48,15 +48,11 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
         onClose={() => setDrawerVisible(false)}
         onLogout={handleLogout}
       />
-    </View>
+    </div>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    height: '100%',
-  },
   content: {
     flex: 1,
     padding: 24,

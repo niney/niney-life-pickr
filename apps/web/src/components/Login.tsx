@@ -35,7 +35,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   }
 
   return (
-    <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
+    <div className="page-container" style={{ backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
       <View style={styles.container}>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
@@ -95,17 +95,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </View>
         </ScrollView>
       </View>
-    </View>
+    </div>
   )
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%',
-  },
   container: {
     width: '100%',
     maxWidth: 480,

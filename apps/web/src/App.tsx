@@ -17,11 +17,9 @@ function AppContent() {
   // 로딩 중
   if (isLoading) {
     return (
-      <div style={{
-        display: 'flex',
+      <div className="page-container" style={{
         justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh',
         backgroundColor: '#fff'
       }}>
         <div>Loading...</div>

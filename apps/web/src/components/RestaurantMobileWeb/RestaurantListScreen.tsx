@@ -1,18 +1,18 @@
 import React from 'react'
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  ScrollView
 } from 'react-native'
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome'
-import {faPlus} from '@fortawesome/free-solid-svg-icons'
-import {useTheme} from '@shared/contexts'
-import {THEME_COLORS} from '@shared/constants'
-import type {RestaurantCategory, RestaurantData, ReviewCrawlStatus} from '@shared/services'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faPlus } from '@fortawesome/free-solid-svg-icons'
+import { useTheme } from '@shared/contexts'
+import { THEME_COLORS } from '@shared/constants'
+import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 
 interface RestaurantListScreenProps {
   url: string
@@ -50,7 +50,7 @@ const RestaurantListScreen: React.FC<RestaurantListScreenProps> = ({
   const colors = THEME_COLORS[theme]
 
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+    <div className="content-scroll">
       {/* 검색 영역 */}
       <View style={styles.searchSection}>
         <TextInput
@@ -193,17 +193,11 @@ const RestaurantListScreen: React.FC<RestaurantListScreenProps> = ({
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
         ) : null}
       </View>
-    </ScrollView>
+    </div>
   )
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
   // 검색 영역
   searchSection: {
     flexDirection: 'row',
