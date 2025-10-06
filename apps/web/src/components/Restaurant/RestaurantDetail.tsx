@@ -1,4 +1,5 @@
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text, ScrollView } from 'react-native'
+import React from 'react'
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
@@ -6,10 +7,14 @@ import { THEME_COLORS } from '@shared/constants'
 import type { ReviewData } from '@shared/services'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
 
-const RestaurantDetail: React.FC = () => {
+interface RestaurantDetailProps {
+  isMobile?: boolean
+}
+
+const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
-  
+
   // 독립적으로 데이터 로드
   const {
     restaurant,
@@ -23,18 +28,19 @@ const RestaurantDetail: React.FC = () => {
   // 레스토랑 정보 로딩 중
   if (restaurantLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
       </View>
     )
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* 헤더 */}
-      <View style={[styles.reviewHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.reviewHeader, { borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
-          <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 22, color: colors.text }} />
+          <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: isMobile ? 22 : 20, color: colors.text }} />
         </TouchableOpacity>
         <View style={styles.reviewHeaderInfo}>
           <Text style={[styles.reviewTitle, { color: colors.text }]}>{restaurant?.name || '레스토랑'}</Text>
@@ -42,8 +48,7 @@ const RestaurantDetail: React.FC = () => {
         </View>
       </View>
 
-      {/* 콘텐츠 */}
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.reviewScrollView} contentContainerStyle={styles.reviewScrollContent}>
         {reviewsLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -119,19 +124,22 @@ const RestaurantDetail: React.FC = () => {
 }
 
 const styles = StyleSheet.create({
-  // 리뷰 헤더
+  container: {
+    flex: 1,
+  },
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderBottomWidth: 1,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   reviewHeaderInfo: {
     flex: 1,
@@ -139,24 +147,22 @@ const styles = StyleSheet.create({
   reviewTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   reviewSubtitle: {
-    fontSize: 13,
+    fontSize: 15,
   },
-  // 스크롤뷰
-  scrollView: {
+  reviewScrollView: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
+  reviewScrollContent: {
+    padding: 20,
   },
-  // 리뷰 목록
   reviewsList: {
-    gap: 14,
+    gap: 16,
   },
   reviewCard: {
-    padding: 16,
+    padding: 20,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -164,49 +170,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   reviewUserName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   reviewDate: {
-    fontSize: 12,
+    fontSize: 13,
   },
   keywordsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 12,
   },
   keyword: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
   emotionKeyword: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
   keywordText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
   },
   reviewText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
   },
   visitInfo: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   visitInfoText: {
-    fontSize: 12,
+    fontSize: 13,
   },
-  // 공통
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -220,8 +225,9 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
   },
 })
 
 export default RestaurantDetail
+
