@@ -14,7 +14,7 @@ import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 
-interface RestaurantListScreenProps {
+interface RestaurantListProps {
   url: string
   setUrl: (url: string) => void
   loading: boolean
@@ -31,7 +31,7 @@ interface RestaurantListScreenProps {
   handleRestaurantClick: (restaurant: RestaurantData) => void
 }
 
-const RestaurantListScreen: React.FC<RestaurantListScreenProps> = ({
+const RestaurantList: React.FC<RestaurantListProps> = ({
   url,
   setUrl,
   loading,
@@ -337,4 +337,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default RestaurantListScreen
+export default RestaurantList

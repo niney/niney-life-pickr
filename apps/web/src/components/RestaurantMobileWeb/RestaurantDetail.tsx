@@ -5,7 +5,7 @@ import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantData, ReviewData } from '@shared/services'
 
-interface RestaurantDetailScreenProps {
+interface RestaurantDetailProps {
   selectedRestaurant: RestaurantData | null
   reviews: ReviewData[]
   reviewsLoading: boolean
@@ -13,7 +13,7 @@ interface RestaurantDetailScreenProps {
   handleBackToList: () => void
 }
 
-const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({
+const RestaurantDetail: React.FC<RestaurantDetailProps> = ({
   selectedRestaurant,
   reviews,
   reviewsLoading,
@@ -218,4 +218,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default RestaurantDetailScreen
+export default RestaurantDetail

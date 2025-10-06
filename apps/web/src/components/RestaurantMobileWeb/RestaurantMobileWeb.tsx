@@ -5,8 +5,8 @@ import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantCategory, RestaurantData, ReviewData, ReviewCrawlStatus } from '@shared/services'
 import Header from '../Header'
 import Drawer from '../Drawer'
-import RestaurantListScreen from './RestaurantListScreen'
-import RestaurantDetailScreen from './RestaurantDetailScreen'
+import RestaurantList from './RestaurantList'
+import RestaurantDetail from './RestaurantDetail'
 
 interface RestaurantMobileProps {
   onLogout: () => Promise<void>
@@ -79,7 +79,7 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
         <Route
           index
           element={
-            <RestaurantListScreen
+            <RestaurantList
               key="list"
               url={url}
               setUrl={setUrl}
@@ -103,7 +103,7 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
         <Route
           path=":placeId"
           element={
-            <RestaurantDetailScreen
+            <RestaurantDetail
               key={selectedPlaceId || 'detail'}
               selectedRestaurant={selectedRestaurant}
               reviews={reviews}
