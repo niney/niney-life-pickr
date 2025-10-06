@@ -31,6 +31,18 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       console.log(`[Socket.io] Client ${socket.id} unsubscribed from job:${jobId}`);
     });
 
+    // Place ID 기반 구독 (여러 사용자가 동일 레스토랑 리뷰 실시간 공유)
+    socket.on('subscribe:place', (placeId: string) => {
+      socket.join(`place:${placeId}`);
+      console.log(`[Socket.io] Client ${socket.id} subscribed to place:${placeId}`);
+    });
+
+    // Place ID 구독 해제
+    socket.on('unsubscribe:place', (placeId: string) => {
+      socket.leave(`place:${placeId}`);
+      console.log(`[Socket.io] Client ${socket.id} unsubscribed from place:${placeId}`);
+    });
+
     socket.on('disconnect', () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
     });

@@ -140,47 +140,73 @@ const RestaurantScreen: React.FC = () => {
     try {
       const response = await apiService.crawlRestaurant({ url: url.trim(), crawlMenus: true, crawlReviews: true });
 
-      if (response.result && response.data?.jobId && socketRef.current) {
+      if (response.result && response.data?.reviewJobId && socketRef.current) {
         const socket = socketRef.current;
-        const jobId = response.data.jobId;
+        const jobId = response.data.reviewJobId;
 
-        socket.on(`reviewCrawl:progress:${jobId}`, (data: any) => {
-          console.log('[Socket.io] Progress:', data);
-          setReviewCrawlStatus({
-            status: 'active',
-            progress: data.progress,
-            reviews: data.reviews
-          });
+        // Job room에 join
+        socket.emit('join', `job:${jobId}`);
+
+        socket.on('review:progress', (data: any) => {
+          if (data.jobId === jobId) {
+            console.log('[Socket.io] Progress:', data);
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              status: 'active',
+              progress: {
+                current: data.current,
+                total: data.total,
+                percentage: data.percentage
+              }
+            }));
+          }
         });
 
-        socket.on(`reviewCrawl:completed:${jobId}`, (data: any) => {
-          console.log('[Socket.io] Completed:', data);
-          setReviewCrawlStatus({
-            status: 'completed',
-            reviews: data.reviews
-          });
-          socket.off(`reviewCrawl:progress:${jobId}`);
-          socket.off(`reviewCrawl:completed:${jobId}`);
-          socket.off(`reviewCrawl:failed:${jobId}`);
-
-          Alert.success('크롤링 완료', `${data.reviews?.length || 0}개의 리뷰를 수집했습니다`);
-          fetchRestaurants();
-          fetchCategories();
+        socket.on('review:item', (data: any) => {
+          if (data.jobId === jobId && data.review) {
+            console.log('[Socket.io] Review Item:', data);
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              reviews: [...(prev.reviews || []), data.review]
+            }));
+          }
         });
 
-        socket.on(`reviewCrawl:failed:${jobId}`, (data: any) => {
-          console.error('[Socket.io] Failed:', data);
-          const errorMessage = data.error || '크롤링 중 오류가 발생했습니다';
-          setReviewCrawlStatus({
-            status: 'failed',
-            error: errorMessage,
-            reviews: []
-          });
-          socket.off(`reviewCrawl:progress:${jobId}`);
-          socket.off(`reviewCrawl:completed:${jobId}`);
-          socket.off(`reviewCrawl:failed:${jobId}`);
+        socket.on('review:completed', (data: any) => {
+          if (data.jobId === jobId) {
+            console.log('[Socket.io] Completed:', data);
+            setReviewCrawlStatus(prev => ({
+              ...prev,
+              status: 'completed'
+            }));
+            socket.off('review:progress');
+            socket.off('review:item');
+            socket.off('review:completed');
+            socket.off('review:error');
+            socket.emit('leave', `job:${jobId}`);
 
-          Alert.error('크롤링 실패', errorMessage);
+            Alert.success('크롤링 완료', `${data.totalReviews || 0}개의 리뷰를 수집했습니다`);
+            fetchRestaurants();
+            fetchCategories();
+          }
+        });
+
+        socket.on('review:error', (data: any) => {
+          if (data.jobId === jobId) {
+            console.error('[Socket.io] Error:', data);
+            const errorMessage = data.error || '크롤링 중 오류가 발생했습니다';
+            setReviewCrawlStatus({
+              status: 'failed',
+              error: errorMessage,
+              reviews: []
+            });
+            socket.off('review:progress');
+            socket.off('review:completed');
+            socket.off('review:error');
+            socket.emit('leave', `job:${jobId}`);
+
+            Alert.error('크롤링 실패', errorMessage);
+          }
         });
       } else {
         Alert.success('크롤링 완료', response.message || '크롤링을 완료했습니다');

@@ -401,6 +401,37 @@ price TEXT NOT NULL
 image TEXT
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+
+-- reviews table (Restaurant reviews from Naver)
+id INTEGER PRIMARY KEY AUTOINCREMENT
+restaurant_id INTEGER NOT NULL
+review_hash TEXT UNIQUE NOT NULL  -- Hash for duplicate detection
+user_name TEXT
+review_text TEXT
+visit_keywords TEXT  -- JSON array
+emotion_keywords TEXT  -- JSON array
+visit_date TEXT
+visit_count TEXT
+verification_method TEXT
+wait_time TEXT
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+
+-- crawl_jobs table (Background job tracking)
+id TEXT PRIMARY KEY  -- UUID
+place_id TEXT NOT NULL
+url TEXT NOT NULL
+restaurant_id INTEGER
+status TEXT NOT NULL  -- pending, active, completed, failed, cancelled
+current INTEGER DEFAULT 0
+total INTEGER DEFAULT 0
+percentage INTEGER DEFAULT 0
+total_reviews INTEGER
+saved_to_db INTEGER
+error_message TEXT
+started_at DATETIME
+completed_at DATETIME
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ```
 
 ### Migration System
@@ -875,12 +906,99 @@ const { email, password, handleLogin } = useLogin()
   - Login flow with alert handling (both platforms)
 - Clean module separation (components/hooks/contexts/constants/services/types/utils)
 
+- **Socket.io Real-time Review Crawling System:**
+  - Place-based room subscription for multi-user collaboration
+  - Real-time progress updates during crawling and DB saving
+  - Background job processing with job manager
+  - Review hash-based duplicate prevention
+  - Automatic review list refresh on completion
+  - Integration tests for crawl jobs and review storage
+
 ### 🔲 In Progress
 - JWT token authentication implementation
 - Backend business logic implementation
 - ML model integration in smart server
-- Real-time features
 - Production database (PostgreSQL)
+
+## Socket.io Real-time Review Crawling System
+
+### Overview
+Real-time system for collaborative review crawling with Socket.io, allowing multiple users to see live progress when crawling the same restaurant.
+
+### Architecture Components
+- **Socket Server**: `servers/friendly/src/socket/socket.ts` - Socket.io initialization and room management
+- **Event Constants**: `servers/friendly/src/socket/events.ts` - Socket event type definitions
+- **Job Manager**: `servers/friendly/src/services/job-manager.service.ts` - In-memory job state management
+- **Crawler Processor**: `servers/friendly/src/services/review-crawler-processor.service.ts` - Background crawling with real-time updates
+- **Job Repository**: `servers/friendly/src/db/repositories/crawl-job.repository.ts` - Database persistence
+- **Review Repository**: `servers/friendly/src/db/repositories/review.repository.ts` - Review storage with hash-based deduplication
+
+### Socket.io Room Strategy
+**Place-based Rooms** (`place:${placeId}`):
+- All users viewing the same restaurant subscribe to the same place room
+- When ANY user starts crawling, ALL subscribers receive real-time updates
+- Enables multi-user collaboration and prevents duplicate crawling
+- Auto-subscription when selecting a restaurant, auto-unsubscription when leaving
+
+```typescript
+// Server: Place room subscription
+socket.on('subscribe:place', (placeId: string) => {
+  socket.join(`place:${placeId}`)
+})
+
+// Client: Auto-subscribe on restaurant selection
+useEffect(() => {
+  if (selectedPlaceId) {
+    socketRef.current.emit('subscribe:place', selectedPlaceId)
+    return () => socketRef.current?.emit('unsubscribe:place', selectedPlaceId)
+  }
+}, [selectedPlaceId])
+```
+
+### Real-time Event Flow
+1. **REVIEW_STARTED** - Crawling begins, sent to place room
+2. **REVIEW_PROGRESS** - Progress updates (every 10 reviews or at completion)
+   - Includes: `placeId`, `current`, `total`, `percentage`
+3. **REVIEW_ITEM** - Individual review data (every 5 reviews or at completion)
+   - Includes: `placeId`, `review`, `index`
+4. **REVIEW_COMPLETED** - Crawling finished successfully
+   - Includes: `placeId`, `totalReviews`, `savedToDb`
+5. **REVIEW_ERROR** - Error occurred during crawling
+   - Includes: `placeId`, `error`
+6. **REVIEW_CANCELLED** - User cancelled the job
+
+### Background Job Processing
+- Jobs tracked in `crawl_jobs` table with UUID
+- In-memory job manager for quick state access
+- Callback-based progress tracking during crawling
+- DB persistence at every review save for durability
+- Support for job cancellation (though not yet exposed in UI)
+
+### Review Deduplication System
+Review hash generated from:
+```typescript
+generateReviewHash(placeId, userName, visitDate, visitCount, verificationMethod)
+```
+- Prevents duplicate reviews from multiple crawls
+- Uses MD5 hash of combined fields
+- UNIQUE constraint on `review_hash` column
+- UPSERT pattern for safe re-crawling
+
+### Client Integration Pattern
+```typescript
+// Frontend automatically handles:
+1. Subscribe to place room on restaurant selection
+2. Listen for progress/item/completed/error events
+3. Update UI with real-time crawling status
+4. Refresh review list on completion
+5. Unsubscribe when leaving restaurant view
+```
+
+### Key Implementation Details
+- **Batch Updates**: Progress emitted every 10 reviews to reduce socket traffic
+- **Review Items**: Sent every 5 reviews for smoother UI updates
+- **Error Resilience**: Failed DB saves logged but don't stop crawling
+- **Multi-user Sync**: All users see identical progress regardless of who started crawling
 
 ## Common Development Tasks
 

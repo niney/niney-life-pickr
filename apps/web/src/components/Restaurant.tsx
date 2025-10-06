@@ -78,6 +78,85 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     }
   }, [])
 
+  // selectedPlaceId 변경 시 place room 구독/구독 해제
+  useEffect(() => {
+    if (!socketRef.current) return
+
+    if (selectedPlaceId) {
+      // 새로운 place room 구독
+      socketRef.current.emit('subscribe:place', selectedPlaceId)
+      console.log(`[Socket.io] Subscribed to place:${selectedPlaceId}`)
+
+      // Socket 이벤트 리스너 등록
+      const handleProgress = (data: any) => {
+        if (data.placeId === selectedPlaceId) {
+          console.log('[Socket.io] Progress:', data)
+          setReviewCrawlStatus(prev => ({
+            ...prev,
+            status: 'active',
+            progress: {
+              current: data.current,
+              total: data.total,
+              percentage: data.percentage
+            }
+          }))
+        }
+      }
+
+      const handleItem = (data: any) => {
+        if (data.placeId === selectedPlaceId && data.review) {
+          console.log('[Socket.io] Review Item:', data)
+          setReviewCrawlStatus(prev => ({
+            ...prev,
+            reviews: [...(prev.reviews || []), data.review]
+          }))
+        }
+      }
+
+      const handleCompleted = (data: any) => {
+        if (data.placeId === selectedPlaceId) {
+          console.log('[Socket.io] Completed:', data)
+          setReviewCrawlStatus(prev => ({
+            ...prev,
+            status: 'completed'
+          }))
+          Alert.success('크롤링 완료', `${data.totalReviews || 0}개의 리뷰를 수집했습니다`)
+          fetchRestaurants()
+          fetchCategories()
+          fetchReviews(selectedPlaceId)
+        }
+      }
+
+      const handleError = (data: any) => {
+        if (data.placeId === selectedPlaceId) {
+          console.error('[Socket.io] Error:', data)
+          const errorMessage = data.error || '크롤링 중 오류가 발생했습니다'
+          setReviewCrawlStatus({
+            status: 'failed',
+            error: errorMessage,
+            reviews: []
+          })
+          Alert.error('크롤링 실패', errorMessage)
+        }
+      }
+
+      socketRef.current.on('review:progress', handleProgress)
+      socketRef.current.on('review:item', handleItem)
+      socketRef.current.on('review:completed', handleCompleted)
+      socketRef.current.on('review:error', handleError)
+
+      return () => {
+        // 구독 해제 및 이벤트 리스너 제거
+        socketRef.current?.emit('unsubscribe:place', selectedPlaceId)
+        socketRef.current?.off('review:progress', handleProgress)
+        socketRef.current?.off('review:item', handleItem)
+        socketRef.current?.off('review:completed', handleCompleted)
+        socketRef.current?.off('review:error', handleError)
+        console.log(`[Socket.io] Unsubscribed from place:${selectedPlaceId}`)
+      }
+    }
+  }, [selectedPlaceId])
+
   // URL 파라미터로 placeId가 전달되면 해당 레스토랑 정보 가져오기
   useEffect(() => {
     if (placeId && placeId !== selectedPlaceId) {
@@ -182,50 +261,10 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     try {
       const response = await apiService.crawlRestaurant({ url, crawlMenus: true, crawlReviews: true })
 
-      if (response.result && response.data?.jobId && socketRef.current) {
-        const socket = socketRef.current
-        const jobId = response.data.jobId
-
-        socket.on(`reviewCrawl:progress:${jobId}`, (data: any) => {
-          console.log('[Socket.io] Progress:', data)
-          setReviewCrawlStatus({
-            status: 'active',
-            progress: data.progress,
-            reviews: data.reviews
-          })
-        })
-
-        socket.on(`reviewCrawl:completed:${jobId}`, (data: any) => {
-          console.log('[Socket.io] Completed:', data)
-          setReviewCrawlStatus({
-            status: 'completed',
-            reviews: data.reviews
-          })
-          socket.off(`reviewCrawl:progress:${jobId}`)
-          socket.off(`reviewCrawl:completed:${jobId}`)
-          socket.off(`reviewCrawl:failed:${jobId}`)
-
-          Alert.success('크롤링 완료', `${data.reviews?.length || 0}개의 리뷰를 수집했습니다`)
-          fetchRestaurants()
-          fetchCategories()
-        })
-
-        socket.on(`reviewCrawl:failed:${jobId}`, (data: any) => {
-          console.error('[Socket.io] Failed:', data)
-          const errorMessage = data.error || '크롤링 중 오류가 발생했습니다'
-          setReviewCrawlStatus({
-            status: 'failed',
-            error: errorMessage,
-            reviews: []
-          })
-          socket.off(`reviewCrawl:progress:${jobId}`)
-          socket.off(`reviewCrawl:completed:${jobId}`)
-          socket.off(`reviewCrawl:failed:${jobId}`)
-
-          Alert.error('크롤링 실패', errorMessage)
-        })
+      if (response.result) {
+        // 크롤링 시작 성공 - Socket 이벤트는 useEffect에서 자동 처리
+        console.log('[Crawl] Started successfully')
       } else {
-        Alert.success('크롤링 완료', response.message || '크롤링을 완료했습니다')
         fetchRestaurants()
         fetchCategories()
         setReviewCrawlStatus({
@@ -338,80 +377,6 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
         </View>
       )}
 
-      {/* 크롤링된 리뷰 임시 표시 */}
-      {reviewCrawlStatus.reviews && reviewCrawlStatus.reviews.length > 0 && (
-        <View style={styles.reviewsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링된 리뷰 ({reviewCrawlStatus.reviews.length})</Text>
-          </View>
-
-          <View style={styles.reviewsList}>
-            {reviewCrawlStatus.reviews.map((review, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.reviewCard,
-                  {
-                    backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
-                    borderColor: colors.border
-                  }
-                ]}
-              >
-                <View style={styles.reviewCardHeader}>
-                  <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
-                  {review.visitInfo.visitDate && (
-                    <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                      {review.visitInfo.visitDate}
-                    </Text>
-                  )}
-                </View>
-
-                {review.visitKeywords.length > 0 && (
-                  <View style={styles.keywordsContainer}>
-                    {review.visitKeywords.map((keyword: string, idx: number) => (
-                      <View key={idx} style={[styles.keyword, { backgroundColor: colors.border }]}>
-                        <Text style={[styles.keywordText, { color: colors.text }]}>{keyword}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {review.reviewText && (
-                  <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
-                )}
-
-                {review.emotionKeywords.length > 0 && (
-                  <View style={styles.keywordsContainer}>
-                    {review.emotionKeywords.map((keyword: string, idx: number) => (
-                      <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
-                        <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.visitInfo}>
-                  {review.visitInfo.visitCount && (
-                    <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                      {review.visitInfo.visitCount}
-                    </Text>
-                  )}
-                  {review.visitInfo.verificationMethod && (
-                    <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                      • {review.visitInfo.verificationMethod}
-                    </Text>
-                  )}
-                  {review.waitTime && (
-                    <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                      • {review.waitTime}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
 
       {/* 레스토랑 목록 */}
       <View style={styles.restaurantsSection}>

@@ -23,8 +23,7 @@ export class ReviewCrawlerProcessor {
       jobManager.updateStatus(jobId, 'active', { startedAt: new Date() });
       await crawlJobRepository.updateStatus(jobId, 'active', { startedAt: new Date() });
 
-      io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
-        jobId,
+      io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
         placeId,
         url
       });
@@ -43,8 +42,8 @@ export class ReviewCrawlerProcessor {
           savedToDb: reviews.length
         });
 
-        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
-          jobId,
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
+          placeId,
           totalReviews: reviews.length
         });
       } else {
@@ -62,19 +61,20 @@ export class ReviewCrawlerProcessor {
         });
 
         // 마지막 100% 진행 상황 보장
-        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
-          jobId,
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
+          placeId,
           current: reviews.length,
           total: reviews.length,
           percentage: 100
         });
 
         // 완료 이벤트
-        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, {
-          jobId,
+        const completedData = {
+          placeId,
           totalReviews: reviews.length,
           savedToDb: reviews.length
-        });
+        };
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, completedData);
       }
 
     } catch (error) {
@@ -87,10 +87,11 @@ export class ReviewCrawlerProcessor {
         errorMessage
       });
 
-      io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, {
-        jobId,
+      const errorData = {
+        placeId,
         error: errorMessage
-      });
+      };
+      io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, errorData);
 
       throw error;
     }
@@ -140,23 +141,25 @@ export class ReviewCrawlerProcessor {
       jobManager.updateProgress(jobId, current, total);
       await crawlJobRepository.updateProgress(jobId, current, total, percentage);
 
-      // Socket 이벤트: 진행 상황 (10개마다 또는 마지막)
+      // Socket 이벤트: 진행 상황 (10개마다 또는 마지막) - place room만 사용
       if (current % 10 === 0 || current === total) {
-        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, {
-          jobId,
+        const progressData = {
+          placeId,
           current,
           total,
           percentage
-        });
+        };
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_PROGRESS, progressData);
       }
 
-      // Socket 이벤트: 리뷰 아이템 (5개마다 전송으로 부담 감소)
+      // Socket 이벤트: 리뷰 아이템 (5개마다 전송으로 부담 감소) - place room만 사용
       if (current % 5 === 0 || current === total) {
-        io.to(`job:${jobId}`).emit(SOCKET_EVENTS.REVIEW_ITEM, {
-          jobId,
+        const reviewData = {
+          placeId,
           review,
           index: current - 1
-        });
+        };
+        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_ITEM, reviewData);
       }
 
       // 10개마다 로그
