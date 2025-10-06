@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { View, StyleSheet } from 'react-native'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
@@ -64,16 +63,10 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   } = restaurantState
 
   return (
-    <div
-      style={{ backgroundColor: colors.background }}
-      className={isMobile ? '' : 'page-container'}
-    >
+    <div className="restaurant-grid-container" style={{ backgroundColor: colors.background }}>
       <Header onMenuPress={() => setDrawerVisible(true)} />
 
-      <View style={[
-        styles.mainContainer,
-        isMobile && styles.mobileContainer
-      ]}>
+      <div className={`restaurant-content ${isMobile ? 'mobile' : 'desktop'}`}>
         {/* 모바일: List 또는 Detail 중 하나만 표시 */}
         {isMobile ? (
           <Routes>
@@ -124,7 +117,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
             </Routes>
           </>
         )}
-      </View>
+      </div>
 
       <Drawer
         visible={drawerVisible}
@@ -134,15 +127,5 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     </div>
   )
 }
-
-const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    flexDirection: 'row', // 데스크탑: 2열 레이아웃
-  },
-  mobileContainer: {
-    flexDirection: 'column', // 모바일: 1열 레이아웃
-  },
-})
 
 export default Restaurant

@@ -1,12 +1,11 @@
-import React, { useRef, useEffect } from 'react'
+import React from 'react'
 import {
   ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ScrollView
+  View
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
@@ -51,26 +50,16 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const { placeId } = useParams<{ placeId?: string }>()
-  const scrollRef = useRef<any>(null)
-
-  // 스크롤 맨 위로 이동 (모바일만)
-  useEffect(() => {
-    if (isMobile && scrollRef.current) {
-      scrollRef.current.scrollTo({ x: 0, y: 0, animated: false })
-    }
-  }, [isMobile])
 
   return (
-    <View style={[
-      styles.container,
-      isMobile ? styles.mobileContainer : styles.desktopContainer,
-      { backgroundColor: colors.background, borderRightColor: colors.border }
-    ]}>
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
+    <div 
+      className={isMobile ? '' : 'restaurant-scroll-area'}
+      style={{
+        backgroundColor: colors.background,
+        borderRight: isMobile ? 'none' : `1px solid ${colors.border}`,
+        padding: 20,
+      }}
+    >
         {/* 검색 영역 */}
         <View style={styles.searchSection}>
           <TextInput
@@ -214,8 +203,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
           ) : null}
         </View>
-      </ScrollView>
-    </View>
+    </div>
   )
 }
 

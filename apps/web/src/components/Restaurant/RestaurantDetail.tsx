@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Text } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
@@ -37,7 +37,10 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <div 
+      className={isMobile ? '' : 'restaurant-scroll-area'}
+      style={{ backgroundColor: colors.background }}
+    >
       <View style={[styles.reviewHeader, { borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
           <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: isMobile ? 22 : 20, color: colors.text }} />
@@ -48,7 +51,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         </View>
       </View>
 
-      <ScrollView style={styles.reviewScrollView} contentContainerStyle={styles.reviewScrollContent}>
+      <div style={{ padding: 20 }}>
         {reviewsLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -118,8 +121,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
-      </ScrollView>
-    </View>
+      </div>
+    </div>
   )
 }
 
