@@ -180,7 +180,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     })
 
     try {
-      const response = await apiService.crawlRestaurant({ url, crawlMenus: true })
+      const response = await apiService.crawlRestaurant({ url, crawlMenus: true, crawlReviews: true })
 
       if (response.result && response.data?.jobId && socketRef.current) {
         const socket = socketRef.current

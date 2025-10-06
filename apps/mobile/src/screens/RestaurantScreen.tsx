@@ -138,7 +138,7 @@ const RestaurantScreen: React.FC = () => {
     });
 
     try {
-      const response = await apiService.crawlRestaurant({ url: url.trim(), crawlMenus: true });
+      const response = await apiService.crawlRestaurant({ url: url.trim(), crawlMenus: true, crawlReviews: true });
 
       if (response.result && response.data?.jobId && socketRef.current) {
         const socket = socketRef.current;
