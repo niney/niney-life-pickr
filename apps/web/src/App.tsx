@@ -3,7 +3,7 @@ import Login from './components/Login'
 import Home from './components/Home'
 import Restaurant from './components/Restaurant'
 import { useAuth } from '@shared/hooks'
-import { ThemeProvider } from '@shared/contexts'
+import { ThemeProvider, SocketProvider } from '@shared/contexts'
 
 function AppContent() {
   const { isAuthenticated, isLoading, logout } = useAuth()
@@ -51,7 +51,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <SocketProvider>
+        <AppContent />
+      </SocketProvider>
     </ThemeProvider>
   )
 }

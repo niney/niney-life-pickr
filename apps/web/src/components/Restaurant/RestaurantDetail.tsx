@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
-import { useTheme } from '@shared/contexts'
+import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { ReviewData } from '@shared/services'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
@@ -14,9 +14,11 @@ interface RestaurantDetailProps {
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
+  const { joinPlaceRoom, leavePlaceRoom, reviewCrawlStatus, crawlProgress, dbProgress } = useSocket()
 
   // 독립적으로 데이터 로드
   const {
+    placeId,
     restaurant,
     restaurantLoading,
     reviews,
@@ -24,6 +26,20 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     reviewsTotal,
     handleBackToList,
   } = useRestaurantDetail()
+
+  // placeId가 있으면 room 입장, 컴포넌트 언마운트 시 퇴장
+  useEffect(() => {
+    if (placeId) {
+      joinPlaceRoom(placeId)
+
+      return () => {
+        leavePlaceRoom(placeId)
+      }
+    }
+  }, [placeId])
+
+  // 크롤링 중인지 체크
+  const isCrawling = reviewCrawlStatus.status === 'active'
 
   // 레스토랑 정보 로딩 중
   if (restaurantLoading) {
@@ -52,6 +68,59 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       </View>
 
       <div style={{ padding: 20 }}>
+        {/* 크롤링 진행 상태 표시 */}
+        {isCrawling && (
+          <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
+              🔄 리뷰 크롤링 중...
+            </Text>
+            
+            {crawlProgress && (
+              <View style={styles.progressSection}>
+                <View style={styles.progressInfo}>
+                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
+                  <Text style={[styles.progressText, { color: colors.text }]}>
+                    {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View 
+                    style={[
+                      styles.progressBarFill, 
+                      { 
+                        backgroundColor: colors.primary,
+                        width: `${crawlProgress.percentage}%` 
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            )}
+
+            {dbProgress && (
+              <View style={styles.progressSection}>
+                <View style={styles.progressInfo}>
+                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
+                  <Text style={[styles.progressText, { color: colors.text }]}>
+                    {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View 
+                    style={[
+                      styles.progressBarFill, 
+                      { 
+                        backgroundColor: '#4caf50',
+                        width: `${dbProgress.percentage}%` 
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
         {reviewsLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -229,6 +298,43 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
+  },
+  crawlProgressContainer: {
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  crawlProgressTitle: {
+    fontSize: 16,
+    fontWeight: '700' as '700',
+    marginBottom: 16,
+  },
+  progressSection: {
+    marginBottom: 12,
+  },
+  progressInfo: {
+    flexDirection: 'row' as 'row',
+    justifyContent: 'space-between' as 'space-between',
+    alignItems: 'center' as 'center',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: '600' as '600',
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '500' as '500',
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden' as 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
   },
 })
 

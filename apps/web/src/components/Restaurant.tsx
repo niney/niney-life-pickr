@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
-import { useTheme } from '@shared/contexts'
+import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { useRestaurant } from '../hooks/useRestaurant'
 import Header from './Header'
@@ -15,6 +15,9 @@ interface RestaurantProps {
 const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   // 공통 state와 로직
   const restaurantState = useRestaurant()
+  
+  // Socket 연결 (전역 단일 연결)
+  const { reviewCrawlStatus, crawlProgress, dbProgress, setPlaceCallbacks, resetCrawlStatus } = useSocket()
   
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -55,12 +58,32 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     restaurants,
     restaurantsLoading,
     total,
-    reviewCrawlStatus,
-    crawlProgress,
-    dbProgress,
     handleCrawl,
     handleRestaurantClick,
+    fetchRestaurants,
+    fetchCategories,
   } = restaurantState
+  
+  // 크롤링 시작 핸들러 (socket 콜백 설정)
+  const handleCrawlWithSocket = async () => {
+    resetCrawlStatus()
+    
+    // 크롤링 완료/에러 시 콜백 설정
+    setPlaceCallbacks({
+      onCompleted: async () => {
+        // 크롤링 완료 시 데이터 갱신
+        await fetchRestaurants()
+        await fetchCategories()
+      },
+      onError: async () => {
+        // 에러 발생 시에도 데이터 갱신
+        await fetchRestaurants()
+        await fetchCategories()
+      }
+    })
+    
+    await handleCrawl()
+  }
 
   return (
     <div className="restaurant-grid-container" style={{ backgroundColor: colors.background }}>
@@ -85,7 +108,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   reviewCrawlStatus={reviewCrawlStatus}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
-                  handleCrawl={handleCrawl}
+                  handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClick}
                   isMobile={isMobile}
                 />
@@ -108,7 +131,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
               reviewCrawlStatus={reviewCrawlStatus}
               crawlProgress={crawlProgress}
               dbProgress={dbProgress}
-              handleCrawl={handleCrawl}
+              handleCrawl={handleCrawlWithSocket}
               handleRestaurantClick={handleRestaurantClick}
               isMobile={isMobile}
             />
