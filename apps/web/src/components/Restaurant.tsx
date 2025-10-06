@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import RestaurantDesktop from './RestaurantDesktop'
-import RestaurantMobileWeb from './RestaurantMobileWeb'
+import RestaurantMobileWeb from './RestaurantMobileWeb/RestaurantMobileWeb'
 import { useRestaurant } from '../hooks/useRestaurant'
 
 interface RestaurantProps {
