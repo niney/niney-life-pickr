@@ -7,7 +7,7 @@
 import { StatusBar, StyleSheet, useColorScheme, View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider } from 'shared/contexts';
+import { ThemeProvider, SocketProvider } from 'shared/contexts';
 import LoginScreen from './src/screens/LoginScreen';
 import BottomTabNavigator from './src/navigation/BottomTabNavigator';
 import { useAuth } from 'shared/hooks';
@@ -18,8 +18,10 @@ function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <AppContent />
+        <SocketProvider>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <AppContent />
+        </SocketProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
