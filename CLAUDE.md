@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Note**: For general usage instructions, setup guides, and testing examples, see [README.md](./README.md).
+
 ## Project Overview
 
 Niney Life Pickr is a cross-platform life decision-making application with:
@@ -105,247 +107,57 @@ niney-life-pickr/
 
 ## Key Commands
 
-### Web Application
-```bash
-cd apps/web
-npm run dev        # Start development server (port 3000)
-npm run build      # Build for production
-npm run preview    # Preview production build
-npm run lint       # Run ESLint
+> **Note**: For detailed command usage, see [README.md - Development Commands](./README.md#개발-서버-실행).
 
-# E2E Testing with Playwright
-npm run test:e2e           # Run E2E tests (headless)
-npm run test:e2e:ui        # Run E2E tests with UI mode (recommended)
-npm run test:e2e:headed    # Run E2E tests in headed mode
-npm run test:e2e:debug     # Run E2E tests in debug mode
-npm run test:e2e:report    # Show test report
-npm run test:e2e:codegen   # Generate test code with Playwright codegen
-```
-
-### Mobile Application
-```bash
-cd apps/mobile
-npm start          # Start Metro bundler
-npm run android    # Run on Android
-npm run ios        # Run on iOS
-npm run lint       # Run ESLint
-npm test           # Run tests
-
-# Reset Metro cache if needed
-npx react-native start --reset-cache
-
-# E2E Testing with Maestro
-npm run test:e2e         # Run all E2E tests
-npm run test:e2e:smoke   # Run smoke test
-npm run test:e2e:login   # Run login flow test
-npm run test:e2e:studio  # Open Maestro Studio (interactive mode)
-```
-
-### Friendly Server (Node.js Backend)
-```bash
-cd servers/friendly
-npm run dev        # Start development server with hot reload (port 4000)
-npm run dev:clean  # Kill existing server and start fresh
-npm run build      # Build TypeScript to JavaScript (uses tsconfig.build.json)
-npm run start      # Start production server
-npm run start:prod # Start with NODE_ENV=production
-npm run clean      # Clean build directory
-npm run lint       # Run ESLint
-npm run lint:fix   # Fix linting issues
-npm run type-check # TypeScript type checking without building
-npm run db:reset   # Reset database and re-run migrations
-npm run kill       # Kill server process (reads port from config/base.yml)
-
-# Testing with Vitest + Supertest
-npm test           # Run all tests in watch mode
-npm run test:run   # Run all tests once
-npm run test:ui    # Open Vitest UI
-npm run test:coverage  # Run tests with coverage report
-npm run test:unit      # Run unit tests only
-npm run test:integration  # Run integration tests only
-npm run test:auth  # Run auth routes tests only
-
-# Run a single test file
-npm test -- src/__tests__/integration/auth.routes.test.ts
-```
-
-### Smart Server (Python ML/AI Backend)
-```bash
-cd servers/smart
-python scripts/dev.py    # Start development server (port 5000)
-python scripts/start.py  # Start production server
-
-# Install dependencies
-pip install -e .          # Install base dependencies
-pip install -e ".[dev]"   # Install with development tools
-pip install -e ".[ml]"    # Install with ML libraries
-
-# Testing with pytest
-pytest                    # Run all tests
-pytest tests/unit         # Run unit tests only
-pytest tests/integration  # Run integration tests only
-pytest --cov=src          # Run with coverage report
-pytest -m unit            # Run tests marked as unit
-pytest -m integration     # Run tests marked as integration
-
-# Code quality
-black src tests           # Format code
-isort src tests           # Sort imports
-ruff check src tests      # Lint code
-mypy src                  # Type checking
-
-# API Documentation
-# Visit http://localhost:5000/docs for Swagger UI
-# Visit http://localhost:5000/redoc for ReDoc
-```
+**Quick Reference:**
+- Web dev server: `cd apps/web && npm run dev` (port 3000)
+- Friendly server: `cd servers/friendly && npm run dev` (port 4000)
+- Smart server: `cd servers/smart && python scripts/dev.py` (port 5000)
+- Mobile: `cd apps/mobile && npm start` (Metro bundler)
 
 ## Technology Stack
 
-### Web Application
-- **React 19.1.1** with React Native Web 0.21.1
-- **Vite 7.1.7** build tool with HMR
-- **TypeScript 5.8.3** for type safety
-- **React Router DOM 7.9.3** for routing
-- **PWA support** with vite-plugin-pwa
-- **Playwright** for E2E testing (Chromium, Mobile Chrome, Mobile Safari)
-- **Shared components** from apps/shared
+> **Note**: For detailed versions and dependencies, see [README.md - Technology Stack](./README.md#기술-스택).
 
-### Mobile Application
-- **React Native 0.81.4** framework
-- **React 19.1.0** core library
-- **TypeScript 5.8.3** for type safety
-- **Metro** bundler for JavaScript bundling
-- **React Native Safe Area Context** for device-safe layouts
-- **Maestro** for E2E testing (Android & iOS)
-- **Shared components** from apps/shared
-
-### Shared Module Architecture
-- **Barrel Export Pattern** for clean imports
-- **Cross-platform components** (Button, InputField)
-- **Shared hooks** (useLogin, useAuth) for business logic with API integration
-- **Shared contexts** (ThemeContext) for global state management
-- **API Service layer** for backend communication with platform-specific URL handling
-- **Centralized constants** (APP_INFO_CONSTANTS, AUTH_CONSTANTS, THEME_COLORS) with domain separation
-- **Cross-platform utilities**:
-  - Alert utility for web and mobile
-  - Storage utility (localStorage for web, AsyncStorage for mobile)
-  - Theme persistence with auto-restore
-- **AsyncStorage 2.2.0** for persistent mobile storage
-- **React Native** base for maximum compatibility
-- **TypeScript** for type definitions
-- **Clean separation** of concerns (components/hooks/contexts/constants/services/types/utils)
-
-### Friendly Server (Node.js Backend)
-- **Fastify 5.6.0** high-performance web framework
-- **TypeScript 5.9.2** with strict type checking
-- **SQLite3 5.1.7** lightweight file-based database
-- **bcrypt 6.0.0** for password hashing
-- **@fastify/swagger 9.5.1** for OpenAPI 3.0 specification
-- **@fastify/swagger-ui 5.2.3** for interactive API documentation
-- **@scalar/fastify-api-reference 1.35.3** for modern API reference UI
-- **@fastify/type-provider-typebox 5.2.0** with **@sinclair/typebox 0.34.41** for runtime validation
-- **@fastify/helmet 13.0.1** for security headers
-- **@fastify/cors 11.1.0** for cross-origin resource sharing
-- **@fastify/sensible 6.0.3** for sensible defaults
-- **pino** structured logging with pino-pretty for development
-- **Vitest** for unit and integration testing
-- **Supertest** for HTTP endpoint testing
-- **Puppeteer 24.23.0** for web crawling and automation
-
-### Smart Server (Python ML/AI Backend)
-- **Python 3.10+** with type hints
-- **FastAPI 0.115+** async web framework
-- **Uvicorn** ASGI server with hot reload
-- **Pydantic v2** for data validation and settings management
-- **PyYAML** for configuration parsing
-- **pytest** for unit and integration testing
-- **pytest-asyncio** for async test support
-- **Black, Ruff, mypy** for code quality
-- **Optional ML libraries**: numpy, pandas, scikit-learn, tensorflow, torch, transformers
+### Core Technologies
+- **Frontend**: React 19, React Native Web (Web) / React Native (Mobile), TypeScript 5.8
+- **Build Tools**: Vite (Web), Metro (Mobile)
+- **Backend**: Fastify 5.6 (Node.js), FastAPI (Python)
+- **Database**: SQLite3 with automated migrations
+- **Testing**: Playwright (Web), Maestro (Mobile), Vitest (Backend)
+- **Crawling**: Puppeteer for Naver Map data extraction
+- **Real-time**: Socket.io for collaborative features
 
 ## API Documentation System
 
-### Multiple Documentation Formats
+> **Note**: For API documentation URLs and usage, see [README.md - API Documentation](./README.md#api-문서).
+
 The friendly server provides comprehensive API documentation in multiple formats:
+- **Swagger UI**: Interactive testing interface at `/docs`
+- **Scalar Reference**: Modern API reference at `/reference`
+- **OpenAPI Spec**: JSON specification at `/api/docs/spec`
+- **Route-Specific Docs**: Generate docs per route at `/api/docs/generate/:routeName`
+- **AI-Friendly Prompt**: AI assistant prompt at `/api/docs/ai-prompt`
 
-#### Swagger UI (Interactive Documentation)
-- **URL**: `http://localhost:4000/docs`
-- Interactive interface for testing API endpoints
+### Key Features
+- Auto-generated examples with TypeBox schemas
 - JWT Bearer token authentication support
-- Request/response examples with TypeBox schema validation
-- Persistent authorization across sessions
-
-#### Scalar API Reference (Modern Alternative)
-- **URL**: `http://localhost:4000/reference`
-- Modern, responsive API documentation interface
-- Dark mode support with purple theme
-- Enhanced UX with better navigation and search
-
-#### OpenAPI JSON Specification
-- **Endpoint**: `GET /api/docs/spec`
-- Complete OpenAPI 3.0 specification in JSON format
-- Machine-readable API specification for tooling integration
-
-#### Route-Specific Documentation Generation
-- **Endpoint**: `GET /api/docs/generate/:routeName`
-- Generates documentation for specific routes (auth, health, api, crawler)
-- Creates separate folders in `generated-docs/` directory (gitignored)
-- Outputs two formats per route:
-  - `{routeName}-api-doc.md` - Markdown documentation with examples
-  - `{routeName}-api-doc.json` - Filtered OpenAPI specification
-- Automatically filters endpoints by route prefix
-
-#### AI-Friendly API Prompt
-- **Endpoint**: `GET /api/docs/ai-prompt`
-- Generates comprehensive AI-friendly prompts describing all API endpoints
-- Includes request/response examples, authentication info, and usage examples
-- Grouped by endpoint tags with detailed descriptions
-- Perfect for training AI assistants or generating documentation
-
-#### Markdown Documentation
-- **Endpoint**: `GET /api/docs/markdown`
-- Complete API documentation in Markdown format
-- Suitable for README files or static documentation sites
-- Includes endpoint tables, schemas, and examples
-
-### Documentation Features
-- **Auto-generated Examples**: TypeBox schemas automatically generate JSON examples
-- **JWT Authentication**: Ready for Bearer token implementation
-- **Tag-based Organization**: Endpoints organized by functional areas (auth, health, api, users, crawler)
-- **Response Standardization**: Consistent error/success response format across all endpoints
-- **Schema Validation**: Request/response validation with detailed error messages
+- Tag-based organization by functional areas
+- Consistent response format with validation
 
 ## Configuration System
 
-### YAML-based Configuration
-- Configuration files stored in root `config/` directory
-- `base.yml`: Default configuration for development
-- `test.yml`: Test environment overrides (port: 0, error logging, wildcard CORS)
-- `production.yml`: Production overrides (merged with base)
-- Server loads environment-specific config automatically based on NODE_ENV
+> **Note**: For environment variables and network access details, see [README.md - Environment Configuration](./README.md#환경-설정).
 
-### Environment Variables
-Environment variables override YAML configuration:
-- `NODE_ENV`: development | test | production
-- `PORT`: Server port number
-- `HOST`: Server host address (0.0.0.0 for network access)
-- `LOG_LEVEL`: debug | info | warn | error
-- `CORS_ORIGIN`: Allowed CORS origins
-- `LOCAL_IP`: Local network IP for mobile device access (optional)
+### YAML Configuration
+- Files in `config/` directory: `base.yml`, `test.yml`, `production.yml`
+- Environment-specific loading based on `NODE_ENV`
+- Environment variables override YAML settings
 
-### Port Configuration
-- Web app: 3000
-- Friendly server: 4000 (0 for tests - random port)
-- Smart server: 5000
-- `strictPort: true` ensures exact port usage
-
-### Network Access
-- **Default**: `HOST=0.0.0.0` allows access from any network interface
-- **Local IP Detection**: Server automatically detects and displays local network IP
-- **Mobile Access**:
-  - Android emulator: Uses `10.0.2.2:4000` to access host machine
-  - iOS simulator: Uses `localhost:4000`
-  - Physical devices: Use local network IP (e.g., `192.168.0.100:4000`)
+### Key Settings
+- **Ports**: Web (3000), Friendly (4000), Smart (5000)
+- **Network**: `HOST=0.0.0.0` for mobile device access
+- **Mobile Access**: Android emulator uses `10.0.2.2:4000`, iOS uses `localhost:4000`
 
 ## Database System
 
@@ -435,344 +247,97 @@ created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ```
 
 ### Migration System
-- **Auto-execution**: Migrations run automatically on server startup
-- **Version Tracking**: Migration history stored in migrations table
-- **Reset Command**: `npm run db:reset` for development database reset
-- **File-based**: SQL migration files with sequential naming (001_create_users.sql)
+- Auto-execution on server startup
+- Version tracking in migrations table
+- Reset: `npm run db:reset`
+- File-based SQL migrations with sequential naming
 
 ## Authentication System
 
 ### Backend Implementation
-- **Registration**: `POST /api/auth/register`
-  - Email/username uniqueness validation
-  - Password strength requirements (minimum 6 characters)
-  - Username length validation (3-50 characters)
-  - Bcrypt password hashing with 10 salt rounds
-  - Automatic account activation
-  - TypeBox schema validation
+- **Registration**: Email/username validation, bcrypt hashing, TypeBox schema validation
+- **Login**: Case-insensitive email, last login tracking, standardized response
+- **User Management**: User listing with password hash exclusion
 
-- **Login**: `POST /api/auth/login`
-  - Email/password authentication (case-insensitive email)
-  - Last login timestamp tracking with database update
-  - Returns updated user with last_login field
-  - Standardized response format
+### Frontend State Management
+- **useAuth Hook**: 로그인 상태 관리, storage 자동 복원, login/logout 함수
+- **useLogin Hook**: 로그인 폼 로직, API 호출, 에러 처리
 
-- **User Management**: `GET /api/auth/users`
-  - User listing endpoint (for testing/admin purposes)
-  - Excludes password hashes from responses
-  - User count and details
-  - Consistent ordering by ID
-
-### Frontend Authentication State
-- **useAuth Hook** (`apps/shared/hooks/useAuth.ts`):
-  - 로그인 상태 관리 (user, isAuthenticated, isLoading)
-  - 초기 로드 시 storage에서 자동 복원
-  - login/logout/checkAuth 함수 제공
-  - 웹과 모바일에서 공통 사용
-
-- **useLogin Hook** (`apps/shared/hooks/useLogin.ts`):
-  - 로그인 폼 로직 (email, password, isLoading)
-  - API 호출 및 에러 처리
-  - 성공 시 storage에 자동 저장
-  - 콜백 지원 (onSuccess)
-
-### Storage & Session Management
-- **Cross-platform Storage** (`apps/shared/utils/storage.utils.ts`):
-  - Web: localStorage
-  - Mobile: AsyncStorage
-  - 통일된 async API (setItem, getItem, removeItem, setObject, getObject)
-  - 인증 전용 메서드 (setUserInfo, getUserInfo, setAuthToken, getAuthToken, logout)
-  - Storage Keys: `auth_token`, `user_info`, `last_login`
-
-- **Session Persistence**:
-  - 로그인 시 사용자 정보 storage에 저장
-  - 앱/페이지 재시작 시 자동 복원
-  - 로그아웃 시 모든 인증 데이터 삭제
-
-### Security Features
-- **Password Hashing**: bcrypt with configurable salt rounds
-- **SQL Injection Protection**: Parameterized queries throughout
-- **Input Validation**: TypeBox schema validation for all endpoints
-- **Security Headers**: Helmet integration for common security headers
-- **CORS Configuration**: Configurable cross-origin resource sharing
-
-### Future JWT Implementation
-- Authentication system is prepared for JWT token integration
-- Session table ready for token storage
-- Bearer token authentication configured in OpenAPI spec
-- Response types include token field for future implementation
-- Storage utility already supports token storage/retrieval
+### Storage & Security
+- **Cross-platform Storage**: localStorage (Web) / AsyncStorage (Mobile) with unified API
+- **Session Persistence**: 자동 복원, 로그아웃 시 데이터 삭제
+- **Security**: bcrypt hashing, SQL injection protection, TypeBox validation, Helmet headers
+- **Future**: JWT token implementation prepared (session table, Bearer auth ready)
 
 ## Naver Map Crawler Service
 
-### Overview
-Puppeteer-based web crawler for extracting restaurant information from Naver Map/Place URLs with automatic database persistence.
-
 ### Architecture
-- **Crawler Service**: `servers/friendly/src/services/naver-crawler.service.ts` - Raw web scraping logic
-- **Restaurant Service**: `servers/friendly/src/services/restaurant.service.ts` - Integrates crawling with DB storage
-- **Repository**: `servers/friendly/src/db/repositories/restaurant.repository.ts` - Data access layer
-- **Routes**: `servers/friendly/src/routes/crawler.routes.ts` - API endpoints
-- **Types**:
-  - `servers/friendly/src/types/crawler.types.ts` - Crawler response types
-  - `servers/friendly/src/types/db.types.ts` - Database entity types
+- **Crawler Service**: Raw web scraping with Puppeteer
+- **Restaurant Service**: Crawling + DB storage integration
+- **Repository**: Data access layer with UPSERT pattern
+- **Routes**: API endpoints (`/api/crawler/*`)
 
 ### Key Features
-- **URL Support**: Handles multiple Naver URL formats
-  - `https://map.naver.com/p/entry/place/{id}`
-  - `https://m.place.naver.com/restaurant/{id}`
-  - `https://naver.me/{shortUrl}` (automatic redirect handling)
-- **Data Extraction**:
-  - Restaurant basic info (name, category, phone, address, coordinates)
-  - Menu items with descriptions and prices (auto-expands "more" buttons)
-  - Reviews with keywords, ratings, and visit info (auto-expands review list)
-- **Performance Optimization**:
-  - Blocks images/CSS/fonts for faster loading
-  - Creates new browser instance per crawl for stability
-  - Timing logs for performance monitoring
+- **URL Support**: Naver Map, Place, short URLs (automatic redirect)
+- **Data Extraction**: Restaurant info, menus, reviews with keywords
+- **Performance**: Image/CSS blocking, per-crawl browser instance
+- **Storage**: UPSERT by `place_id`, menu replacement on re-crawl
 
 ### API Endpoints
-```bash
-# Single restaurant crawl
-POST /api/crawler/restaurant
-{
-  "url": "https://map.naver.com/p/entry/place/1234567890",
-  "crawlMenus": true  # optional, default: true
-}
+> **Note**: For curl examples, see [README.md - API Testing](./README.md#naver-map-크롤러).
 
-# Bulk crawl (max 5 URLs)
-POST /api/crawler/bulk
-{
-  "urls": ["url1", "url2", ...]
-}
+- `POST /api/crawler/restaurant` - Single crawl (with optional menu crawling)
+- `POST /api/crawler/bulk` - Bulk crawl (max 5 URLs)
+- `POST /api/crawler/reviews` - Review crawling
 
-# Review crawl
-POST /api/crawler/reviews
-{
-  "url": "https://m.place.naver.com/restaurant/{id}/review/visitor?reviewSort=recent"
-}
-
-# Cleanup (deprecated - auto cleanup per crawl)
-POST /api/crawler/cleanup
-```
-
-### Database Storage Implementation
-- **UPSERT Pattern**: Restaurant data is upserted based on `place_id` (no duplicates)
-- **Menu Replacement**: Menus are deleted and re-inserted on each crawl for freshness
-- **Service Layer Architecture**:
-  - `RestaurantService.crawlAndSaveRestaurant()` - Single restaurant crawl + save
-  - `RestaurantService.crawlAndSaveMultiple()` - Bulk crawl + save (sequential)
-- **Repository Pattern**:
-  - `upsertRestaurant()` - Insert or update restaurant by place_id
-  - `saveMenus()` - Replace all menus for a restaurant
-  - `findByPlaceId()`, `findMenusByRestaurantId()` - Query methods
-- **Response Fields**:
-  - `savedToDb: boolean` - Indicates if data was persisted
-  - `restaurantId: number` - Database ID of saved restaurant
-
-### Important Implementation Notes
-- **Browser Management**: Each crawl creates and destroys its own browser instance
-- **Dynamic Loading**: Waits for elements to load text content (phone/address)
-- **URL Normalization**: Automatically converts all URLs to mobile format for consistent scraping
-- **Error Handling**: Graceful degradation when optional elements are missing
-- **TypeScript DOM Types**: Uses `lib: ["ES2022", "DOM"]` in tsconfig.json for page.evaluate() contexts
-- **Data Conversion**: Crawler types automatically converted to DB input types via service layer
-
-### Response Helper Usage
-All endpoints use `ResponseHelper` utilities:
-```typescript
-// Success
-ResponseHelper.success(reply, data, message)
-
-// Errors
-ResponseHelper.validationError(reply, message)
-ResponseHelper.error(reply, message, statusCode)
-```
+### Implementation Notes
+- Browser per crawl for stability
+- Mobile URL normalization for consistency
+- TypeScript DOM types for page.evaluate()
+- Graceful error handling for missing elements
 
 ## Restaurant Data Management API
 
-### Overview
-Restaurant API provides access to crawled restaurant data with category aggregation and pagination support.
-
 ### Endpoints
-- **GET /api/restaurants/categories** - Get restaurant count grouped by category
-  - Returns categories sorted by count (descending) then name (ascending)
-  - NULL categories appear as "Unknown"
+> **Note**: For curl examples, see [README.md - API Testing](./README.md#레스토랑-데이터-조회).
 
-- **GET /api/restaurants** - List restaurants with pagination
-  - Query params: `limit` (default: 20), `offset` (default: 0)
-  - Returns total count and paginated results
-
-- **GET /api/restaurants/:id** - Get restaurant details with menus
-  - Returns restaurant info and associated menu items
-  - 404 if restaurant not found
+- `GET /api/restaurants/categories` - Category aggregation (NULL as "Unknown")
+- `GET /api/restaurants` - Paginated list (limit, offset)
+- `GET /api/restaurants/:id` - Detail with menus (404 if not found)
 
 ### Type System
-- **MenuInput**: Menu data without restaurant_id (used in saveMenus method)
-- **MenuInsert**: Extends MenuInput with restaurant_id (used for DB insertion)
-- This separation allows `restaurantRepository.saveMenus(restaurantId, menus)` to accept menus without explicit restaurant_id
-
-### Integration Tests
-All restaurant routes have comprehensive integration tests in `src/__tests__/integration/restaurant.routes.test.ts`:
-- Category aggregation (including NULL handling)
-- Pagination (limit, offset, default values)
-- Restaurant details with menus
-- Response format validation
-- Tests account for existing production data using `>=` comparisons
+- **MenuInput**: Menu data without restaurant_id
+- **MenuInsert**: Extends MenuInput with restaurant_id for DB insertion
 
 ## API Response Standardization
 
-All API endpoints use a consistent response format:
-
-### Success Response
-```typescript
-{
-  result: true,
-  message: string,
-  data: T,
-  timestamp: string
-}
-```
-
-### Error Response
-```typescript
-{
-  result: false,
-  message: string,
-  statusCode: number,
-  timestamp: string
-}
-```
-
-### Response Helper Utilities
-Response helpers available in `servers/friendly/src/utils/response.utils.ts`:
-- `ResponseHelper.success()` - 200 OK
-- `ResponseHelper.created()` - 201 Created
-- `ResponseHelper.error()` - Custom error
-- `ResponseHelper.validationError()` - 400 Bad Request
-- `ResponseHelper.unauthorized()` - 401 Unauthorized
-- `ResponseHelper.forbidden()` - 403 Forbidden
-- `ResponseHelper.notFound()` - 404 Not Found
-- `ResponseHelper.conflict()` - 409 Conflict
-- `ResponseHelper.paginated()` - Paginated response format
+All endpoints use consistent response format with `ResponseHelper` utilities:
+- Success: `{ result: true, message, data, timestamp }`
+- Error: `{ result: false, message, statusCode, timestamp }`
+- Helpers: success, error, validationError, unauthorized, notFound, paginated, etc.
 
 ## TypeScript Configuration
 
-### Build Configuration
-- **Development**: Uses `tsconfig.json` (excludes vitest.config.ts from includes)
-- **Production Build**: Uses `tsconfig.build.json` (excludes test files)
-- **Test Configuration**: Tests use `buildApp()` function for proper Fastify initialization
-- **Path Aliases**: Configured in both TypeScript and test runners
-  - Friendly Server: `@routes`, `@controllers`, `@services`, `@middlewares`, `@utils`, `@types`
+- **Development**: `tsconfig.json` (excludes vitest.config.ts)
+- **Production**: `tsconfig.build.json` (excludes test files)
+- **Path Aliases**: `@routes`, `@services`, `@utils`, `@types` (Friendly server)
 
 ## Development Workflow
 
-### Process Management
-- **Kill Script**: `scripts/kill.js` automatically reads port from `config/base.yml`
-  - Reads `server.friendly.port` configuration (default: 4000)
-  - Cross-platform support (Windows/Mac/Linux)
-  - Handles multiple processes on the same port
-- `npm run kill`: Terminates server process on configured port
-- `npm run dev:clean`: Kills existing server then starts fresh
-
-### Maestro Installation (Mobile E2E Testing)
-Maestro는 별도 설치가 필요합니다:
-
-```bash
-# macOS/Linux
-curl -Ls "https://get.maestro.mobile.dev" | bash
-
-# Windows (WSL2 필요)
-# WSL2에서 위 명령어 실행
-```
-
-설치 확인:
-```bash
-maestro --version
-```
+- **Kill Script**: `npm run kill` (port from config), `npm run dev:clean` (kill + start)
+- **Cross-platform**: Windows/Mac/Linux support
 
 ## Testing Strategy
 
+> **Note**: For test commands and examples, see [README.md - Testing](./README.md#테스트).
+
 ### Test Organization
-- **Web E2E Tests** (`apps/web/e2e/`):
-  - Playwright E2E tests for user flows
-  - Login flow test: Alert handling, navigation verification
-  - Test browsers: Chromium, Mobile Chrome, Mobile Safari
-  - Important: React Native Web buttons render as `<div>`, use `getByText()` instead of `getByRole('button')`
-
-- **Mobile E2E Tests** (`apps/mobile/.maestro/`):
-  - Maestro E2E tests for React Native apps
-  - YAML-based test flows
-  - Tests: Smoke test, Login flow
-  - Supports Android & iOS platforms
-  - Test account: niney@ks.com / tester (defined in config.yaml)
-
-- **Friendly Server Tests**:
-  - Unit tests: `src/__tests__/unit/`
-  - Integration tests: `src/__tests__/integration/`
-  - Auth routes test: Comprehensive test suite for authentication endpoints
-    - Registration validation and error handling
-    - Login with case-insensitive email support
-    - User listing and management
-    - Performance and concurrent request handling
-  - Crawler routes test: Integration tests for Naver Map crawler with DB persistence
-    - URL validation (missing URL, invalid domain)
-    - Crawling + DB save integration
-    - Database persistence verification (restaurants, menus)
-    - Uses mocked crawler service for consistent test data
-  - Restaurant routes test: Integration tests for restaurant data management
-    - Category aggregation with NULL handling
-    - Pagination (limit, offset, defaults)
-    - Restaurant details with menus
-    - 404 handling for non-existent restaurants
-    - Tests use `>=` comparisons to account for production data
-
-### Testing Approach
-- **E2E Tests**: User flows, integration testing
-  - Web: Playwright with auto-starting dev server
-  - Mobile: Maestro with YAML-based flows
-- **Unit/Integration Tests**: Business logic, utilities, services
-  - Friendly Server: Vitest with 80% coverage threshold
-  - Smart Server: pytest with async support
-
-### Test Running Examples
-
-#### Run a single test file
-```bash
-# Playwright E2E (Web)
-cd apps/web
-npm run test:e2e -- login.spec.ts           # Run specific test file
-npm run test:e2e:ui                         # Interactive UI mode
-npm run test:e2e:headed -- login.spec.ts    # Watch test execution
-
-# Maestro E2E (Mobile)
-cd apps/mobile
-npm run test:e2e:smoke                      # Run smoke test
-npm run test:e2e:login                      # Run login flow test
-maestro test .maestro/login.yaml            # Run specific test directly
-
-# Vitest (Friendly Server)
-npm test -- src/__tests__/unit/userService.test.ts
-npm test -- src/__tests__/integration/auth.routes.test.ts
-
-# Run specific test suite
-npm run test:auth  # Auth routes tests only
-
-# pytest (Smart Server)
-pytest tests/unit/test_config.py
-```
-
-#### Debug tests
-```bash
-# Playwright E2E (Web)
-cd apps/web && npm run test:e2e:debug
-
-# Maestro Studio (Mobile - Interactive)
-cd apps/mobile && npm run test:e2e:studio
-
-# Vitest UI
-cd servers/friendly && npm run test:ui
-```
+- **Web E2E** (`apps/web/e2e/`): Playwright (Chromium, Mobile Chrome/Safari)
+  - Important: React Native Web buttons are `<div>`, use `getByText()` not `getByRole('button')`
+- **Mobile E2E** (`apps/mobile/.maestro/`): Maestro YAML flows (Android & iOS)
+- **Server Tests**: Vitest (Friendly), pytest (Smart)
+  - Auth, Crawler, Restaurant routes with comprehensive integration tests
+  - 80% coverage threshold (Friendly server)
 
 ## Current Implementation Status
 
@@ -1002,83 +567,13 @@ generateReviewHash(placeId, userName, visitDate, visitCount, verificationMethod)
 
 ## Common Development Tasks
 
-### Testing API Endpoints
-```bash
-# Registration (validates email format, username length 3-50, password min 6)
-curl -X POST http://localhost:4000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
+> **Note**: For API testing examples, database operations, and documentation URLs, see [README.md - API Testing](./README.md#api-테스트-예제) and [README.md - Database Management](./README.md#데이터베이스-관리).
 
-# Login (case-insensitive email, updates last_login)
-curl -X POST http://localhost:4000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
-
-# Test account for quick access (already registered)
-# Email: niney@ks.com
-# Password: tester
-
-# Health check
-curl http://localhost:4000/health
-
-# Get OpenAPI specification
-curl http://localhost:4000/api/docs/spec
-
-# Get AI-friendly API prompt
-curl http://localhost:4000/api/docs/ai-prompt
-
-# Get Markdown documentation
-curl http://localhost:4000/api/docs/markdown
-
-# Generate route-specific documentation
-curl http://localhost:4000/api/docs/generate/auth
-curl http://localhost:4000/api/docs/generate/health
-curl http://localhost:4000/api/docs/generate/api
-curl http://localhost:4000/api/docs/generate/crawler
-
-# Naver Map crawler endpoints
-curl -X POST http://localhost:4000/api/crawler/restaurant \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://map.naver.com/p/entry/place/1234567890","crawlMenus":true}'
-
-curl -X POST http://localhost:4000/api/crawler/reviews \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://m.place.naver.com/restaurant/1234567890/review/visitor?reviewSort=recent"}'
-```
-
-### Database Operations
-```bash
-# Reset database (delete and recreate)
-cd servers/friendly && npm run db:reset
-
-# View database (requires SQLite CLI)
-sqlite3 servers/friendly/data/niney.db ".tables"
-sqlite3 servers/friendly/data/niney.db "SELECT * FROM users;"
-sqlite3 servers/friendly/data/niney.db "SELECT * FROM restaurants;"
-sqlite3 servers/friendly/data/niney.db "SELECT * FROM menus WHERE restaurant_id = 1;"
-
-# Check restaurant count
-sqlite3 servers/friendly/data/niney.db "SELECT COUNT(*) FROM restaurants;"
-
-# View restaurant with menus (JOIN query)
-sqlite3 servers/friendly/data/niney.db "
-SELECT r.name, r.category, r.phone, m.name as menu_name, m.price
-FROM restaurants r
-LEFT JOIN menus m ON r.id = m.restaurant_id
-WHERE r.place_id = 'test20848484';"
-```
-
-### Accessing API Documentation
-```bash
-# Interactive Swagger UI
-open http://localhost:4000/docs
-
-# Modern Scalar API Reference
-open http://localhost:4000/reference
-
-# Get AI prompt for API integration
-curl http://localhost:4000/api/docs/ai-prompt -s | jq -r '.prompt' > api-prompt.txt
-```
+**Quick Reference:**
+- Test account: `niney@ks.com` / `tester`
+- API docs: http://localhost:4000/docs (Swagger UI)
+- API reference: http://localhost:4000/reference (Scalar)
+- Database reset: `cd servers/friendly && npm run db:reset`
 
 ## React Native Web 제약사항 및 해결 패턴
 
@@ -1174,40 +669,20 @@ html, body {
 
 ## Code Style and Quality
 
-### ESLint Configuration
-- Friendly server uses traditional `.eslintrc` format
-- TypeScript-specific rules enabled
-- Run `npm run lint:fix` to auto-fix issues
+> **Note**: For linting commands, see [README.md - Code Quality](./README.md#코드-품질).
 
 ### Commit Message Convention
 **IMPORTANT: 커밋 메시지는 반드시 한글로 작성**
 
-Prefix commits with the affected scope:
-- `[web]` - Web application changes
-- `[mobile]` - Mobile application changes
-- `[shared]` - Shared components/utilities changes
-- `[friendly]` - Node.js backend changes
-- `[smart]` - Python backend changes
-- `[config]` - Configuration file changes
+Scope prefixes: `[web]`, `[mobile]`, `[shared]`, `[friendly]`, `[smart]`, `[config]`
 
 Examples:
 ```
 [web] 데스크탑/모바일 레이아웃 분리 및 리뷰 기능 추가
-[mobile] 공유 폴더 사용을 위한 Metro 설정 업데이트
-[shared] 크로스 플랫폼 Button 컴포넌트 생성
 [friendly] Place ID 기반 리뷰 조회 API 추가
-[smart] 개발 환경을 위한 FastAPI 설정 수정
-[config] JWT를 위한 환경 변수 추가
 ```
 
 ## Performance Considerations
 
-### Fastify Optimizations
-- Automatic schema validation with TypeBox
-- Built-in serialization optimization
-- Structured logging with pino for minimal overhead
-- Connection pooling prepared for future database scaling
-
-### Build Optimization
-- Conditional minification based on environment
-- Tree-shaking enabled for production builds
+- **Fastify**: TypeBox schema validation, serialization optimization, pino logging
+- **Build**: Conditional minification, tree-shaking
