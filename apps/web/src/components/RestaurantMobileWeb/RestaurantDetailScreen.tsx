@@ -1,5 +1,4 @@
-import React from 'react'
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text, ScrollView } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
@@ -25,7 +24,7 @@ const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({
   const colors = THEME_COLORS[theme]
 
   return (
-    <div className="flex-container">
+    <View style={{ flex: 1 }}>
       {/* 헤더 */}
       <View style={[styles.reviewHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
@@ -38,7 +37,7 @@ const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({
       </View>
 
       {/* 콘텐츠 */}
-      <div className="content-scroll">
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {reviewsLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -108,8 +107,8 @@ const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
-      </div>
-    </div>
+      </ScrollView>
+    </View>
   )
 }
 
@@ -138,6 +137,13 @@ const styles = StyleSheet.create({
   },
   reviewSubtitle: {
     fontSize: 13,
+  },
+  // 스크롤뷰
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
   },
   // 리뷰 목록
   reviewsList: {

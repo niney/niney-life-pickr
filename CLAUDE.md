@@ -603,69 +603,48 @@ generateReviewHash(placeId, userName, visitDate, visitCount, verificationMethod)
 </div>
 ```
 
-### iOS Safari 주소창 자동 최소화 패턴
-iOS Safari에서 스크롤 시 주소창이 자동으로 최소화되도록 하는 레이아웃 구조:
+### 스크롤 관리 패턴
+**중요**: React Native Web 환경에서 스크롤 초기화가 필요한 경우:
 
-**글로벌 CSS** (`apps/web/src/index.css`):
-```css
-/* body에 고정 높이 없음 - 콘텐츠에 따라 늘어남 */
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;  /* iOS 스크롤 최적화 */
-}
-
-#root {
-  min-height: 100vh;  /* 최소 높이만 지정 */
-  display: flex;
-  flex-direction: column;
-}
-
-/* 공통 레이아웃 클래스 */
-.page-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.content-scroll {
-  flex: 1;
-  padding: 16px;
-  overflow: auto;
-}
-
-.flex-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
+**잘못된 방법**:
+```typescript
+// ❌ 복잡한 레이아웃 (flex, overflow, min-height 등)과 함께 사용하면 작동 불안정
+useEffect(() => {
+  window.scrollTo(0, 0)
+  document.body.scrollTop = 0
+  document.documentElement.scrollTop = 0
+}, [])
 ```
 
-**컴포넌트 패턴**:
+**올바른 방법**:
 ```typescript
-// 페이지 컨테이너
-<div className="page-container" style={{ backgroundColor: colors.background }}>
-  <Header />
-  <div className="content-scroll">
-    {/* 스크롤 가능한 콘텐츠 */}
-  </div>
-</div>
+// ✅ React Native Web의 ScrollView 사용
+import { ScrollView, View, StyleSheet } from 'react-native'
 
-// 중첩 플렉스 레이아웃
-<div className="flex-container">
-  <View style={styles.header}>...</View>
-  <div className="content-scroll">
-    {/* 스크롤 가능한 콘텐츠 */}
-  </div>
-</div>
+return (
+  <View style={{ flex: 1 }}>
+    <Header />
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      {/* 콘텐츠 */}
+    </ScrollView>
+  </View>
+)
+
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+  },
+})
 ```
 
 **핵심 원칙**:
-1. ❌ `height: 100%` 또는 `height: 100vh` 사용 금지 (고정 높이)
-2. ✅ `min-height: 100vh` 사용 (최소 높이, 콘텐츠에 따라 늘어남)
-3. ✅ Body 레벨 스크롤 발생 (내부 ScrollView 대신 일반 div)
-4. ✅ CSS 클래스 기반 레이아웃 (인라인 스타일 최소화)
+1. ✅ React Native의 `ScrollView` 컴포넌트 사용 (자동 스크롤 초기화)
+2. ✅ 최소한의 레이아웃 스타일 (불필요한 flex, overflow, min-height 제거)
+3. ❌ CSS 기반 스크롤 컨테이너(`.content-scroll { overflow: auto }`)와 `window.scrollTo()` 혼용 금지
+4. ✅ React Router로 경로 변경 시 컴포넌트 재마운트로 자동 스크롤 리셋
 
 ## Code Style and Quality
 

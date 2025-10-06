@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantCategory, RestaurantData, ReviewData, ReviewCrawlStatus } from '@shared/services'
@@ -55,6 +56,14 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
   const colors = THEME_COLORS[theme]
+  const location = useLocation()
+
+  // 경로가 변경될 때마다 스크롤을 맨 위로 이동
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    document.body.scrollTop = 0
+    document.documentElement.scrollTop = 0
+  }, [location.pathname])
 
   const handleLogout = async () => {
     await onLogout()
@@ -62,35 +71,49 @@ const RestaurantMobile: React.FC<RestaurantMobileProps> = ({
   }
 
   return (
-    <div className="page-container" style={{ backgroundColor: colors.background }}>
+    <div style={{ backgroundColor: colors.background }}>
       <Header onMenuPress={() => setDrawerVisible(true)} />
 
-      {selectedPlaceId ? (
-        <RestaurantDetailScreen
-          selectedRestaurant={selectedRestaurant}
-          reviews={reviews}
-          reviewsLoading={reviewsLoading}
-          reviewsTotal={reviewsTotal}
-          handleBackToList={handleBackToList}
+      <Routes>
+        {/* 레스토랑 목록 화면 */}
+        <Route
+          index
+          element={
+            <RestaurantListScreen
+              key="list"
+              url={url}
+              setUrl={setUrl}
+              loading={loading}
+              categories={categories}
+              categoriesLoading={categoriesLoading}
+              restaurants={restaurants}
+              restaurantsLoading={restaurantsLoading}
+              total={total}
+              reviewCrawlStatus={reviewCrawlStatus}
+              crawlProgress={crawlProgress}
+              dbProgress={dbProgress}
+              selectedPlaceId={selectedPlaceId}
+              handleCrawl={handleCrawl}
+              handleRestaurantClick={handleRestaurantClick}
+            />
+          }
         />
-      ) : (
-        <RestaurantListScreen
-          url={url}
-          setUrl={setUrl}
-          loading={loading}
-          categories={categories}
-          categoriesLoading={categoriesLoading}
-          restaurants={restaurants}
-          restaurantsLoading={restaurantsLoading}
-          total={total}
-          reviewCrawlStatus={reviewCrawlStatus}
-          crawlProgress={crawlProgress}
-          dbProgress={dbProgress}
-          selectedPlaceId={selectedPlaceId}
-          handleCrawl={handleCrawl}
-          handleRestaurantClick={handleRestaurantClick}
+
+        {/* 레스토랑 상세 화면 */}
+        <Route
+          path=":placeId"
+          element={
+            <RestaurantDetailScreen
+              key={selectedPlaceId || 'detail'}
+              selectedRestaurant={selectedRestaurant}
+              reviews={reviews}
+              reviewsLoading={reviewsLoading}
+              reviewsTotal={reviewsTotal}
+              handleBackToList={handleBackToList}
+            />
+          }
         />
-      )}
+      </Routes>
 
       <Drawer
         visible={drawerVisible}

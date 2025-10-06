@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 import {
   ActivityIndicator,
   StyleSheet,
@@ -48,9 +48,21 @@ const RestaurantListScreen: React.FC<RestaurantListScreenProps> = ({
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // 컴포넌트 마운트 시 스크롤을 맨 위로 이동
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    document.body.scrollTop = 0
+    document.documentElement.scrollTop = 0
+
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [])
 
   return (
-    <div className="content-scroll">
+    <div ref={scrollContainerRef} style={{ padding: 16 }}>
       {/* 검색 영역 */}
       <View style={styles.searchSection}>
         <TextInput

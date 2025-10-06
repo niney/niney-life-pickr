@@ -38,8 +38,7 @@ function AppContent() {
         ) : (
           <>
             <Route path="/" element={<Home onLogout={logout} />} />
-            <Route path="/restaurant" element={<Restaurant onLogout={logout} />} />
-            <Route path="/restaurant/:placeId" element={<Restaurant onLogout={logout} />} />
+            <Route path="/restaurant/*" element={<Restaurant onLogout={logout} />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
