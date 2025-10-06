@@ -90,17 +90,31 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
           </View>
 
           {categories.length > 0 ? (
-            <View style={styles.categoriesGrid}>
+            <div style={{ 
+              display: 'flex', 
+              overflowX: isMobile ? 'auto' : 'visible',
+              gap: '10px',
+              flexWrap: isMobile ? 'nowrap' : 'wrap',
+              paddingBottom: isMobile ? '8px' : '0',
+              WebkitOverflowScrolling: 'touch',
+            }}>
               {categories.map((category: RestaurantCategory) => (
                 <View
                   key={category.category}
-                  style={[styles.categoryCard, { backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface, borderColor: colors.border }]}
+                  style={[
+                    styles.categoryCard, 
+                    { 
+                      backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface, 
+                      borderColor: colors.border,
+                      flexShrink: isMobile ? 0 : 1,
+                    }
+                  ]}
                 >
                   <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
                   <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
                 </View>
               ))}
-            </View>
+            </div>
           ) : !categoriesLoading ? (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
           ) : null}

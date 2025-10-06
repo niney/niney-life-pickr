@@ -201,7 +201,11 @@ const RestaurantScreen: React.FC = () => {
           {categoriesLoading && <ActivityIndicator size="small" color={colors.text} />}
         </View>
         {categories.length > 0 ? (
-          <View style={styles.categoriesGrid}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollContent}
+          >
             {categories.map((category) => (
               <View
                 key={category.category}
@@ -211,7 +215,7 @@ const RestaurantScreen: React.FC = () => {
                 <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
               </View>
             ))}
-          </View>
+          </ScrollView>
         ) : !categoriesLoading ? (
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
         ) : null}
@@ -478,6 +482,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  categoriesScrollContent: {
+    gap: 8,
+    paddingRight: 16,
   },
   categoryCard: {
     paddingVertical: 12,
