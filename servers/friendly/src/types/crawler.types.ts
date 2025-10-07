@@ -12,6 +12,8 @@ export interface MenuItem {
   price: string;
   /** 메뉴 이미지 URL (선택) */
   image?: string;
+  /** AI가 정규화한 메뉴 이름 (음식명|메뉴명, 선택) */
+  normalizedName?: string;
 }
 
 /**

@@ -2,12 +2,12 @@
  * Ollama 서비스 간단 테스트 스크립트
  * 
  * 실행 방법:
- * npx ts-node src/services/ollama/test-ollama.ts
+ * npx ts-node src/tests/ollama/ollama.ts
  */
 
-import { createLocalConfig, createCloudConfig, printOllamaConfig } from './ollama.config';
-import { BaseLocalOllamaService } from './local-ollama.service';
-import { BaseCloudOllamaService } from './cloud-ollama.service';
+import { createLocalConfig, createCloudConfig, printOllamaConfig } from '../../services/ollama/ollama.config';
+import { BaseLocalOllamaService } from '../../services/ollama/local-ollama.service';
+import { BaseCloudOllamaService } from '../../services/ollama/cloud-ollama.service';
 
 /**
  * 간단한 테스트 서비스

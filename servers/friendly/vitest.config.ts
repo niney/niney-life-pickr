@@ -16,6 +16,7 @@ export default defineConfig({
         '**/*.d.ts',
         '**/__tests__/**',
         '**/__mocks__/**',
+        '**/tests/**',
         '**/types/**'
       ],
       thresholds: {

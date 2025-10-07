@@ -5,6 +5,7 @@ import { RestaurantInfo, MenuItem } from '../types/crawler.types';
 import jobManager from './job-manager.service';
 import crawlJobRepository from '../db/repositories/crawl-job.repository';
 import reviewCrawlerProcessor from './review-crawler-processor.service';
+import { normalizeMenuItems } from './menu-normalization.service';
 
 /**
  * Restaurant Service
@@ -44,7 +45,8 @@ export class RestaurantService {
       name: item.name,
       description: item.description || null,
       price: item.price,
-      image: item.image || null
+      image: item.image || null,
+      normalized_name: item.normalizedName || null  // ← AI 정규화 결과 포함
     }));
   }
 
@@ -89,9 +91,13 @@ export class RestaurantService {
 
         // 2-2. 메뉴 저장 (있는 경우)
         if (restaurantInfo.menuItems && restaurantInfo.menuItems.length > 0) {
-          const menuInputs = this.convertToMenuInputs(restaurantId, restaurantInfo.menuItems);
+          // AI로 메뉴 정규화 (normalized_name 추가)
+          console.log(`[RestaurantService] AI로 ${restaurantInfo.menuItems.length}개 메뉴 정규화 중...`);
+          const normalizedMenuItems = await normalizeMenuItems(restaurantInfo.menuItems, true); // true = Cloud 우선 (실패 시 Local)
+          
+          const menuInputs = this.convertToMenuInputs(restaurantId, normalizedMenuItems);
           await restaurantRepository.saveMenus(restaurantId, menuInputs);
-          console.log(`[RestaurantService] 메뉴 ${menuInputs.length}개 저장 완료`);
+          console.log(`[RestaurantService] 메뉴 ${menuInputs.length}개 저장 완료 (정규화 포함)`);
         }
 
         console.log('[RestaurantService] DB 저장 완료:', restaurantId);

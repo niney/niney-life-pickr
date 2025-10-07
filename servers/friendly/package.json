@@ -23,6 +23,10 @@
     "test:auth": "vitest run src/__tests__/integration/auth.routes.test.ts",
     "test:crawler": "vitest run src/__tests__/integration/crawler.routes.test.ts",
     "test:restaurant": "vitest run src/__tests__/integration/restaurant.routes.test.ts",
+    "test:ollama": "ts-node src/tests/ollama/ollama.ts",
+    "test:menu-norm": "ts-node src/tests/menu-normalization.ts",
+    "test:unified-ollama": "ts-node src/tests/unified-ollama.ts",
+    "test:unified-menu": "ts-node src/tests/unified-menu-normalization.ts",
     "db:reset": "node scripts/db-reset.js",
     "kill": "node scripts/kill.js"
   },
