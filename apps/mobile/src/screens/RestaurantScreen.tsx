@@ -294,11 +294,14 @@ const RestaurantScreen: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView style={styles.reviewScrollView}>
+      <ScrollView 
+        style={styles.reviewScrollView}
+        contentContainerStyle={styles.reviewScrollContent}
+      >
         {/* 크롤링 진행 상태 표시 */}
         {reviewCrawlStatus.status === 'active' && (
-          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-            <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+          <View style={styles.crawlProgressContainer}>
+            <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
                 🔄 리뷰 크롤링 중...
               </Text>
@@ -457,6 +460,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 100, // 하단 탭바 공간 확보
   },
   searchContainer: {
     flexDirection: 'row',
@@ -641,7 +645,10 @@ const styles = StyleSheet.create({
   },
   reviewScrollView: {
     flex: 1,
+  },
+  reviewScrollContent: {
     padding: 16,
+    paddingBottom: 100, // 하단 탭바 공간 확보
   },
   loadingContainer: {
     flex: 1,
@@ -661,10 +668,12 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   crawlProgressContainer: {
+    marginBottom: 16,
+  },
+  crawlProgressCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 16,
   },
   crawlProgressTitle: {
     fontSize: 15,
