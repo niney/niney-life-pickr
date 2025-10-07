@@ -12,7 +12,7 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
-import { useParams } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
 interface RestaurantListProps {
   url: string
@@ -49,7 +49,10 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
-  const { placeId } = useParams<{ placeId?: string }>()
+  const location = useLocation()
+  
+  // URL에서 placeId 추출 (/restaurant/:placeId)
+  const placeId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
 
   return (
     <div 
@@ -188,30 +191,40 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
 
           {restaurants.length > 0 ? (
             <View style={styles.restaurantsList}>
-              {restaurants.map((restaurant: RestaurantData) => (
-                <TouchableOpacity
-                  key={restaurant.id}
-                  style={[
-                    styles.restaurantCard,
-                    {
-                      backgroundColor: theme === 'light' ? '#fff' : colors.surface,
-                      borderColor: placeId === restaurant.place_id ? colors.primary : colors.border,
-                      borderWidth: placeId === restaurant.place_id ? 2 : 1,
-                    }
-                  ]}
-                  onPress={() => handleRestaurantClick(restaurant)}
-                >
-                  <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
-                  {restaurant.category && (
-                    <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>{restaurant.category}</Text>
-                  )}
-                  {restaurant.address && (
-                    <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {restaurant.address}
+              {restaurants.map((restaurant: RestaurantData) => {
+                const isSelected = placeId === restaurant.place_id
+                return (
+                  <TouchableOpacity
+                    key={restaurant.id}
+                    style={[
+                      styles.restaurantCard,
+                      {
+                        backgroundColor: isSelected 
+                          ? (theme === 'light' ? '#f0f7ff' : 'rgba(33, 150, 243, 0.15)')
+                          : (theme === 'light' ? '#fff' : colors.surface),
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        borderWidth: isSelected ? 2 : 1,
+                      }
+                    ]}
+                    onPress={() => handleRestaurantClick(restaurant)}
+                  >
+                    <Text style={[
+                      styles.restaurantName, 
+                      { color: isSelected ? colors.primary : colors.text }
+                    ]}>
+                      {restaurant.name}
                     </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {restaurant.category && (
+                      <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>{restaurant.category}</Text>
+                    )}
+                    {restaurant.address && (
+                      <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {restaurant.address}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )
+              })}
             </View>
           ) : !restaurantsLoading ? (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
@@ -340,7 +353,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   restaurantCard: {
-    padding: 18,
+    padding: 8,
     borderRadius: 10,
     borderWidth: 1,
   },

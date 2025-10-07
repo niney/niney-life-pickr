@@ -12,6 +12,32 @@ interface RestaurantProps {
   onLogout: () => Promise<void>
 }
 
+// 데스크탑 레이아웃 컴포넌트 (라우팅 컨텍스트 내부)
+const DesktopLayout: React.FC<{
+  url: string
+  setUrl: (url: string) => void
+  loading: boolean
+  categories: any[]
+  categoriesLoading: boolean
+  restaurants: any[]
+  restaurantsLoading: boolean
+  total: number
+  reviewCrawlStatus: any
+  crawlProgress: any
+  dbProgress: any
+  handleCrawl: () => Promise<void>
+  handleRestaurantClick: (restaurant: any) => void
+}> = (props) => {
+  return (
+    <>
+      <RestaurantList {...props} isMobile={false} />
+      <Routes>
+        <Route path=":placeId" element={<RestaurantDetail isMobile={false} />} />
+      </Routes>
+    </>
+  )
+}
+
 const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   // 공통 state와 로직
   const restaurantState = useRestaurant()
@@ -117,28 +143,29 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
             <Route path=":placeId" element={<RestaurantDetail isMobile={isMobile} />} />
           </Routes>
         ) : (
-          // 데스크탑: List는 항상, Detail은 라우팅 기반
-          <>
-            <RestaurantList
-              url={url}
-              setUrl={setUrl}
-              loading={loading}
-              categories={categories}
-              categoriesLoading={categoriesLoading}
-              restaurants={restaurants}
-              restaurantsLoading={restaurantsLoading}
-              total={total}
-              reviewCrawlStatus={reviewCrawlStatus}
-              crawlProgress={crawlProgress}
-              dbProgress={dbProgress}
-              handleCrawl={handleCrawlWithSocket}
-              handleRestaurantClick={handleRestaurantClick}
-              isMobile={isMobile}
+          // 데스크탑: List와 Detail 모두 표시 (라우팅 컨텍스트 공유)
+          <Routes>
+            <Route
+              path="*"
+              element={(
+                <DesktopLayout
+                  url={url}
+                  setUrl={setUrl}
+                  loading={loading}
+                  categories={categories}
+                  categoriesLoading={categoriesLoading}
+                  restaurants={restaurants}
+                  restaurantsLoading={restaurantsLoading}
+                  total={total}
+                  reviewCrawlStatus={reviewCrawlStatus}
+                  crawlProgress={crawlProgress}
+                  dbProgress={dbProgress}
+                  handleCrawl={handleCrawlWithSocket}
+                  handleRestaurantClick={handleRestaurantClick}
+                />
+              )}
             />
-            <Routes>
-              <Route path=":placeId" element={<RestaurantDetail isMobile={isMobile} />} />
-            </Routes>
-          </>
+          </Routes>
         )}
       </div>
 
