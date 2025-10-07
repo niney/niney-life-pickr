@@ -7,8 +7,9 @@ import { THEME_COLORS } from 'shared/constants';
 import HomeScreen from '../screens/HomeScreen';
 import RestaurantScreen from '../screens/RestaurantScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import type { RootTabParamList } from './types';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<RootTabParamList>();
 
 const BottomTabNavigator: React.FC = () => {
   const { theme } = useTheme();

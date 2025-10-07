@@ -175,7 +175,14 @@ const RestaurantScreen: React.FC = () => {
     <>
       <View style={styles.searchContainer}>
         <TextInput
-          style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+          style={[
+            styles.input, 
+            { 
+              borderColor: colors.border, 
+              color: colors.text,
+              backgroundColor: theme === 'light' ? '#ffffff' : colors.surface
+            }
+          ]}
           placeholder="URL 또는 Place ID를 입력하세요"
           placeholderTextColor={colors.textSecondary}
           value={url}
@@ -456,7 +463,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 15,
-    backgroundColor: '#fff',
   },
   searchButton: {
     paddingHorizontal: 20,
