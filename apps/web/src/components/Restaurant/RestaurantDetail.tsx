@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
@@ -15,6 +15,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const { joinPlaceRoom, leavePlaceRoom, reviewCrawlStatus, crawlProgress, dbProgress } = useSocket()
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   // 독립적으로 데이터 로드
   const {
@@ -24,6 +27,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     reviews,
     reviewsLoading,
     reviewsTotal,
+    hasMore,
+    loadMoreReviews,
     handleBackToList,
   } = useRestaurantDetail()
 
@@ -37,6 +42,66 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       }
     }
   }, [placeId])
+
+  // 무한 스크롤 콜백
+  const handleLoadMore = useCallback(() => {
+    if (placeId && hasMore && !reviewsLoading) {
+      loadMoreReviews(placeId)
+    }
+  }, [placeId, hasMore, reviewsLoading, loadMoreReviews])
+
+  // 데스크톱 스크롤 이벤트 (스크롤 영역 감지)
+  useEffect(() => {
+    if (isMobile || !scrollContainerRef.current) return
+
+    const handleScroll = () => {
+      const container = scrollContainerRef.current
+      if (!container) return
+
+      const scrollTop = container.scrollTop
+      const scrollHeight = container.scrollHeight
+      const clientHeight = container.clientHeight
+
+      // 스크롤이 하단 200px 근처에 도달하면 로드
+      if (scrollHeight - scrollTop - clientHeight < 200) {
+        handleLoadMore()
+      }
+    }
+
+    const container = scrollContainerRef.current
+    container.addEventListener('scroll', handleScroll)
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+    }
+  }, [isMobile, handleLoadMore])
+
+  // Intersection Observer 설정 (모바일 무한 스크롤)
+  useEffect(() => {
+    if (!isMobile || !loadMoreTriggerRef.current) return
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0]
+        if (target.isIntersecting) {
+          handleLoadMore()
+        }
+      },
+      {
+        root: null,
+        rootMargin: '100px', // 100px 전에 미리 로드
+        threshold: 0.1,
+      }
+    )
+
+    observerRef.current.observe(loadMoreTriggerRef.current)
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, [isMobile, handleLoadMore])
 
   // 크롤링 중인지 체크
   const isCrawling = reviewCrawlStatus.status === 'active'
@@ -54,6 +119,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   return (
     <div 
+      ref={scrollContainerRef}
       className={isMobile ? '' : 'restaurant-scroll-area'}
       style={{ backgroundColor: colors.background }}
     >
@@ -121,70 +187,97 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           </View>
         )}
 
-        {reviewsLoading ? (
+        {reviewsLoading && reviews.length === 0 ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : reviews.length > 0 ? (
-          <View style={styles.reviewsList}>
-            {reviews.map((review: ReviewData) => (
-              <View
-                key={review.id}
-                style={[styles.reviewCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}
-              >
-                <View style={styles.reviewCardHeader}>
-                  <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
-                  {review.visitInfo.visitDate && (
-                    <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                      {review.visitInfo.visitDate}
-                    </Text>
-                  )}
-                </View>
-
-                {review.visitKeywords.length > 0 && (
-                  <View style={styles.keywordsContainer}>
-                    {review.visitKeywords.map((keyword: string, idx: number) => (
-                      <View key={idx} style={[styles.keyword, { backgroundColor: theme === 'light' ? '#f0f0f0' : colors.border }]}>
-                        <Text style={[styles.keywordText, { color: colors.text }]}>{keyword}</Text>
-                      </View>
-                    ))}
+          <>
+            <View style={styles.reviewsList}>
+              {reviews.map((review: ReviewData) => (
+                <View
+                  key={review.id}
+                  style={[styles.reviewCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.reviewCardHeader}>
+                    <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
+                    {review.visitInfo.visitDate && (
+                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                        {review.visitInfo.visitDate}
+                      </Text>
+                    )}
                   </View>
-                )}
 
-                {review.reviewText && (
-                  <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
-                )}
+                  {review.visitKeywords.length > 0 && (
+                    <View style={styles.keywordsContainer}>
+                      {review.visitKeywords.map((keyword: string, idx: number) => (
+                        <View key={idx} style={[styles.keyword, { backgroundColor: theme === 'light' ? '#f0f0f0' : colors.border }]}>
+                          <Text style={[styles.keywordText, { color: colors.text }]}>{keyword}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
-                {review.emotionKeywords.length > 0 && (
-                  <View style={styles.keywordsContainer}>
-                    {review.emotionKeywords.map((keyword: string, idx: number) => (
-                      <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
-                        <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
-                      </View>
-                    ))}
+                  {review.reviewText && (
+                    <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
+                  )}
+
+                  {review.emotionKeywords.length > 0 && (
+                    <View style={styles.keywordsContainer}>
+                      {review.emotionKeywords.map((keyword: string, idx: number) => (
+                        <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
+                          <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.visitInfo}>
+                    {review.visitInfo.visitCount && (
+                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                        {review.visitInfo.visitCount}
+                      </Text>
+                    )}
+                    {review.visitInfo.verificationMethod && (
+                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                        • {review.visitInfo.verificationMethod}
+                      </Text>
+                    )}
+                    {review.waitTime && (
+                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                        • {review.waitTime}
+                      </Text>
+                    )}
                   </View>
-                )}
-
-                <View style={styles.visitInfo}>
-                  {review.visitInfo.visitCount && (
-                    <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                      {review.visitInfo.visitCount}
-                    </Text>
-                  )}
-                  {review.visitInfo.verificationMethod && (
-                    <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                      • {review.visitInfo.verificationMethod}
-                    </Text>
-                  )}
-                  {review.waitTime && (
-                    <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                      • {review.waitTime}
-                    </Text>
-                  )}
                 </View>
+              ))}
+            </View>
+
+            {/* 무한 스크롤 트리거 (모바일) */}
+            {isMobile && hasMore && (
+              <div ref={loadMoreTriggerRef} style={{ padding: '20px', textAlign: 'center' }}>
+                {reviewsLoading && (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                )}
+              </div>
+            )}
+
+            {/* 로딩 인디케이터 (데스크톱) */}
+            {!isMobile && reviewsLoading && hasMore && (
+              <View style={styles.loadMoreButtonContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ))}
-          </View>
+            )}
+
+            {/* 모든 리뷰 로드 완료 표시 */}
+            {!hasMore && (
+              <View style={styles.endMessageContainer}>
+                <Text style={[styles.endMessageText, { color: colors.textSecondary }]}>
+                  모든 리뷰를 불러왔습니다 ({reviewsTotal}개)
+                </Text>
+              </View>
+            )}
+          </>
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
@@ -335,6 +428,17 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  loadMoreButtonContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  endMessageContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  endMessageText: {
+    fontSize: 14,
   },
 })
 
