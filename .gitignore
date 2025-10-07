@@ -52,3 +52,7 @@ ENV/
 # PWA
 **/public/sw.js
 **/public/workbox-*.js
+
+# Ollama API Keys (보안)
+.ollama-api-key
+config/base.yml

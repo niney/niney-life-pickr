@@ -46,3 +46,19 @@ pwa:
 api:
   timeout: 30000
   retries: 3
+
+# Ollama AI Service Configuration
+ollama:
+  # Local Ollama (self-hosted)
+  local:
+    url: "http://localhost:11434"
+    model: "gemma3:27b"
+    timeout: 60000
+  
+  # Cloud Ollama (external API)
+  cloud:
+    host: "https://ollama.com"
+    model: "gpt-oss:20b"
+    timeout: 60000
+    parallelSize: 10
+    apiKey: ""  # Cloud API 키를 여기에 입력하세요
