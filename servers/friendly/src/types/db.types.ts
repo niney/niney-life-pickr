@@ -27,6 +27,7 @@ export interface MenuDB {
   description: string | null;
   price: string;
   image: string | null;
+  normalized_name: string | null;  // AI가 정규화한 메뉴 이름
   created_at: string;
 }
 
@@ -53,6 +54,7 @@ export interface MenuInput {
   description?: string | null;
   price: string;
   image?: string | null;
+  normalized_name?: string | null;  // AI가 정규화한 메뉴 이름 (선택)
 }
 
 export interface MenuInsert extends MenuInput {

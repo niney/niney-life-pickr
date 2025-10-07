@@ -125,10 +125,39 @@ export class RestaurantRepository {
     // 새 메뉴 삽입
     for (const menu of menus) {
       await db.run(
-        `INSERT INTO menus (restaurant_id, name, description, price, image)
-         VALUES (?, ?, ?, ?, ?)`,
-        [restaurantId, menu.name, menu.description || null, menu.price, menu.image || null]
+        `INSERT INTO menus (restaurant_id, name, description, price, image, normalized_name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          restaurantId, 
+          menu.name, 
+          menu.description || null, 
+          menu.price, 
+          menu.image || null,
+          menu.normalized_name || null
+        ]
       );
+    }
+  }
+
+  /**
+   * 메뉴의 normalized_name 업데이트
+   * @param menuId - 메뉴 ID
+   * @param normalizedName - AI가 정규화한 메뉴 이름
+   */
+  async updateMenuNormalizedName(menuId: number, normalizedName: string): Promise<void> {
+    await db.run(
+      'UPDATE menus SET normalized_name = ? WHERE id = ?',
+      [normalizedName, menuId]
+    );
+  }
+
+  /**
+   * 여러 메뉴의 normalized_name 일괄 업데이트
+   * @param updates - { menuId, normalizedName } 배열
+   */
+  async updateMenusNormalizedNames(updates: Array<{ menuId: number; normalizedName: string }>): Promise<void> {
+    for (const { menuId, normalizedName } of updates) {
+      await this.updateMenuNormalizedName(menuId, normalizedName);
     }
   }
 
