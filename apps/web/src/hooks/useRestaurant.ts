@@ -47,7 +47,8 @@ export const useRestaurant = () => {
   }
 
   const handleRestaurantClick = (restaurant: RestaurantData) => {
-    navigate(`/restaurant/${restaurant.place_id}`)
+    // restaurant 정보를 state로 전달하여 불필요한 fetch 방지
+    navigate(`/restaurant/${restaurant.id}`, { state: { restaurant } })
   }
 
   useEffect(() => {
@@ -71,11 +72,17 @@ export const useRestaurant = () => {
         
         if (placeId) {
           // 목록 갱신 (새로 추가된 레스토랑 표시)
-          await fetchRestaurants()
+          const updatedRestaurants = await fetchRestaurants()
           await fetchCategories()
           
-          // 상세 화면으로 이동 (RestaurantDetail에서 자동으로 room 입장)
-          navigate(`/restaurant/${placeId}`)
+          // placeId로 레스토랑 찾아서 id로 이동
+          if (updatedRestaurants && updatedRestaurants.length > 0) {
+            const newRestaurant = updatedRestaurants.find(r => r.place_id === placeId)
+            if (newRestaurant) {
+              // 상세 화면으로 이동 (RestaurantDetail에서 자동으로 room 입장)
+              navigate(`/restaurant/${newRestaurant.id}`, { state: { restaurant: newRestaurant } })
+            }
+          }
         }
       } else {
         await fetchRestaurants()

@@ -274,10 +274,10 @@ class ApiService {
   }
 
   /**
-   * Place ID로 리뷰 조회
+   * Restaurant ID로 리뷰 조회
    */
-  async getReviewsByPlaceId(placeId: string, limit: number = 20, offset: number = 0): Promise<ApiResponse<ReviewListResponse>> {
-    return this.request<ReviewListResponse>(`/api/restaurants/place/${placeId}/reviews?limit=${limit}&offset=${offset}`, {
+  async getReviewsByRestaurantId(restaurantId: number, limit: number = 20, offset: number = 0): Promise<ApiResponse<ReviewListResponse>> {
+    return this.request<ReviewListResponse>(`/api/restaurants/${restaurantId}/reviews?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }

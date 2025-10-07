@@ -21,7 +21,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   // 독립적으로 데이터 로드
   const {
-    placeId,
+    id,
     restaurant,
     restaurantLoading,
     reviews,
@@ -32,23 +32,27 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     handleBackToList,
   } = useRestaurantDetail()
 
-  // placeId가 있으면 room 입장, 컴포넌트 언마운트 시 퇴장
+  // restaurant id가 있으면 room 입장, 컴포넌트 언마운트 시 퇴장
+  // Socket room은 place_id 기반으로 유지 (크롤링이 place_id 기반이므로)
   useEffect(() => {
-    if (placeId) {
-      joinPlaceRoom(placeId)
+    if (restaurant?.place_id) {
+      joinPlaceRoom(restaurant.place_id)
 
       return () => {
-        leavePlaceRoom(placeId)
+        leavePlaceRoom(restaurant.place_id)
       }
     }
-  }, [placeId])
+  }, [restaurant?.place_id])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
-    if (placeId && hasMore && !reviewsLoading) {
-      loadMoreReviews(placeId)
+    if (id && hasMore && !reviewsLoading) {
+      const restaurantId = parseInt(id, 10)
+      if (!isNaN(restaurantId)) {
+        loadMoreReviews(restaurantId)
+      }
     }
-  }, [placeId, hasMore, reviewsLoading, loadMoreReviews])
+  }, [id, hasMore, reviewsLoading, loadMoreReviews])
 
   // 데스크톱 스크롤 이벤트 (스크롤 영역 감지)
   useEffect(() => {

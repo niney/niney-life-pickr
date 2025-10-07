@@ -69,6 +69,21 @@ npm run start:prod
 - `GET /health/live` - Liveness probe
 - `GET /health/ready` - Readiness probe
 
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/auth/users` - Get all users (test only)
+
+### Restaurants
+- `GET /api/restaurants` - Get restaurant list (pagination)
+- `GET /api/restaurants/categories` - Get restaurant categories
+- `GET /api/restaurants/:id` - Get restaurant detail with menus
+- `GET /api/restaurants/:id/reviews` - Get restaurant reviews by ID (pagination)
+- `GET /api/restaurants/place/:placeId/reviews` - Get reviews by Place ID (deprecated, use `:id/reviews`)
+
+### Crawler
+- `POST /api/crawler/restaurant` - Crawl restaurant from Naver Place URL
+
 ### API
 - `GET /api/version` - API version info
 - `GET /api/choices` - Choice categories (placeholder)

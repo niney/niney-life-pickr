@@ -32,7 +32,7 @@ const DesktopLayout: React.FC<{
     <>
       <RestaurantList {...props} isMobile={false} />
       <Routes>
-        <Route path=":placeId" element={<RestaurantDetail isMobile={false} />} />
+        <Route path=":id" element={<RestaurantDetail isMobile={false} />} />
       </Routes>
     </>
   )
@@ -140,7 +140,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                 />
               )}
             />
-            <Route path=":placeId" element={<RestaurantDetail isMobile={isMobile} />} />
+            <Route path=":id" element={<RestaurantDetail isMobile={isMobile} />} />
           </Routes>
         ) : (
           // 데스크탑: List와 Detail 모두 표시 (라우팅 컨텍스트 공유)

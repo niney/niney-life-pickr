@@ -153,14 +153,122 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * GET /api/restaurants/:id/reviews
+   * Restaurant ID로 리뷰 조회 (페이지네이션)
+   */
+  fastify.get('/:id/reviews', {
+    schema: {
+      tags: ['restaurants'],
+      summary: 'Restaurant ID로 리뷰 조회',
+      description: '특정 Restaurant ID의 음식점 리뷰를 페이지네이션으로 조회합니다.',
+      params: Type.Object({
+        id: Type.Number({ description: 'Restaurant ID' })
+      }),
+      querystring: Type.Object({
+        limit: Type.Optional(Type.Number({
+          description: '페이지당 항목 수 (기본: 20)',
+          default: 20,
+          minimum: 1,
+          maximum: 100
+        })),
+        offset: Type.Optional(Type.Number({
+          description: '시작 위치 (기본: 0)',
+          default: 0,
+          minimum: 0
+        }))
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            total: Type.Number({ description: '전체 리뷰 수' }),
+            limit: Type.Number({ description: '페이지당 항목 수' }),
+            offset: Type.Number({ description: '시작 위치' }),
+            reviews: Type.Array(ReviewSchema)
+          }),
+          timestamp: Type.String()
+        }),
+        404: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: number };
+    const { limit = 20, offset = 0 } = request.query as { limit?: number; offset?: number };
+
+    try {
+      // 1. Restaurant ID로 음식점 조회
+      const restaurant = await restaurantRepository.findById(id);
+
+      if (!restaurant) {
+        return ResponseHelper.notFound(reply, `Restaurant ID ${id}에 해당하는 음식점을 찾을 수 없습니다`);
+      }
+
+      // 2. 리뷰 조회
+      const [reviewsDB, total] = await Promise.all([
+        reviewRepository.findByRestaurantId(id, limit, offset),
+        reviewRepository.countByRestaurantId(id)
+      ]);
+
+      // 3. DB 데이터를 API 응답 형식으로 변환 (쉼표 구분 문자열 → 배열)
+      const reviews = reviewsDB.map(review => ({
+        id: review.id,
+        userName: review.user_name,
+        visitKeywords: review.visit_keywords ? review.visit_keywords.split(',') : [],
+        waitTime: review.wait_time,
+        reviewText: review.review_text,
+        emotionKeywords: review.emotion_keywords ? review.emotion_keywords.split(',') : [],
+        visitInfo: {
+          visitDate: review.visit_date,
+          visitCount: review.visit_count,
+          verificationMethod: review.verification_method
+        },
+        crawledAt: review.crawled_at,
+        createdAt: review.created_at
+      }));
+
+      return ResponseHelper.success(
+        reply,
+        {
+          total,
+          limit,
+          offset,
+          reviews
+        },
+        `${reviews.length}개 리뷰 조회 성공`
+      );
+    } catch (error) {
+      console.error('리뷰 조회 에러:', error);
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to fetch reviews',
+        500
+      );
+    }
+  });
+
+  /**
    * GET /api/restaurants/place/:placeId/reviews
    * Place ID로 리뷰 조회 (페이지네이션)
+   * @deprecated 하위 호환성을 위해 유지, /api/restaurants/:id/reviews 사용 권장
    */
   fastify.get('/place/:placeId/reviews', {
     schema: {
       tags: ['restaurants'],
-      summary: 'Place ID로 리뷰 조회',
-      description: '특정 Place ID의 음식점 리뷰를 페이지네이션으로 조회합니다.',
+      summary: 'Place ID로 리뷰 조회 (Deprecated)',
+      description: '특정 Place ID의 음식점 리뷰를 페이지네이션으로 조회합니다. (하위 호환성을 위해 유지, /api/restaurants/:id/reviews 사용 권장)',
+      deprecated: true,
       params: Type.Object({
         placeId: Type.String({ description: 'Naver Place ID' })
       }),

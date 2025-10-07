@@ -51,8 +51,8 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   const colors = THEME_COLORS[theme]
   const location = useLocation()
   
-  // URL에서 placeId 추출 (/restaurant/:placeId)
-  const placeId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
+  // URL에서 restaurant id 추출 (/restaurant/:id)
+  const restaurantId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
 
   return (
     <div 
@@ -192,7 +192,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
           {restaurants.length > 0 ? (
             <View style={styles.restaurantsList}>
               {restaurants.map((restaurant: RestaurantData) => {
-                const isSelected = placeId === restaurant.place_id
+                const isSelected = restaurantId === String(restaurant.id)
                 return (
                   <TouchableOpacity
                     key={restaurant.id}

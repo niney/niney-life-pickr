@@ -11,10 +11,10 @@ export const useReviews = () => {
   const [reviewsOffset, setReviewsOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
-  const fetchReviews = async (placeId: string, offset: number = 0, append: boolean = false) => {
+  const fetchReviews = async (restaurantId: number, offset: number = 0, append: boolean = false) => {
     setReviewsLoading(true)
     try {
-      const response = await apiService.getReviewsByPlaceId(placeId, reviewsLimit, offset)
+      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset)
       if (response.result && response.data) {
         if (append) {
           // 무한 스크롤: 기존 리뷰에 추가
@@ -38,11 +38,11 @@ export const useReviews = () => {
     }
   }
 
-  const loadMoreReviews = async (placeId: string) => {
+  const loadMoreReviews = async (restaurantId: number) => {
     if (!hasMore || reviewsLoading) return
     
     const nextOffset = reviewsOffset + reviewsLimit
-    await fetchReviews(placeId, nextOffset, true)
+    await fetchReviews(restaurantId, nextOffset, true)
   }
 
   const clearReviews = () => {
