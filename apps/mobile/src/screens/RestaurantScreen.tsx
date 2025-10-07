@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { BlurView } from '@react-native-community/blur';
 import { useTheme, useSocket } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import { apiService } from 'shared/services';
@@ -223,10 +224,18 @@ const RestaurantScreen: React.FC = () => {
             {categories.map((category) => (
               <View
                 key={category.category}
-                style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                style={styles.categoryCardContainer}
               >
-                <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
-                <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
+                <BlurView
+                  style={styles.blurContainer}
+                  blurType={theme === 'dark' ? 'dark' : 'light'}
+                  blurAmount={15}
+                  reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+                />
+                <View style={styles.categoryCardContent}>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
+                </View>
               </View>
             ))}
           </ScrollView>
@@ -247,27 +256,31 @@ const RestaurantScreen: React.FC = () => {
               <TouchableOpacity
                 key={restaurant.id}
                 style={[
-                  styles.restaurantCard,
-                  {
-                    backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
-                    borderColor: colors.border
-                  },
+                  styles.restaurantCardContainer,
                   selectedPlaceId === restaurant.place_id && styles.restaurantCardSelected,
                   selectedPlaceId === restaurant.place_id && { borderColor: colors.primary }
                 ]}
                 onPress={() => handleRestaurantClick(restaurant)}
               >
-                <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
-                {restaurant.category && (
-                  <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>
-                    {restaurant.category}
-                  </Text>
-                )}
-                {restaurant.address && (
-                  <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {restaurant.address}
-                  </Text>
-                )}
+                <BlurView
+                  style={styles.blurContainer}
+                  blurType={theme === 'dark' ? 'dark' : 'light'}
+                  blurAmount={15}
+                  reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+                />
+                <View style={styles.restaurantCardContent}>
+                  <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
+                  {restaurant.category && (
+                    <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>
+                      {restaurant.category}
+                    </Text>
+                  )}
+                  {restaurant.address && (
+                    <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {restaurant.address}
+                    </Text>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -362,22 +375,23 @@ const RestaurantScreen: React.FC = () => {
             {reviews.map((review) => (
               <View
                 key={review.id}
-                style={[
-                  styles.reviewCard,
-                  {
-                    backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
-                    borderColor: colors.border
-                  }
-                ]}
+                style={styles.reviewCardContainer}
               >
-                <View style={styles.reviewCardHeader}>
-                  <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
-                  {review.visitInfo.visitDate && (
-                    <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                      {review.visitInfo.visitDate}
-                    </Text>
-                  )}
-                </View>
+                <BlurView
+                  style={styles.blurContainer}
+                  blurType={theme === 'dark' ? 'dark' : 'light'}
+                  blurAmount={15}
+                  reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+                />
+                <View style={styles.reviewCardContent}>
+                  <View style={styles.reviewCardHeader}>
+                    <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
+                    {review.visitInfo.visitDate && (
+                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                        {review.visitInfo.visitDate}
+                      </Text>
+                    )}
+                  </View>
 
                 {review.visitKeywords.length > 0 && (
                   <View style={styles.keywordsContainer}>
@@ -421,6 +435,7 @@ const RestaurantScreen: React.FC = () => {
                   )}
                 </View>
               </View>
+            </View>
             ))}
           </View>
         ) : (
@@ -504,6 +519,30 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingRight: 16,
   },
+  // 글래스모피즘 카테고리 카드
+  categoryCardContainer: {
+    overflow: 'hidden',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    minWidth: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  blurContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  categoryCardContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
   categoryCard: {
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -521,6 +560,22 @@ const styles = StyleSheet.create({
   },
   restaurantsList: {
     gap: 8,
+  },
+  // 글래스모피즘 레스토랑 카드
+  restaurantCardContainer: {
+    overflow: 'hidden',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  restaurantCardContent: {
+    padding: 16,
   },
   restaurantCard: {
     padding: 16,
@@ -567,6 +622,22 @@ const styles = StyleSheet.create({
   // 리뷰 목록
   reviewsList: {
     gap: 12,
+  },
+  // 글래스모피즘 리뷰 카드
+  reviewCardContainer: {
+    overflow: 'hidden',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  reviewCardContent: {
+    padding: 16,
   },
   reviewCard: {
     padding: 16,
