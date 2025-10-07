@@ -189,14 +189,21 @@ const RestaurantScreen: React.FC = () => {
           onChangeText={setUrl}
         />
         <TouchableOpacity
-          style={[styles.searchButton, { backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: colors.border }]}
+          style={[
+            styles.searchButton, 
+            { 
+              backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface,
+              borderWidth: 1, 
+              borderColor: colors.border 
+            }
+          ]}
           onPress={handleCrawl}
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#666" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={{ color: '#666', fontSize: 15, fontWeight: '600' }}>추가</Text>
+            <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600' }}>추가</Text>
           )}
         </TouchableOpacity>
       </View>

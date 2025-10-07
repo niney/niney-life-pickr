@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Platform, Text } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import HomeScreen from '../screens/HomeScreen';
@@ -62,7 +63,7 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '홈',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="home" color={color} size={size} />
+            <Icon name="home" size={size} color={color} />
           ),
         }}
       />
@@ -72,7 +73,7 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '맛집',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="restaurant" color={color} size={size} />
+            <Icon name="restaurant" size={size} color={color} />
           ),
         }}
       />
@@ -82,33 +83,11 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '설정',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="settings" color={color} size={size} />
+            <Icon name="settings" size={size} color={color} />
           ),
         }}
       />
     </Tab.Navigator>
-  );
-};
-
-// 간단한 아이콘 컴포넌트 (추후 react-native-vector-icons로 교체 가능)
-const TabIcon: React.FC<{ name: string; color: string; size: number }> = ({ name, size }) => {
-  const getEmoji = () => {
-    switch (name) {
-      case 'home':
-        return '🏠';
-      case 'restaurant':
-        return '🍴';
-      case 'settings':
-        return '⚙️';
-      default:
-        return '•';
-    }
-  };
-
-  return (
-    <Text style={{ fontSize: size }}>
-      {getEmoji()}
-    </Text>
   );
 };
 

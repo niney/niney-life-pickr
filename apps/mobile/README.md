@@ -50,6 +50,17 @@ bundle exec pod install
 
 For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
 
+> **Important**: After installing `react-native-vector-icons`, you need to run `pod install` for iOS and rebuild the Android app to link the native icon fonts.
+
+```sh
+# iOS - Install pods
+cd ios && bundle exec pod install && cd ..
+
+# Android - The fonts.gradle will automatically link fonts
+# Just rebuild the app
+npm run android
+```
+
 ```sh
 # Using npm
 npm run ios
