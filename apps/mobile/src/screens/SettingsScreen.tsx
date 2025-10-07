@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 100, // 하단 탭바 공간 확보
   },
   section: {
     padding: 16,
