@@ -499,37 +499,38 @@ Real-time system for collaborative review crawling with Socket.io, allowing mult
 - **Review Repository**: `servers/friendly/src/db/repositories/review.repository.ts` - Review storage with hash-based deduplication
 
 ### Socket.io Room Strategy
-**Place-based Rooms** (`place:${placeId}`):
-- All users viewing the same restaurant subscribe to the same place room
+**Restaurant ID-based Rooms** (`restaurant:${restaurantId}`):
+- All users viewing the same restaurant subscribe to the same restaurant room
 - When ANY user starts crawling, ALL subscribers receive real-time updates
 - Enables multi-user collaboration and prevents duplicate crawling
 - Auto-subscription when selecting a restaurant, auto-unsubscription when leaving
+- **Legacy support**: Place-based rooms (`place:${placeId}`) still supported for backward compatibility
 
 ```typescript
-// Server: Place room subscription
-socket.on('subscribe:place', (placeId: string) => {
-  socket.join(`place:${placeId}`)
+// Server: Restaurant room subscription
+socket.on('subscribe:restaurant', (restaurantId: string) => {
+  socket.join(`restaurant:${restaurantId}`)
 })
 
 // Client: Auto-subscribe on restaurant selection
 useEffect(() => {
-  if (selectedPlaceId) {
-    socketRef.current.emit('subscribe:place', selectedPlaceId)
-    return () => socketRef.current?.emit('unsubscribe:place', selectedPlaceId)
+  if (restaurantId) {
+    socketRef.current.emit('subscribe:restaurant', restaurantId)
+    return () => socketRef.current?.emit('unsubscribe:restaurant', restaurantId)
   }
-}, [selectedPlaceId])
+}, [restaurantId])
 ```
 
 ### Real-time Event Flow
-1. **REVIEW_STARTED** - Crawling begins, sent to place room
+1. **REVIEW_STARTED** - Crawling begins, sent to restaurant room
 2. **REVIEW_PROGRESS** - Progress updates (every 10 reviews or at completion)
-   - Includes: `placeId`, `current`, `total`, `percentage`
+   - Includes: `restaurantId`, `placeId`, `current`, `total`, `percentage`
 3. **REVIEW_ITEM** - Individual review data (every 5 reviews or at completion)
-   - Includes: `placeId`, `review`, `index`
+   - Includes: `restaurantId`, `placeId`, `review`, `index`
 4. **REVIEW_COMPLETED** - Crawling finished successfully
-   - Includes: `placeId`, `totalReviews`, `savedToDb`
+   - Includes: `restaurantId`, `placeId`, `totalReviews`, `savedToDb`
 5. **REVIEW_ERROR** - Error occurred during crawling
-   - Includes: `placeId`, `error`
+   - Includes: `restaurantId`, `placeId`, `error`
 6. **REVIEW_CANCELLED** - User cancelled the job
 
 ### Background Job Processing
@@ -552,11 +553,29 @@ generateReviewHash(placeId, userName, visitDate, visitCount, verificationMethod)
 ### Client Integration Pattern
 ```typescript
 // Frontend automatically handles:
-1. Subscribe to place room on restaurant selection
+1. Subscribe to restaurant room on restaurant selection (by ID)
 2. Listen for progress/item/completed/error events
 3. Update UI with real-time crawling status
 4. Refresh review list on completion
 5. Unsubscribe when leaving restaurant view
+
+// SocketContext API
+const {
+  joinRestaurantRoom,      // Join restaurant:${restaurantId} room
+  leaveRestaurantRoom,     // Leave restaurant room
+  setRestaurantCallbacks,  // Set onCompleted/onError callbacks
+  reviewCrawlStatus,       // { status: 'idle' | 'active' | 'completed' | 'failed', error?, reviews[] }
+  crawlProgress,           // { current, total, percentage } | null
+  dbProgress,              // { current, total, percentage } | null
+} = useSocket()
+
+// Usage in RestaurantDetail
+useEffect(() => {
+  if (restaurantId) {
+    joinRestaurantRoom(restaurantId)
+    return () => leaveRestaurantRoom(restaurantId)
+  }
+}, [restaurantId])
 ```
 
 ### Key Implementation Details

@@ -43,7 +43,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const restaurantState = useRestaurant()
   
   // Socket 연결 (전역 단일 연결)
-  const { reviewCrawlStatus, crawlProgress, dbProgress, setPlaceCallbacks, resetCrawlStatus } = useSocket()
+  const { reviewCrawlStatus, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
   
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -95,7 +95,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     resetCrawlStatus()
     
     // 크롤링 완료/에러 시 콜백 설정
-    setPlaceCallbacks({
+    setRestaurantCallbacks({
       onCompleted: async () => {
         // 크롤링 완료 시 데이터 갱신
         await fetchRestaurants()

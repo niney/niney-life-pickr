@@ -21,11 +21,11 @@ interface SocketContextValue {
   reviewCrawlStatus: ReviewCrawlStatus
   crawlProgress: CrawlProgress | null
   dbProgress: CrawlProgress | null
-  joinPlaceRoom: (placeId: string) => void
-  leavePlaceRoom: (placeId: string) => void
-  setPlaceCallbacks: (callbacks: {
-    onCompleted?: (data: { placeId: string; totalReviews: number }) => void
-    onError?: (data: { placeId: string; error: string }) => void
+  joinRestaurantRoom: (restaurantId: string) => void
+  leaveRestaurantRoom: (restaurantId: string) => void
+  setRestaurantCallbacks: (callbacks: {
+    onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
+    onError?: (data: { restaurantId: string; error: string }) => void
   }) => void
   resetCrawlStatus: () => void
 }
@@ -84,10 +84,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null)
   const [dbProgress, setDbProgress] = useState<CrawlProgress | null>(null)
   const callbacksRef = useRef<{
-    onCompleted?: (data: { placeId: string; totalReviews: number }) => void
-    onError?: (data: { placeId: string; error: string }) => void
+    onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
+    onError?: (data: { restaurantId: string; error: string }) => void
   }>({})
-  const currentPlaceIdRef = useRef<string | null>(null)
+  const currentRestaurantIdRef = useRef<string | null>(null)
 
   // Socket.io 연결 초기화 (앱 전체에서 단 한 번)
   useEffect(() => {
@@ -151,7 +151,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       // 콜백 호출
       if (callbacksRef.current.onCompleted) {
         callbacksRef.current.onCompleted({
-          placeId: data.placeId,
+          restaurantId: data.restaurantId,
           totalReviews: data.totalReviews || 0
         })
       }
@@ -169,7 +169,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       // 콜백 호출
       if (callbacksRef.current.onError) {
         callbacksRef.current.onError({
-          placeId: data.placeId,
+          restaurantId: data.restaurantId,
           error: errorMessage
         })
       }
@@ -183,8 +183,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     }
   }, [])
 
-  // Place room 입장
-  const joinPlaceRoom = (placeId: string) => {
+  // Restaurant room 입장
+  const joinRestaurantRoom = (restaurantId: string) => {
     const socket = socketRef.current
     if (!socket) {
       console.error('[Socket.io] Socket not initialized')
@@ -192,36 +192,36 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     }
 
     // 이전 room 퇴장
-    if (currentPlaceIdRef.current && currentPlaceIdRef.current !== placeId) {
-      socket.emit('unsubscribe:place', currentPlaceIdRef.current)
-      console.log(`[Socket.io] Left room: place:${currentPlaceIdRef.current}`)
+    if (currentRestaurantIdRef.current && currentRestaurantIdRef.current !== restaurantId) {
+      socket.emit('unsubscribe:restaurant', currentRestaurantIdRef.current)
+      console.log(`[Socket.io] Left room: restaurant:${currentRestaurantIdRef.current}`)
     }
 
-    currentPlaceIdRef.current = placeId
+    currentRestaurantIdRef.current = restaurantId
 
     // 새 room 입장
-    socket.emit('subscribe:place', placeId)
-    console.log(`[Socket.io] Joined room: place:${placeId}`)
+    socket.emit('subscribe:restaurant', restaurantId)
+    console.log(`[Socket.io] Joined room: restaurant:${restaurantId}`)
   }
 
-  // Place room 퇴장
-  const leavePlaceRoom = (placeId: string) => {
+  // Restaurant room 퇴장
+  const leaveRestaurantRoom = (restaurantId: string) => {
     const socket = socketRef.current
     if (!socket) return
 
-    socket.emit('unsubscribe:place', placeId)
-    console.log(`[Socket.io] Left room: place:${placeId}`)
+    socket.emit('unsubscribe:restaurant', restaurantId)
+    console.log(`[Socket.io] Left room: restaurant:${restaurantId}`)
 
-    if (currentPlaceIdRef.current === placeId) {
-      currentPlaceIdRef.current = null
+    if (currentRestaurantIdRef.current === restaurantId) {
+      currentRestaurantIdRef.current = null
       callbacksRef.current = {}
     }
   }
 
   // 콜백 설정 (크롤링 시작 시 호출)
-  const setPlaceCallbacks = (callbacks: {
-    onCompleted?: (data: { placeId: string; totalReviews: number }) => void
-    onError?: (data: { placeId: string; error: string }) => void
+  const setRestaurantCallbacks = (callbacks: {
+    onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
+    onError?: (data: { restaurantId: string; error: string }) => void
   }) => {
     callbacksRef.current = callbacks
   }
@@ -239,9 +239,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     reviewCrawlStatus,
     crawlProgress,
     dbProgress,
-    joinPlaceRoom,
-    leavePlaceRoom,
-    setPlaceCallbacks,
+    joinRestaurantRoom,
+    leaveRestaurantRoom,
+    setRestaurantCallbacks,
     resetCrawlStatus,
   }
 

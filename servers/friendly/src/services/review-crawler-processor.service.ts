@@ -23,8 +23,15 @@ export class ReviewCrawlerProcessor {
       jobManager.updateStatus(jobId, 'active', { startedAt: new Date() });
       await crawlJobRepository.updateStatus(jobId, 'active', { startedAt: new Date() });
 
+      // Place room과 Restaurant room 모두에 이벤트 발행 (호환성)
       io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
         placeId,
+        restaurantId,
+        url
+      });
+      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
+        placeId,
+        restaurantId,
         url
       });
 
@@ -44,6 +51,12 @@ export class ReviewCrawlerProcessor {
 
         io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
           placeId,
+          restaurantId,
+          totalReviews: reviews.length
+        });
+        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
+          placeId,
+          restaurantId,
           totalReviews: reviews.length
         });
       } else {
@@ -60,13 +73,15 @@ export class ReviewCrawlerProcessor {
           savedToDb: reviews.length
         });
 
-        // 완료 이벤트
+        // 완료 이벤트 (Place room과 Restaurant room 모두)
         const completedData = {
           placeId,
+          restaurantId,
           totalReviews: reviews.length,
           savedToDb: reviews.length
         };
         io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, completedData);
+        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, completedData);
       }
 
     } catch (error) {
@@ -81,9 +96,11 @@ export class ReviewCrawlerProcessor {
 
       const errorData = {
         placeId,
+        restaurantId,
         error: errorMessage
       };
       io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, errorData);
+      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, errorData);
 
       throw error;
     }
@@ -139,11 +156,13 @@ export class ReviewCrawlerProcessor {
       if (current % 10 === 0 || current === total) {
         const dbProgressData = {
           placeId,
+          restaurantId,
           current,
           total,
           percentage
         };
         io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_DB_PROGRESS, dbProgressData);
+        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_DB_PROGRESS, dbProgressData);
         console.log(`[Job ${jobId}] DB 저장 진행: ${current}/${total} (${percentage}%)`);
       }
     },
@@ -154,11 +173,13 @@ export class ReviewCrawlerProcessor {
         // Socket 이벤트: 크롤링 진행 상황
         const crawlProgressData = {
           placeId,
+          restaurantId,
           current,
           total,
           percentage
         };
         io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS, crawlProgressData);
+        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS, crawlProgressData);
         
         console.log(`[Job ${jobId}] 크롤링 진행: ${current}/${total} (${percentage}%)`);
       }

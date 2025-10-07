@@ -14,7 +14,7 @@ interface RestaurantDetailProps {
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
-  const { joinPlaceRoom, leavePlaceRoom, reviewCrawlStatus, crawlProgress, dbProgress } = useSocket()
+  const { joinRestaurantRoom, leaveRestaurantRoom, reviewCrawlStatus, crawlProgress, dbProgress } = useSocket()
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -32,17 +32,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     handleBackToList,
   } = useRestaurantDetail()
 
-  // restaurant id가 있으면 room 입장, 컴포넌트 언마운트 시 퇴장
-  // Socket room은 place_id 기반으로 유지 (크롤링이 place_id 기반이므로)
+  // restaurant id로 room 입장, 컴포넌트 언마운트 시 퇴장
   useEffect(() => {
-    if (restaurant?.place_id) {
-      joinPlaceRoom(restaurant.place_id)
+    if (id) {
+      joinRestaurantRoom(id)
 
       return () => {
-        leavePlaceRoom(restaurant.place_id)
+        leaveRestaurantRoom(id)
       }
     }
-  }, [restaurant?.place_id])
+  }, [id])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
