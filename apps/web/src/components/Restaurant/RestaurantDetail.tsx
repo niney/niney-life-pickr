@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
@@ -11,6 +11,8 @@ interface RestaurantDetailProps {
   isMobile?: boolean
 }
 
+type TabType = 'menu' | 'review'
+
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
@@ -18,6 +20,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  
+  // 탭 상태 관리
+  const [activeTab, setActiveTab] = useState<TabType>('menu')
 
   // 독립적으로 데이터 로드
   const {
@@ -134,98 +139,153 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         </TouchableOpacity>
         <View style={styles.reviewHeaderInfo}>
           <Text style={[styles.reviewTitle, { color: colors.text }]}>{restaurant?.name || '레스토랑'}</Text>
-          <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]}>리뷰 {reviewsTotal}개</Text>
+          <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]}>
+            메뉴 {menus.length}개 · 리뷰 {reviewsTotal}개
+          </Text>
         </View>
       </View>
 
-      <div style={{ padding: 20 }}>
-        {/* 메뉴 섹션 */}
-        {menusLoading && menus.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : menus.length > 0 ? (
-          <View style={styles.menuSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>메뉴</Text>
-            <View style={styles.menusList}>
-              {menus.map((menu, index) => (
-                <View
-                  key={index}
-                  style={[styles.menuCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}
-                >
-                  <View style={styles.menuCardContent}>
-                    <View style={styles.menuInfo}>
-                      <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
-                      {menu.description && (
-                        <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>{menu.description}</Text>
-                      )}
-                    </View>
-                    <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
-                  </View>
-                </View>
-              ))}
+      {/* 크롤링 진행 상태 표시 */}
+      {isCrawling && (
+        <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
+            🔄 리뷰 크롤링 중...
+          </Text>
+          
+          {crawlProgress && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressInfo}>
+                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
+                <Text style={[styles.progressText, { color: colors.text }]}>
+                  {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
+                </Text>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View 
+                  style={[
+                    styles.progressBarFill, 
+                    { 
+                      backgroundColor: colors.primary,
+                      width: `${crawlProgress.percentage}%` 
+                    }
+                  ]} 
+                />
+              </View>
             </View>
-          </View>
-        ) : null}
+          )}
 
-        {/* 크롤링 진행 상태 표시 */}
-        {isCrawling && (
-          <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
-              🔄 리뷰 크롤링 중...
-            </Text>
-            
-            {crawlProgress && (
-              <View style={styles.progressSection}>
-                <View style={styles.progressInfo}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
-                  <Text style={[styles.progressText, { color: colors.text }]}>
-                    {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                  <View 
-                    style={[
-                      styles.progressBarFill, 
-                      { 
-                        backgroundColor: colors.primary,
-                        width: `${crawlProgress.percentage}%` 
-                      }
-                    ]} 
-                  />
+          {dbProgress && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressInfo}>
+                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
+                <Text style={[styles.progressText, { color: colors.text }]}>
+                  {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
+                </Text>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View 
+                  style={[
+                    styles.progressBarFill, 
+                    { 
+                      backgroundColor: '#4caf50',
+                      width: `${dbProgress.percentage}%` 
+                    }
+                  ]} 
+                />
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* 탭 메뉴 */}
+      <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'menu' && styles.tabButtonActive
+          ]}
+          onPress={() => setActiveTab('menu')}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              { color: activeTab === 'menu' ? colors.primary : colors.textSecondary }
+            ]}
+          >
+            메뉴 {menus.length > 0 && `(${menus.length})`}
+          </Text>
+          {activeTab === 'menu' && (
+            <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'review' && styles.tabButtonActive
+          ]}
+          onPress={() => setActiveTab('review')}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              { color: activeTab === 'review' ? colors.primary : colors.textSecondary }
+            ]}
+          >
+            리뷰 ({reviewsTotal})
+          </Text>
+          {activeTab === 'review' && (
+            <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <div style={{ padding: 20 }}>
+        {/* 메뉴 탭 */}
+        {activeTab === 'menu' && (
+          <>
+            {menusLoading && menus.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : menus.length > 0 ? (
+              <View style={styles.menuSection}>
+                <View style={styles.menusList}>
+                  {menus.map((menu, index) => (
+                    <View
+                      key={index}
+                      style={[styles.menuCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}
+                    >
+                      <View style={styles.menuCardContent}>
+                        <View style={styles.menuInfo}>
+                          <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
+                          {menu.description && (
+                            <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>{menu.description}</Text>
+                          )}
+                        </View>
+                        <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
+                      </View>
+                    </View>
+                  ))}
                 </View>
               </View>
-            )}
-
-            {dbProgress && (
-              <View style={styles.progressSection}>
-                <View style={styles.progressInfo}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-                  <Text style={[styles.progressText, { color: colors.text }]}>
-                    {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                  <View 
-                    style={[
-                      styles.progressBarFill, 
-                      { 
-                        backgroundColor: '#4caf50',
-                        width: `${dbProgress.percentage}%` 
-                      }
-                    ]} 
-                  />
-                </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 메뉴가 없습니다</Text>
               </View>
             )}
-          </View>
+          </>
         )}
 
-        {reviewsLoading && reviews.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : reviews.length > 0 ? (
+        {/* 리뷰 탭 */}
+        {activeTab === 'review' && (
+          <>
+            {reviewsLoading && reviews.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : reviews.length > 0 ? (
           <>
             <View style={styles.reviewsList}>
               {reviews.map((review: ReviewData) => (
@@ -317,6 +377,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
+          </>
+        )}
       </div>
     </div>
   )
@@ -350,6 +412,34 @@ const styles = StyleSheet.create({
   },
   reviewSubtitle: {
     fontSize: 15,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabButtonActive: {
+    // активная вкладка
+  },
+  tabButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
   },
   sectionTitle: {
     fontSize: 20,
@@ -468,7 +558,8 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginTop: 16,
+    marginHorizontal: 20,
   },
   crawlProgressTitle: {
     fontSize: 16,

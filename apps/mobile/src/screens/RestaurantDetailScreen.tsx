@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { BlurView } from '@react-native-community/blur';
@@ -16,6 +17,7 @@ import { Alert } from 'shared/utils';
 import type { RestaurantStackParamList } from '../navigation/types';
 
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
+type TabType = 'menu' | 'review';
 
 const RestaurantDetailScreen: React.FC = () => {
   const route = useRoute<RestaurantDetailRouteProp>();
@@ -31,6 +33,9 @@ const RestaurantDetailScreen: React.FC = () => {
     joinRestaurantRoom, 
     leaveRestaurantRoom 
   } = useSocket();
+  
+  // 탭 상태 관리
+  const [activeTab, setActiveTab] = useState<TabType>('menu');
   
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -112,51 +117,10 @@ const RestaurantDetailScreen: React.FC = () => {
               </Text>
             )}
             <Text style={[styles.reviewCount, { color: colors.primary }]}>
-              리뷰 {reviewsTotal}개
+              메뉴 {menus.length}개 · 리뷰 {reviewsTotal}개
             </Text>
           </View>
         </View>
-
-        {/* 메뉴 목록 */}
-        {menusLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : menus.length > 0 ? (
-          <View style={styles.menuSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>메뉴</Text>
-            <View style={styles.menusList}>
-              {menus.map((menu, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.menuCardContainer,
-                    theme === 'dark' ? styles.menuCardDark : styles.menuCardLight,
-                  ]}
-                >
-                  <BlurView
-                    style={styles.blurContainer}
-                    blurType={theme === 'dark' ? 'dark' : 'light'}
-                    blurAmount={20}
-                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
-                    pointerEvents="none"
-                  />
-                  <View style={styles.menuCardContent}>
-                    <View style={styles.menuInfo}>
-                      <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
-                      {menu.description && (
-                        <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
-                          {menu.description}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : null}
 
         {/* 크롤링 진행 상태 */}
         {reviewCrawlStatus.status === 'active' && (
@@ -213,13 +177,100 @@ const RestaurantDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {/* 리뷰 목록 */}
-        {reviewsLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : reviews.length > 0 ? (
-          <View style={styles.reviewsList}>
+        {/* 탭 메뉴 */}
+        <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setActiveTab('menu')}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                { color: activeTab === 'menu' ? colors.primary : colors.textSecondary }
+              ]}
+            >
+              메뉴 {menus.length > 0 && `(${menus.length})`}
+            </Text>
+            {activeTab === 'menu' && (
+              <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setActiveTab('review')}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                { color: activeTab === 'review' ? colors.primary : colors.textSecondary }
+              ]}
+            >
+              리뷰 ({reviewsTotal})
+            </Text>
+            {activeTab === 'review' && (
+              <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* 메뉴 탭 */}
+        {activeTab === 'menu' && (
+          <>
+            {menusLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : menus.length > 0 ? (
+              <View style={styles.menuSection}>
+                <View style={styles.menusList}>
+                  {menus.map((menu, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.menuCardContainer,
+                        theme === 'dark' ? styles.menuCardDark : styles.menuCardLight,
+                      ]}
+                    >
+                      <BlurView
+                        style={styles.blurContainer}
+                        blurType={theme === 'dark' ? 'dark' : 'light'}
+                        blurAmount={20}
+                        reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+                        pointerEvents="none"
+                      />
+                      <View style={styles.menuCardContent}>
+                        <View style={styles.menuInfo}>
+                          <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
+                          {menu.description && (
+                            <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
+                              {menu.description}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 메뉴가 없습니다</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* 리뷰 탭 */}
+        {activeTab === 'review' && (
+          <>
+            {reviewsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : reviews.length > 0 ? (
+              <View style={styles.reviewsList}>
             {reviews.map((review) => (
               <View
                 key={review.id}
@@ -295,6 +346,8 @@ const RestaurantDetailScreen: React.FC = () => {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -335,6 +388,32 @@ const styles = StyleSheet.create({
   reviewCount: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    backgroundColor: 'transparent',
+    marginBottom: 16,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
   },
   sectionTitle: {
     fontSize: 18,
