@@ -24,9 +24,9 @@ const RestaurantScreen: React.FC = () => {
     reviewCrawlStatus, 
     crawlProgress, 
     dbProgress, 
-    joinPlaceRoom, 
-    leavePlaceRoom,
-    setPlaceCallbacks,
+    joinRestaurantRoom, 
+    leaveRestaurantRoom,
+    setRestaurantCallbacks,
     resetCrawlStatus 
   } = useSocket();
   
@@ -39,7 +39,7 @@ const RestaurantScreen: React.FC = () => {
   const [total, setTotal] = useState(0);
 
   // 리뷰 목록 state
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -47,15 +47,15 @@ const RestaurantScreen: React.FC = () => {
   const [reviewsLimit] = useState(20);
   const [reviewsOffset, setReviewsOffset] = useState(0);
 
-  // selectedPlaceId 변경 시 room 입장/퇴장
+  // selectedRestaurantId 변경 시 room 입장/퇴장
   useEffect(() => {
-    if (selectedPlaceId) {
-      joinPlaceRoom(selectedPlaceId);
+    if (selectedRestaurantId) {
+      joinRestaurantRoom(selectedRestaurantId);
       return () => {
-        leavePlaceRoom(selectedPlaceId);
+        leaveRestaurantRoom(selectedRestaurantId);
       };
     }
-  }, [selectedPlaceId]);
+  }, [selectedRestaurantId]);
 
   const fetchCategories = async () => {
     setCategoriesLoading(true);
@@ -78,18 +78,20 @@ const RestaurantScreen: React.FC = () => {
       if (response.result && response.data) {
         setRestaurants(response.data.restaurants);
         setTotal(response.data.total);
+        return response.data.restaurants;
       }
     } catch (err) {
       console.error('레스토랑 목록 조회 실패:', err);
     } finally {
       setRestaurantsLoading(false);
     }
+    return [];
   };
 
-  const fetchReviews = async (placeId: string, offset: number = 0) => {
+  const fetchReviews = async (restaurantId: number, offset: number = 0) => {
     setReviewsLoading(true);
     try {
-      const response = await apiService.getReviewsByPlaceId(placeId, reviewsLimit, offset);
+      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset);
       if (response.result && response.data) {
         setReviews(response.data.reviews);
         setReviewsTotal(response.data.total);
@@ -104,13 +106,13 @@ const RestaurantScreen: React.FC = () => {
   };
 
   const handleRestaurantClick = (restaurant: RestaurantData) => {
-    setSelectedPlaceId(restaurant.place_id);
+    setSelectedRestaurantId(String(restaurant.id));
     setSelectedRestaurant(restaurant);
-    fetchReviews(restaurant.place_id);
+    fetchReviews(restaurant.id);
   };
 
   const handleBackToList = () => {
-    setSelectedPlaceId(null);
+    setSelectedRestaurantId(null);
     setSelectedRestaurant(null);
     setReviews([]);
   };
@@ -130,7 +132,7 @@ const RestaurantScreen: React.FC = () => {
     resetCrawlStatus();
     
     // 크롤링 완료/에러 시 콜백 설정
-    setPlaceCallbacks({
+    setRestaurantCallbacks({
       onCompleted: async () => {
         await fetchRestaurants();
         await fetchCategories();
@@ -149,11 +151,11 @@ const RestaurantScreen: React.FC = () => {
         
         if (placeId) {
           // 목록 갱신
-          await fetchRestaurants();
+          const updatedRestaurants = await fetchRestaurants();
           await fetchCategories();
           
           // 해당 레스토랑 선택 (자동으로 room 입장)
-          const restaurant = restaurants.find(r => r.place_id === placeId);
+          const restaurant = updatedRestaurants.find(r => r.place_id === placeId);
           if (restaurant) {
             handleRestaurantClick(restaurant);
           }
@@ -257,8 +259,8 @@ const RestaurantScreen: React.FC = () => {
                 key={restaurant.id}
                 style={[
                   styles.restaurantCardContainer,
-                  selectedPlaceId === restaurant.place_id && styles.restaurantCardSelected,
-                  selectedPlaceId === restaurant.place_id && { borderColor: colors.primary }
+                  selectedRestaurantId === String(restaurant.id) && styles.restaurantCardSelected,
+                  selectedRestaurantId === String(restaurant.id) && { borderColor: colors.primary }
                 ]}
                 onPress={() => handleRestaurantClick(restaurant)}
               >
@@ -450,7 +452,7 @@ const RestaurantScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 모바일: 전체 화면 토글 (레스토랑 목록 ↔ 리뷰) */}
-      {selectedPlaceId ? (
+      {selectedRestaurantId ? (
         <View style={styles.mobileReviewContainer}>
           <ReviewListContent />
         </View>

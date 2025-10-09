@@ -569,13 +569,28 @@ const {
   dbProgress,              // { current, total, percentage } | null
 } = useSocket()
 
-// Usage in RestaurantDetail
+// Usage in Web (RestaurantDetail.tsx)
 useEffect(() => {
   if (restaurantId) {
     joinRestaurantRoom(restaurantId)
     return () => leaveRestaurantRoom(restaurantId)
   }
 }, [restaurantId])
+
+// Usage in Mobile (RestaurantScreen.tsx)
+const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null)
+
+useEffect(() => {
+  if (selectedRestaurantId) {
+    joinRestaurantRoom(selectedRestaurantId)
+    return () => leaveRestaurantRoom(selectedRestaurantId)
+  }
+}, [selectedRestaurantId])
+
+const handleRestaurantClick = (restaurant: RestaurantData) => {
+  setSelectedRestaurantId(String(restaurant.id))
+  fetchReviews(restaurant.id)  // Use restaurant ID, not place_id
+}
 ```
 
 ### Key Implementation Details

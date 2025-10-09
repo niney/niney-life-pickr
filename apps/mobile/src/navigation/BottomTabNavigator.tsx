@@ -2,9 +2,9 @@ import React from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
+import { HomeIcon, RestaurantIcon, SettingsIcon } from '../components/TabBarIcons';
 import HomeScreen from '../screens/HomeScreen';
 import RestaurantScreen from '../screens/RestaurantScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -63,7 +63,7 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '홈',
           tabBarIcon: ({ color, size }) => (
-            <Icon name="home" size={size} color={color} />
+            <HomeIcon size={size} color={color} />
           ),
         }}
       />
@@ -73,7 +73,7 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '맛집',
           tabBarIcon: ({ color, size }) => (
-            <Icon name="restaurant" size={size} color={color} />
+            <RestaurantIcon size={size} color={color} />
           ),
         }}
       />
@@ -83,7 +83,7 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '설정',
           tabBarIcon: ({ color, size }) => (
-            <Icon name="settings" size={size} color={color} />
+            <SettingsIcon size={size} color={color} />
           ),
         }}
       />
