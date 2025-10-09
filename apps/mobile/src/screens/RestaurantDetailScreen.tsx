@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -44,12 +44,17 @@ const RestaurantDetailScreen: React.FC = () => {
 
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsLoadingMore, setReviewsLoadingMore] = useState(false);
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [reviewsLimit] = useState(20);
   const [reviewsOffset, setReviewsOffset] = useState(0);
+  const [hasMoreReviews, setHasMoreReviews] = useState(true);
 
   const [menus, setMenus] = useState<MenuItem[]>([]);
   const [menusLoading, setMenusLoading] = useState(false);
+
+  // 중복 요청 방지를 위한 ref
+  const fetchingOffsetRef = useRef<number | null>(null);
 
   // Room 입장/퇴장
   useEffect(() => {
@@ -61,23 +66,59 @@ const RestaurantDetailScreen: React.FC = () => {
     };
   }, [restaurantId]);
 
-  // 리뷰 조회
-  const fetchReviews = async (offset: number = 0) => {
-    setReviewsLoading(true);
+  // 리뷰 조회 (초기 로드)
+  const fetchReviews = async (offset: number = 0, append: boolean = false) => {
+    // 중복 요청 방지: 이미 같은 offset으로 요청 중이면 스킵
+    if (fetchingOffsetRef.current === offset) {
+      return;
+    }
+
+    // 요청 시작 - offset 기록
+    fetchingOffsetRef.current = offset;
+    
+    if (append) {
+      setReviewsLoadingMore(true);
+    } else {
+      setReviewsLoading(true);
+    }
+    
     try {
       const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset);
+      
       if (response.result && response.data) {
-        setReviews(response.data.reviews);
+        const newReviews = response.data.reviews;
+        
+        if (append) {
+          setReviews(prev => [...prev, ...newReviews]);
+        } else {
+          setReviews(newReviews);
+        }
+        
         setReviewsTotal(response.data.total);
         setReviewsOffset(offset);
+        
+        // 더 불러올 데이터가 있는지 확인
+        const hasMore = offset + newReviews.length < response.data.total;
+        setHasMoreReviews(hasMore);
       }
     } catch (err) {
       console.error('리뷰 조회 실패:', err);
       Alert.error('조회 실패', '리뷰를 불러오는데 실패했습니다');
     } finally {
+      // 요청 완료 - offset 기록 초기화
+      fetchingOffsetRef.current = null;
       setReviewsLoading(false);
+      setReviewsLoadingMore(false);
     }
   };
+
+  // 추가 리뷰 로드
+  const loadMoreReviews = useCallback(() => {
+    if (!reviewsLoadingMore && !reviewsLoading && hasMoreReviews && activeTab === 'review') {
+      const nextOffset = reviewsOffset + reviewsLimit;
+      fetchReviews(nextOffset, true);
+    }
+  }, [reviewsLoadingMore, reviewsLoading, hasMoreReviews, reviewsOffset, reviewsLimit, reviews.length, activeTab, reviewsTotal]);
 
   // 메뉴 조회
   const fetchMenus = async () => {
@@ -103,6 +144,17 @@ const RestaurantDetailScreen: React.FC = () => {
   // Sticky header 인덱스 계산 (크롤링 상태 유무에 따라 달라짐)
   const stickyHeaderIndex = reviewCrawlStatus.status === 'active' ? 2 : 1;
 
+  // 스크롤 이벤트 처리 (무한 스크롤)
+  const handleScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const paddingToBottom = 100; // 하단에서 100px 전에 트리거
+    const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
+    
+    if (isNearBottom && activeTab === 'review') {
+      loadMoreReviews();
+    }
+  }, [activeTab, loadMoreReviews]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -113,6 +165,8 @@ const RestaurantDetailScreen: React.FC = () => {
         snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
         snapToEnd={false}
         decelerationRate="normal"
+        onScroll={handleScroll}
+        scrollEventThrottle={400}
       >
         {/* 레스토랑 정보 + 크롤링 상태 헤더 (높이 측정용) */}
         <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
@@ -363,6 +417,16 @@ const RestaurantDetailScreen: React.FC = () => {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
+        
+        {/* 추가 로딩 인디케이터 */}
+        {reviewsLoadingMore && (
+          <View style={styles.footerLoader}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.footerLoaderText, { color: colors.textSecondary }]}>
+              리뷰 불러오는 중...
+            </Text>
+          </View>
+        )}
           </View>
         )}
       </ScrollView>
@@ -602,6 +666,15 @@ const styles = StyleSheet.create({
     padding: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerLoaderText: {
+    fontSize: 13,
+    marginTop: 8,
   },
   emptyContainer: {
     padding: 40,
