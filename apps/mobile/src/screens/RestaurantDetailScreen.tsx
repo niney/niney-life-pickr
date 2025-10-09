@@ -11,7 +11,7 @@ import { BlurView } from '@react-native-community/blur';
 import { useTheme, useSocket } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import { apiService } from 'shared/services';
-import type { ReviewData } from 'shared/services';
+import type { ReviewData, MenuItem } from 'shared/services';
 import { Alert } from 'shared/utils';
 import type { RestaurantStackParamList } from '../navigation/types';
 
@@ -37,6 +37,9 @@ const RestaurantDetailScreen: React.FC = () => {
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [reviewsLimit] = useState(20);
   const [reviewsOffset, setReviewsOffset] = useState(0);
+
+  const [menus, setMenus] = useState<MenuItem[]>([]);
+  const [menusLoading, setMenusLoading] = useState(false);
 
   // Room 입장/퇴장
   useEffect(() => {
@@ -66,8 +69,25 @@ const RestaurantDetailScreen: React.FC = () => {
     }
   };
 
+  // 메뉴 조회
+  const fetchMenus = async () => {
+    setMenusLoading(true);
+    try {
+      const response = await apiService.getRestaurantById(restaurantId);
+      if (response.result && response.data) {
+        setMenus(response.data.menus || []);
+      }
+    } catch (err) {
+      console.error('메뉴 조회 실패:', err);
+      Alert.error('조회 실패', '메뉴를 불러오는데 실패했습니다');
+    } finally {
+      setMenusLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchReviews();
+    fetchMenus();
   }, []);
 
   return (
@@ -96,6 +116,47 @@ const RestaurantDetailScreen: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        {/* 메뉴 목록 */}
+        {menusLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : menus.length > 0 ? (
+          <View style={styles.menuSection}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>메뉴</Text>
+            <View style={styles.menusList}>
+              {menus.map((menu, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.menuCardContainer,
+                    theme === 'dark' ? styles.menuCardDark : styles.menuCardLight,
+                  ]}
+                >
+                  <BlurView
+                    style={styles.blurContainer}
+                    blurType={theme === 'dark' ? 'dark' : 'light'}
+                    blurAmount={20}
+                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+                    pointerEvents="none"
+                  />
+                  <View style={styles.menuCardContent}>
+                    <View style={styles.menuInfo}>
+                      <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
+                      {menu.description && (
+                        <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
+                          {menu.description}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {/* 크롤링 진행 상태 */}
         {reviewCrawlStatus.status === 'active' && (
@@ -274,6 +335,59 @@ const styles = StyleSheet.create({
   reviewCount: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  menuSection: {
+    marginBottom: 16,
+  },
+  menusList: {
+    gap: 12,
+  },
+  menuCardContainer: {
+    overflow: 'hidden',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  menuCardLight: {
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  menuCardDark: {
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(26, 26, 26, 0.3)',
+  },
+  menuCardContent: {
+    padding: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  menuInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  menuName: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  menuDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  menuPrice: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   crawlProgressContainer: {
     marginBottom: 16,
