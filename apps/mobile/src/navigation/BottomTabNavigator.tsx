@@ -21,11 +21,12 @@ const BottomTabNavigator: React.FC = () => {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.headerBackground,
         },
-        headerTintColor: colors.text,
+        headerTintColor: colors.headerText,
         headerTitleStyle: {
           fontWeight: '600',
+          color: colors.headerText,
         },
         tabBarStyle: {
           position: 'absolute',

@@ -4,22 +4,19 @@
  * @format
  */
 
-import { StatusBar, StyleSheet, useColorScheme, View, Text, ActivityIndicator } from 'react-native';
+import { StatusBar, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider, SocketProvider } from 'shared/contexts';
+import { ThemeProvider, SocketProvider, useTheme } from 'shared/contexts';
 import LoginScreen from './src/screens/LoginScreen';
 import BottomTabNavigator from './src/navigation/BottomTabNavigator';
 import { useAuth } from 'shared/hooks';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         <SocketProvider>
-          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
           <AppContent />
         </SocketProvider>
       </ThemeProvider>
@@ -29,6 +26,7 @@ function App() {
 
 function AppContent() {
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
+  const { theme } = useTheme();
 
   const handleLoginSuccess = async () => {
     // 로그인 성공 시 storage에서 다시 로드하여 화면 전환
@@ -39,6 +37,7 @@ function AppContent() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
+        <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
@@ -47,6 +46,7 @@ function AppContent() {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
       {isAuthenticated ? (
         <NavigationContainer>
           <BottomTabNavigator />
