@@ -193,13 +193,16 @@ const RestaurantListScreen: React.FC = () => {
               {categories.map((category) => (
                 <View
                   key={category.category}
-                  style={styles.categoryCardContainer}
+                  style={[
+                    styles.categoryCardContainer,
+                    theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
+                  ]}
                 >
                   <BlurView
                     style={styles.blurContainer}
                     blurType={theme === 'dark' ? 'dark' : 'light'}
-                    blurAmount={15}
-                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+                    blurAmount={20}
+                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
                   />
                   <View style={styles.categoryCardContent}>
                     <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
@@ -224,14 +227,17 @@ const RestaurantListScreen: React.FC = () => {
               {restaurants.map((restaurant) => (
                 <TouchableOpacity
                   key={restaurant.id}
-                  style={styles.restaurantCardContainer}
+                  style={[
+                    styles.restaurantCardContainer,
+                    theme === 'dark' ? styles.restaurantCardDark : styles.restaurantCardLight,
+                  ]}
                   onPress={() => handleRestaurantPress(restaurant)}
                 >
                   <BlurView
                     style={styles.blurContainer}
                     blurType={theme === 'dark' ? 'dark' : 'light'}
-                    blurAmount={15}
-                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+                    blurAmount={20}
+                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
                   />
                   <View style={styles.restaurantCardContent}>
                     <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
@@ -308,15 +314,22 @@ const styles = StyleSheet.create({
   },
   categoryCardContainer: {
     overflow: 'hidden',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 16,
+    borderWidth: 1.5,
     minWidth: 100,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  categoryCardLight: {
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  categoryCardDark: {
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(26, 26, 26, 0.3)',
   },
   blurContainer: {
     position: 'absolute',
@@ -342,15 +355,22 @@ const styles = StyleSheet.create({
   },
   restaurantCardContainer: {
     overflow: 'hidden',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 20,
+    borderWidth: 1.5,
     marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  restaurantCardLight: {
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  restaurantCardDark: {
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(26, 26, 26, 0.3)',
   },
   restaurantCardContent: {
     padding: 16,

@@ -162,13 +162,16 @@ const RestaurantDetailScreen: React.FC = () => {
             {reviews.map((review) => (
               <View
                 key={review.id}
-                style={styles.reviewCardContainer}
+                style={[
+                  styles.reviewCardContainer,
+                  theme === 'dark' ? styles.reviewCardDark : styles.reviewCardLight,
+                ]}
               >
                 <BlurView
                   style={styles.blurContainer}
                   blurType={theme === 'dark' ? 'dark' : 'light'}
-                  blurAmount={15}
-                  reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+                  blurAmount={20}
+                  reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
                 />
                 <View style={styles.reviewCardContent}>
                   <View style={styles.reviewCardHeader}>
@@ -313,15 +316,22 @@ const styles = StyleSheet.create({
   },
   reviewCardContainer: {
     overflow: 'hidden',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 20,
+    borderWidth: 1.5,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  reviewCardLight: {
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  reviewCardDark: {
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(26, 26, 26, 0.3)',
   },
   blurContainer: {
     position: 'absolute',
