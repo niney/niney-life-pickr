@@ -36,11 +36,11 @@ const RestaurantStackNavigator: React.FC = () => {
       <Stack.Screen
         name="RestaurantDetail"
         component={RestaurantDetailScreen}
-        options={{
-          title: '리뷰',
+        options={({ route }) => ({
+          title: route.params?.restaurant?.name || '레스토랑',
           headerShown: true,
           headerBackTitle: '뒤로',
-        }}
+        })}
       />
     </Stack.Navigator>
   );
