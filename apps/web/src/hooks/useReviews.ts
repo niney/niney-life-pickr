@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { apiService } from '@shared/services'
 import type { ReviewData } from '@shared/services'
 import { Alert } from '@shared/utils'
@@ -10,9 +10,20 @@ export const useReviews = () => {
   const [reviewsLimit] = useState(20)
   const [reviewsOffset, setReviewsOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
+  
+  // 중복 요청 방지를 위한 ref
+  const fetchingOffsetRef = useRef<number | null>(null)
 
   const fetchReviews = async (restaurantId: number, offset: number = 0, append: boolean = false) => {
-    setReviewsLoading(true)
+    // 중복 요청 방지: 같은 offset으로 이미 요청 중이면 무시
+    if (fetchingOffsetRef.current === offset) {
+      console.log(`⚠️ 중복 요청 방지: offset ${offset}은 이미 요청 중입니다`);
+      return;
+    }
+    
+    fetchingOffsetRef.current = offset;
+    setReviewsLoading(true);
+    
     try {
       const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset)
       if (response.result && response.data) {
@@ -35,6 +46,7 @@ export const useReviews = () => {
       Alert.error('조회 실패', '리뷰를 불러오는데 실패했습니다')
     } finally {
       setReviewsLoading(false)
+      fetchingOffsetRef.current = null; // 요청 완료 후 초기화
     }
   }
 
@@ -50,6 +62,7 @@ export const useReviews = () => {
     setReviewsTotal(0)
     setReviewsOffset(0)
     setHasMore(true)
+    fetchingOffsetRef.current = null; // ref도 초기화
   }
 
   return {
