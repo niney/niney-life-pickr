@@ -13,6 +13,7 @@ export type {
   RestaurantCategory,
   RestaurantData,
   RestaurantListResponse,
+  RestaurantDetailResponse,
   ReviewInfo,
   ReviewData,
   ReviewListResponse,

@@ -29,6 +29,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     reviewsTotal,
     hasMore,
     loadMoreReviews,
+    menus,
+    menusLoading,
     handleBackToList,
   } = useRestaurantDetail()
 
@@ -137,6 +139,35 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       </View>
 
       <div style={{ padding: 20 }}>
+        {/* 메뉴 섹션 */}
+        {menusLoading && menus.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : menus.length > 0 ? (
+          <View style={styles.menuSection}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>메뉴</Text>
+            <View style={styles.menusList}>
+              {menus.map((menu, index) => (
+                <View
+                  key={index}
+                  style={[styles.menuCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.menuCardContent}>
+                    <View style={styles.menuInfo}>
+                      <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
+                      {menu.description && (
+                        <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>{menu.description}</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {/* 크롤링 진행 상태 표시 */}
         {isCrawling && (
           <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
@@ -319,6 +350,44 @@ const styles = StyleSheet.create({
   },
   reviewSubtitle: {
     fontSize: 15,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  menuSection: {
+    marginBottom: 32,
+  },
+  menusList: {
+    gap: 12,
+  },
+  menuCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  menuCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  menuInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  menuName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  menuDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  menuPrice: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   reviewScrollView: {
     flex: 1,

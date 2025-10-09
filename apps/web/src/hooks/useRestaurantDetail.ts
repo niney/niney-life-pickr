@@ -4,6 +4,7 @@ import { apiService } from '@shared/services'
 import type { RestaurantData } from '@shared/services'
 import { Alert } from '@shared/utils'
 import { useReviews } from './useReviews'
+import { useMenus } from './useMenus'
 
 export const useRestaurantDetail = () => {
   const { id } = useParams<{ id: string }>()
@@ -15,6 +16,9 @@ export const useRestaurantDetail = () => {
 
   // 공통 리뷰 훅 사용
   const reviewsState = useReviews()
+  
+  // 메뉴 훅 사용
+  const menusState = useMenus()
 
   // restaurant id로 레스토랑 정보 가져오기 (state로 전달받지 못한 경우에만)
   const fetchRestaurant = async (restaurantId: number) => {
@@ -52,13 +56,15 @@ export const useRestaurantDetail = () => {
       const stateRestaurant = location.state?.restaurant as RestaurantData | undefined
       
       if (stateRestaurant && stateRestaurant.id === restaurantId) {
-        // state로 전달받은 경우 - restaurant 정보 재사용, review만 fetch
+        // state로 전달받은 경우 - restaurant 정보 재사용, review와 menu만 fetch
         setRestaurant(stateRestaurant)
         reviewsState.fetchReviews(restaurantId)
+        menusState.fetchMenus(restaurantId)
       } else {
-        // state가 없는 경우 (직접 URL 접근) - 둘 다 fetch
+        // state가 없는 경우 (직접 URL 접근) - 모두 fetch
         fetchRestaurant(restaurantId)
         reviewsState.fetchReviews(restaurantId)
+        menusState.fetchMenus(restaurantId)
       }
     }
   }, [id])
@@ -72,6 +78,7 @@ export const useRestaurantDetail = () => {
     restaurant,
     restaurantLoading,
     ...reviewsState,
+    ...menusState,
     handleBackToList,
   }
 }

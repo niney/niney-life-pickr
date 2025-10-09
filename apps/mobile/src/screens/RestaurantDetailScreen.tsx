@@ -172,6 +172,7 @@ const RestaurantDetailScreen: React.FC = () => {
                   blurType={theme === 'dark' ? 'dark' : 'light'}
                   blurAmount={20}
                   reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+                  pointerEvents="none"
                 />
                 <View style={styles.reviewCardContent}>
                   <View style={styles.reviewCardHeader}>

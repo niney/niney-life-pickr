@@ -203,6 +203,7 @@ const RestaurantListScreen: React.FC = () => {
                     blurType={theme === 'dark' ? 'dark' : 'light'}
                     blurAmount={20}
                     reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+                    pointerEvents="none"
                   />
                   <View style={styles.categoryCardContent}>
                     <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
@@ -232,12 +233,14 @@ const RestaurantListScreen: React.FC = () => {
                     theme === 'dark' ? styles.restaurantCardDark : styles.restaurantCardLight,
                   ]}
                   onPress={() => handleRestaurantPress(restaurant)}
+                  activeOpacity={0.7}
                 >
                   <BlurView
                     style={styles.blurContainer}
                     blurType={theme === 'dark' ? 'dark' : 'light'}
                     blurAmount={20}
                     reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+                    pointerEvents="none"
                   />
                   <View style={styles.restaurantCardContent}>
                     <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
