@@ -97,12 +97,16 @@ const RestaurantDetailScreen: React.FC = () => {
     fetchMenus();
   }, []);
 
+  // Sticky header 인덱스 계산 (크롤링 상태 유무에 따라 달라짐)
+  const stickyHeaderIndex = reviewCrawlStatus.status === 'active' ? 2 : 1;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[stickyHeaderIndex]} // 탭 메뉴를 sticky로 설정
       >
         {/* 레스토랑 정보 헤더 */}
         <View style={styles.restaurantInfoContainer}>
@@ -179,46 +183,48 @@ const RestaurantDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {/* 탭 메뉴 */}
-        <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity
-            style={styles.tabButton}
-            onPress={() => setActiveTab('menu')}
-          >
-            <Text
-              style={[
-                styles.tabButtonText,
-                { color: activeTab === 'menu' ? colors.primary : colors.textSecondary }
-              ]}
+        {/* 탭 메뉴 - Sticky 고정 */}
+        <View style={{ backgroundColor: colors.background, paddingHorizontal: 16, paddingBottom: 7 }}>
+          <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity
+              style={styles.tabButton}
+              onPress={() => setActiveTab('menu')}
             >
-              메뉴 {menus.length > 0 && `(${menus.length})`}
-            </Text>
-            {activeTab === 'menu' && (
-              <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.tabButton}
-            onPress={() => setActiveTab('review')}
-          >
-            <Text
-              style={[
-                styles.tabButtonText,
-                { color: activeTab === 'review' ? colors.primary : colors.textSecondary }
-              ]}
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  { color: activeTab === 'menu' ? colors.primary : colors.textSecondary }
+                ]}
+              >
+                메뉴 {menus.length > 0 && `(${menus.length})`}
+              </Text>
+              {activeTab === 'menu' && (
+                <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.tabButton}
+              onPress={() => setActiveTab('review')}
             >
-              리뷰 ({reviewsTotal})
-            </Text>
-            {activeTab === 'review' && (
-              <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
-            )}
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  { color: activeTab === 'review' ? colors.primary : colors.textSecondary }
+                ]}
+              >
+                리뷰 ({reviewsTotal})
+              </Text>
+              {activeTab === 'review' && (
+                <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 메뉴 탭 */}
         {activeTab === 'menu' && (
-          <>
+          <View style={{ paddingHorizontal: 16 }}>
             {menusLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -261,12 +267,12 @@ const RestaurantDetailScreen: React.FC = () => {
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 메뉴가 없습니다</Text>
               </View>
             )}
-          </>
+          </View>
         )}
 
         {/* 리뷰 탭 */}
         {activeTab === 'review' && (
-          <>
+          <View style={{ paddingHorizontal: 16 }}>
             {reviewsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
@@ -348,7 +354,7 @@ const RestaurantDetailScreen: React.FC = () => {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
-          </>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -362,11 +368,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  content: {
-    padding: 16,
-  },
   restaurantInfoContainer: {
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   restaurantInfoCard: {
     padding: 16,
@@ -393,8 +397,8 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    backgroundColor: 'transparent',
-    marginBottom: 16,
+    marginBottom: 0,
+    backgroundColor: 'transparent', // 배경색을 부모로 이동
   },
   tabButton: {
     flex: 1,
@@ -471,6 +475,7 @@ const styles = StyleSheet.create({
   },
   crawlProgressContainer: {
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   crawlProgressCard: {
     padding: 16,
