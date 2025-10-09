@@ -33,7 +33,8 @@ const RestaurantDetailScreen: React.FC = () => {
     crawlProgress,
     dbProgress,
     joinRestaurantRoom,
-    leaveRestaurantRoom
+    leaveRestaurantRoom,
+    setRestaurantCallbacks
   } = useSocket();
 
   // 레스토랑 정보 섹션 높이 추적
@@ -56,10 +57,25 @@ const RestaurantDetailScreen: React.FC = () => {
   // 중복 요청 방지를 위한 ref
   const fetchingOffsetRef = useRef<number | null>(null);
 
-  // Room 입장/퇴장
+  // Room 입장/퇴장 및 크롤링 완료 콜백 설정
   useEffect(() => {
     const restaurantIdStr = String(restaurantId);
     joinRestaurantRoom(restaurantIdStr);
+
+    // 크롤링 완료 시 리뷰 갱신 콜백 설정
+    setRestaurantCallbacks({
+      onCompleted: async () => {
+        // 리뷰 다시 로드
+        await fetchReviews(0, false); // offset 0으로 초기화
+        
+        // 메뉴도 함께 갱신
+        await fetchMenus();
+      },
+      onError: async () => {
+        await fetchReviews(0, false);
+        await fetchMenus();
+      }
+    });
 
     return () => {
       leaveRestaurantRoom(restaurantIdStr);
