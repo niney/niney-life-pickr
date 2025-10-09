@@ -6,7 +6,7 @@ import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import { HomeIcon, RestaurantIcon, SettingsIcon } from '../components/TabBarIcons';
 import HomeScreen from '../screens/HomeScreen';
-import RestaurantScreen from '../screens/RestaurantScreen';
+import RestaurantStackNavigator from './RestaurantStackNavigator';
 import SettingsScreen from '../screens/SettingsScreen';
 import type { RootTabParamList } from './types';
 
@@ -70,9 +70,10 @@ const BottomTabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="Restaurant"
-        component={RestaurantScreen}
+        component={RestaurantStackNavigator}
         options={{
           title: '맛집',
+          headerShown: false, // Stack Navigator가 자체 헤더를 가짐
           tabBarIcon: ({ color, size }) => (
             <RestaurantIcon size={size} color={color} />
           ),
