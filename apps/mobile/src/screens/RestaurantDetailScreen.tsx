@@ -23,22 +23,25 @@ type TabType = 'menu' | 'review';
 const RestaurantDetailScreen: React.FC = () => {
   const route = useRoute<RestaurantDetailRouteProp>();
   const { restaurantId, restaurant } = route.params;
-  
+
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
   const insets = useSafeAreaInsets();
-  
-  const { 
-    reviewCrawlStatus, 
-    crawlProgress, 
-    dbProgress, 
-    joinRestaurantRoom, 
-    leaveRestaurantRoom 
+
+  const {
+    reviewCrawlStatus,
+    crawlProgress,
+    dbProgress,
+    joinRestaurantRoom,
+    leaveRestaurantRoom
   } = useSocket();
-  
+
+  // 레스토랑 정보 섹션 높이 추적
+  const [headerHeight, setHeaderHeight] = useState(0);
+
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu');
-  
+
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsTotal, setReviewsTotal] = useState(0);
@@ -52,7 +55,7 @@ const RestaurantDetailScreen: React.FC = () => {
   useEffect(() => {
     const restaurantIdStr = String(restaurantId);
     joinRestaurantRoom(restaurantIdStr);
-    
+
     return () => {
       leaveRestaurantRoom(restaurantIdStr);
     };
@@ -102,40 +105,45 @@ const RestaurantDetailScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[stickyHeaderIndex]} // 탭 메뉴를 sticky로 설정
+        snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
+        snapToEnd={false}
+        decelerationRate="normal"
       >
-        {/* 레스토랑 정보 헤더 */}
-        <View style={styles.restaurantInfoContainer}>
-          <View style={[styles.restaurantInfoCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
-            {restaurant.category && (
-              <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>
-                {restaurant.category}
+        {/* 레스토랑 정보 + 크롤링 상태 헤더 (높이 측정용) */}
+        <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+          {/* 레스토랑 정보 헤더 */}
+          <View style={styles.restaurantInfoContainer}>
+            <View style={[styles.restaurantInfoCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
+              {restaurant.category && (
+                <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>
+                  {restaurant.category}
+                </Text>
+              )}
+              {restaurant.address && (
+                <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]}>
+                  {restaurant.address}
+                </Text>
+              )}
+              <Text style={[styles.reviewCount, { color: colors.primary }]}>
+                메뉴 {menus.length}개 · 리뷰 {reviewsTotal}개
               </Text>
-            )}
-            {restaurant.address && (
-              <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]}>
-                {restaurant.address}
-              </Text>
-            )}
-            <Text style={[styles.reviewCount, { color: colors.primary }]}>
-              메뉴 {menus.length}개 · 리뷰 {reviewsTotal}개
-            </Text>
+            </View>
           </View>
-        </View>
 
-        {/* 크롤링 진행 상태 */}
-        {reviewCrawlStatus.status === 'active' && (
-          <View style={styles.crawlProgressContainer}>
+          {/* 크롤링 진행 상태 */}
+          {reviewCrawlStatus.status === 'active' && (
+            <View style={styles.crawlProgressContainer}>
             <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
                 🔄 리뷰 크롤링 중...
               </Text>
-              
+
               {crawlProgress && (
                 <View style={styles.progressSection}>
                   <View style={styles.progressInfo}>
@@ -145,14 +153,14 @@ const RestaurantDetailScreen: React.FC = () => {
                     </Text>
                   </View>
                   <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                    <View 
+                    <View
                       style={[
-                        styles.progressBarFill, 
-                        { 
+                        styles.progressBarFill,
+                        {
                           backgroundColor: colors.primary,
-                          width: `${crawlProgress.percentage}%` 
+                          width: `${crawlProgress.percentage}%`
                         }
-                      ]} 
+                      ]}
                     />
                   </View>
                 </View>
@@ -167,21 +175,22 @@ const RestaurantDetailScreen: React.FC = () => {
                     </Text>
                   </View>
                   <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                    <View 
+                    <View
                       style={[
-                        styles.progressBarFill, 
-                        { 
+                        styles.progressBarFill,
+                        {
                           backgroundColor: '#4caf50',
-                          width: `${dbProgress.percentage}%` 
+                          width: `${dbProgress.percentage}%`
                         }
-                      ]} 
+                      ]}
                     />
                   </View>
                 </View>
               )}
             </View>
           </View>
-        )}
+          )}
+        </View>
 
         {/* 탭 메뉴 - Sticky 고정 */}
         <View style={{ backgroundColor: colors.background, paddingHorizontal: 16, paddingBottom: 7 }}>
@@ -202,7 +211,7 @@ const RestaurantDetailScreen: React.FC = () => {
                 <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
               )}
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={styles.tabButton}
               onPress={() => setActiveTab('review')}
@@ -369,6 +378,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   restaurantInfoContainer: {
+    marginTop: 16,
     marginBottom: 16,
     paddingHorizontal: 16,
   },
