@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   wait_time TEXT,
   review_text TEXT,
   emotion_keywords TEXT,              -- "음식이 맛있어요,매장이 넓어요,친절해요" (쉼표 구분)
-  visit_date TEXT,
+  visit_date DATE,                    -- ISO 날짜 형식 (YYYY-MM-DD)
   visit_count TEXT,                   -- "1번째 방문"
   verification_method TEXT,           -- "인증 수단영수증"
   review_hash TEXT UNIQUE NOT NULL,   -- MD5 해시 (placeId+userName+visitDate+visitCount+receiptVerified)

@@ -56,7 +56,7 @@ export class ReviewRepository {
    */
   async findByRestaurantId(restaurantId: number, limit: number = 20, offset: number = 0): Promise<ReviewDB[]> {
     return await db.all<ReviewDB>(
-      'SELECT * FROM reviews WHERE restaurant_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      'SELECT * FROM reviews WHERE restaurant_id = ? ORDER BY visit_date DESC, id DESC LIMIT ? OFFSET ?',
       [restaurantId, limit, offset]
     );
   }

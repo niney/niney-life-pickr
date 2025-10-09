@@ -7,6 +7,7 @@ import type {
   CrawlResult,
   CrawlOptions
 } from '../types/crawler.types';
+import { parseVisitDate } from '../utils/date.utils';
 
 /**
  * DOM 타입 선언 (page.evaluate() 내부에서 사용)
@@ -806,11 +807,11 @@ class NaverCrawlerService {
 
       // 리뷰 정보 추출
       console.log('리뷰 정보 추출 시작...');
-      const reviews = await page.evaluate(() => {
+      const rawReviews = await page.evaluate(() => {
         const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
         console.log(`발견된 리뷰 요소 수: ${reviewElements.length}`);
 
-        const reviews: ReviewInfo[] = [];
+        const reviews: any[] = [];
 
         reviewElements.forEach((element) => {
           try {
@@ -889,6 +890,7 @@ class NaverCrawlerService {
               }
             }
 
+            // 원본 날짜 데이터를 그대로 반환 (파싱은 Node.js 환경에서)
             if (userName || reviewText) {
               reviews.push({
                 userName,
@@ -897,7 +899,7 @@ class NaverCrawlerService {
                 reviewText,
                 emotionKeywords,
                 visitInfo: {
-                  visitDate,
+                  visitDate, // 원본 데이터 ("8.16.토", "24.10.6.일" 등)
                   visitCount,
                   verificationMethod
                 }
@@ -910,6 +912,12 @@ class NaverCrawlerService {
 
         return reviews;
       });
+
+      for (const review of rawReviews) {
+        review.visitInfo.visitDate = parseVisitDate(review.visitInfo.visitDate);
+      }
+      
+      const reviews: ReviewInfo[] = rawReviews;
 
       startTime = this.logTiming('리뷰 정보 추출 완료', startTime);
       console.log(`총 ${reviews.length}개의 리뷰 추출 완료`);
