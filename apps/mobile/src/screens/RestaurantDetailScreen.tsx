@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
 import { useTheme, useSocket } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
@@ -25,6 +26,7 @@ const RestaurantDetailScreen: React.FC = () => {
   
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
+  const insets = useSafeAreaInsets();
   
   const { 
     reviewCrawlStatus, 
@@ -99,7 +101,7 @@ const RestaurantDetailScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* 레스토랑 정보 헤더 */}
@@ -362,7 +364,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
   },
   restaurantInfoContainer: {
     marginBottom: 16,
