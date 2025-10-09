@@ -120,6 +120,33 @@ class NaverCrawlerService {
   }
 
   /**
+   * 텍스트에서 URL 추출 (한글 주소 등이 포함된 경우)
+   */
+  extractUrl(text: string): string | null {
+    // URL 패턴 매칭 (http, https 포함)
+    const urlPattern = /(https?:\/\/[^\s]+)/;
+    const match = text.match(urlPattern);
+    
+    if (match) {
+      console.log('텍스트에서 URL 추출:', match[1]);
+      return match[1];
+    }
+    
+    // naver.me 단축 URL 패턴 (http/https 없이도 감지)
+    const naverMePattern = /(naver\.me\/[^\s]+)/;
+    const naverMeMatch = text.match(naverMePattern);
+    
+    if (naverMeMatch) {
+      const url = `https://${naverMeMatch[1]}`;
+      console.log('naver.me URL 추출:', url);
+      return url;
+    }
+    
+    // URL이 아니면 전체 텍스트를 URL로 간주 (기존 동작 유지)
+    return text.trim();
+  }
+
+  /**
    * URL에서 Place ID 추출 (다양한 형태 지원)
    */
   extractPlaceId(url: string): string | null {
@@ -192,6 +219,13 @@ class NaverCrawlerService {
     let startTime = Date.now();
     startTime = this.logTiming('크롤링 시작', startTime);
 
+    // 텍스트에서 URL 추출 (한글 주소 등이 포함된 경우)
+    const extractedUrl = this.extractUrl(url);
+    if (!extractedUrl) {
+      throw new Error('URL을 추출할 수 없습니다');
+    }
+    console.log('추출된 URL:', extractedUrl);
+
     let browser: Browser | null = null;
     let page: Page | null = null;
 
@@ -219,15 +253,15 @@ class NaverCrawlerService {
       await page.setViewport({ width: 1920, height: 1080 });
 
       // 1단계: 홈 페이지에서 기본 정보 크롤링
-      console.log('1단계: 홈 페이지 크롤링 시작:', url);
+      console.log('1단계: 홈 페이지 크롤링 시작:', extractedUrl);
 
       // naver.me 단축 URL 처리
-      let finalUrl = url;
-      let crawlUrl = url; // 실제 크롤링할 URL
+      let finalUrl = extractedUrl;
+      let crawlUrl = extractedUrl; // 실제 크롤링할 URL
 
-      if (url.includes('naver.me')) {
+      if (extractedUrl.includes('naver.me')) {
         console.log('naver.me 단축 URL 감지, 리다이렉트 처리...');
-        await page.goto(url, {
+        await page.goto(extractedUrl, {
           waitUntil: 'domcontentloaded',
           timeout: 20000
         });
@@ -597,6 +631,13 @@ class NaverCrawlerService {
     let startTime = Date.now();
     startTime = this.logTiming('리뷰 크롤링 시작', startTime);
 
+    // 텍스트에서 URL 추출 (한글 주소 등이 포함된 경우)
+    const extractedUrl = this.extractUrl(url);
+    if (!extractedUrl) {
+      throw new Error('URL을 추출할 수 없습니다');
+    }
+    console.log('추출된 URL:', extractedUrl);
+
     let browser: Browser | null = null;
     let page: Page | null = null;
 
@@ -621,15 +662,15 @@ class NaverCrawlerService {
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       await page.setViewport({ width: 1920, height: 1080 });
 
-      console.log('리뷰 페이지 로드 시작:', url);
+      console.log('리뷰 페이지 로드 시작:', extractedUrl);
 
       // naver.me 단축 URL 처리
-      let finalUrl = url;
-      let crawlUrl = url;
+      let finalUrl = extractedUrl;
+      let crawlUrl = extractedUrl;
 
-      if (url.includes('naver.me')) {
+      if (extractedUrl.includes('naver.me')) {
         console.log('naver.me 단축 URL 감지, 리다이렉트 처리...');
-        await page.goto(url, {
+        await page.goto(extractedUrl, {
           waitUntil: 'domcontentloaded',
           timeout: 20000
         });
