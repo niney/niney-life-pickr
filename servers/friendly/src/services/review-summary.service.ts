@@ -12,9 +12,13 @@ class ReviewSummaryService extends UnifiedOllamaService {
   /**
    * 여러 리뷰를 개별적으로 요약 (병렬/순차)
    * @param reviews - 리뷰 배열
+   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number) => void
    * @returns 각 리뷰의 요약 결과 배열
    */
-  async summarizeReviews(reviews: ReviewDB[]): Promise<ReviewSummaryData[]> {
+  async summarizeReviews(
+    reviews: ReviewDB[],
+    onProgress?: (current: number, total: number) => void
+  ): Promise<ReviewSummaryData[]> {
     if (reviews.length === 0) {
       return [];
     }
@@ -25,10 +29,12 @@ class ReviewSummaryService extends UnifiedOllamaService {
         this.createSingleReviewPrompt(review)
       );
       
-      // 2. Cloud: 병렬 / Local: 순차
-      const responses = await this.generateBatch(prompts, { 
-        num_ctx: 2048 
-      });
+      // 2. Cloud: 병렬 / Local: 순차 (진행 상황 콜백 전달)
+      const responses = await this.generateBatch(
+        prompts, 
+        { num_ctx: 2048 },
+        onProgress
+      );
 
       // 3. JSON 파싱
       const results = responses.map((response, index) => {

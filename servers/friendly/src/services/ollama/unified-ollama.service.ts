@@ -135,9 +135,14 @@ export class UnifiedOllamaService {
    * 
    * @param prompts - 프롬프트 배열
    * @param options - 생성 옵션
+   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number) => void
    * @returns 응답 배열 (prompts와 같은 순서)
    */
-  async generateBatch(prompts: string[], options?: GenerateOptions): Promise<string[]> {
+  async generateBatch(
+    prompts: string[], 
+    options?: GenerateOptions,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<string[]> {
     if (prompts.length === 0) {
       return [];
     }
@@ -151,17 +156,17 @@ export class UnifiedOllamaService {
     if (this.isCloudAvailable && this.cloudService) {
       try {
         console.log('🌥️  Cloud 병렬 처리 모드');
-        results = await this.cloudService.generateBatch(prompts, options);
+        results = await this.cloudService.generateBatch(prompts, options, undefined, onProgress);
       } catch (error) {
         console.warn('⚠️  Cloud 병렬 처리 실패, Local 순차 처리로 전환:', error instanceof Error ? error.message : error);
         this.isCloudAvailable = false;
-        results = await this.generateBatchLocal(prompts, options);
+        results = await this.generateBatchLocal(prompts, options, onProgress);
       }
     } 
     // Local: 순차 처리
     else if (this.localService) {
       console.log('💻 Local 순차 처리 모드 (병렬 불가)');
-      results = await this.generateBatchLocal(prompts, options);
+      results = await this.generateBatchLocal(prompts, options, onProgress);
     } else {
       throw new Error('❌ 사용 가능한 Ollama 서비스가 없습니다');
     }
@@ -175,7 +180,11 @@ export class UnifiedOllamaService {
   /**
    * Local에서 순차 처리 (병렬 불가하므로)
    */
-  private async generateBatchLocal(prompts: string[], options?: GenerateOptions): Promise<string[]> {
+  private async generateBatchLocal(
+    prompts: string[], 
+    options?: GenerateOptions,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<string[]> {
     if (!this.localService) {
       throw new Error('❌ Local Ollama 서비스가 없습니다');
     }
@@ -194,6 +203,11 @@ export class UnifiedOllamaService {
         console.error(`  ❌ [${i + 1}/${prompts.length}] 실패:`, error instanceof Error ? error.message : error);
         results.push(''); // 빈 응답으로 처리
         failCount++;
+      }
+      
+      // 진행 상황 콜백 호출
+      if (onProgress) {
+        onProgress(i + 1, prompts.length);
       }
     }
 

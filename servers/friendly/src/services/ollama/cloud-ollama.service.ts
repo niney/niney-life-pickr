@@ -100,12 +100,14 @@ export abstract class BaseCloudOllamaService extends BaseOllamaService {
    * @param prompts - 처리할 프롬프트 배열
    * @param options - 생성 옵션
    * @param parallelSize - 동시 처리 크기 (기본값: 생성자에서 설정한 값)
+   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number) => void
    * @returns 생성된 응답 배열 (실패 시 빈 문자열)
    */
   async generateBatch(
     prompts: string[],
     options?: GenerateOptions,
-    parallelSize?: number
+    parallelSize?: number,
+    onProgress?: (current: number, total: number) => void
   ): Promise<string[]> {
     const batchSize = parallelSize ?? this.parallelSize;
     const results: string[] = [];
@@ -145,6 +147,12 @@ export abstract class BaseCloudOllamaService extends BaseOllamaService {
 
       const batchTime = Date.now() - batchStart;
       console.log(`  ✅ 배치 완료: ${(batchTime / 1000).toFixed(2)}초 (${successCount}/${batch.length} 성공)`);
+      
+      // 진행 상황 콜백 호출
+      if (onProgress) {
+        const currentProgress = Math.min(i + batchSize, totalPrompts);
+        onProgress(currentProgress, totalPrompts);
+      }
     }
 
     const totalTime = Date.now() - startTime;

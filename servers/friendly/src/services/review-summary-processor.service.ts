@@ -37,10 +37,10 @@ export class ReviewSummaryProcessor {
       console.log(`📦 미완료 요약 ${incompleteSummaries.length}개 발견`);
 
       // 2. 리뷰 데이터 조회
-      const reviewIds = incompleteSummaries.map(s => s.review_id);
+      const summaryReviewIds = incompleteSummaries.map(s => s.review_id);
       const reviews: ReviewDB[] = [];
       
-      for (const reviewId of reviewIds) {
+      for (const reviewId of summaryReviewIds) {
         const review = await reviewRepository.findById(reviewId);
         if (review) {
           reviews.push(review);
@@ -69,58 +69,59 @@ export class ReviewSummaryProcessor {
       let completedCount = 0;
       let failedCount = 0;
 
-      // 5. 배치 처리 (generateBatch가 자동으로 Cloud는 병렬, Local은 순차 처리)
-      const BATCH_SIZE = 10;
+      // 5. 전체 리뷰를 한 번에 처리 (generateBatch가 내부에서 배치 병렬 처리)
+      const reviewIds = reviews.map(r => r.id);
       
-      for (let batchStart = 0; batchStart < reviews.length; batchStart += BATCH_SIZE) {
-        const batchEnd = Math.min(batchStart + BATCH_SIZE, reviews.length);
-        const batch = reviews.slice(batchStart, batchEnd);
-        const batchReviewIds = batch.map(r => r.id);
-        
-        console.log(`  📦 배치 처리 [${batchStart + 1}-${batchEnd}/${reviews.length}]`);
+      // 5-1. 전체를 processing 상태로 변경
+      await Promise.all(
+        reviewIds.map(id => reviewSummaryRepository.updateStatus(id, 'processing'))
+      );
 
-        try {
-          // 5-1. 배치 전체를 processing 상태로 변경
-          await Promise.all(
-            batchReviewIds.map(id => reviewSummaryRepository.updateStatus(id, 'processing'))
-          );
-
-          // 5-2. AI 요약 생성 (Cloud: 병렬, Local: 순차 자동 처리)
-          const summaryDataList = await summaryService.summarizeReviews(batch);
-
-          // 5-3. 배치 결과 저장
-          await Promise.all(
-            summaryDataList.map((summaryData, idx) => 
-              reviewSummaryRepository.updateSummary(batchReviewIds[idx], summaryData)
-            )
-          );
-
-          completedCount += batch.length;
-          console.log(`  ✅ 배치 ${batch.length}개 완료`);
+      // 5-2. AI 요약 생성 (진행 상황 콜백 포함)
+      // - Cloud: parallelSize(기본 3개)씩 자동 배치 병렬 처리
+      // - Local: 순차 처리
+      const summaryDataList = await summaryService.summarizeReviews(
+        reviews,
+        (current, total) => {
+          // Socket 진행률 업데이트 콜백
+          const percentage = Math.floor((current / total) * 100);
           
-        } catch (error) {
-          // 배치 전체 실패 처리
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          await Promise.all(
-            batchReviewIds.map(id => reviewSummaryRepository.markAsFailed(id, errorMessage))
-          );
-          failedCount += batch.length;
-          console.error(`  ❌ 배치 실패:`, errorMessage);
+          io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_PROGRESS, {
+            restaurantId,
+            current,
+            total,
+            percentage,
+            completed: completedCount,
+            failed: failedCount
+          });
         }
+      );
 
-        // 5-4. Socket 진행률 업데이트 (배치마다)
-        const currentProgress = batchEnd;
-        const percentage = Math.floor((currentProgress / reviews.length) * 100);
+      // 5-3. 결과 저장 (성공한 것만)
+      for (let i = 0; i < summaryDataList.length; i++) {
+        const summaryData = summaryDataList[i];
+        const reviewId = reviewIds[i];
         
-        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_PROGRESS, {
-          restaurantId,
-          current: currentProgress,
-          total: reviews.length,
-          percentage,
-          completed: completedCount,
-          failed: failedCount
-        });
+        if (summaryData && summaryData.summary) {
+          await reviewSummaryRepository.updateSummary(reviewId, summaryData);
+          completedCount++;
+        } else {
+          await reviewSummaryRepository.markAsFailed(reviewId, 'AI 요약 생성 실패');
+          failedCount++;
+        }
       }
+
+      console.log(`  ✅ 전체 완료 (성공: ${completedCount}, 실패: ${failedCount})`);
+      
+      // 5-4. 최종 Socket 진행률 업데이트
+      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_PROGRESS, {
+        restaurantId,
+        current: reviews.length,
+        total: reviews.length,
+        percentage: 100,
+        completed: completedCount,
+        failed: failedCount
+      });
 
       const elapsed = Date.now() - startTime;
       console.log(`✅ 처리 완료 (${(elapsed / 1000).toFixed(2)}초)`);

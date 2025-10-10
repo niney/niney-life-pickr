@@ -16,7 +16,15 @@ type TabType = 'menu' | 'review'
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
-  const { joinRestaurantRoom, leaveRestaurantRoom, reviewCrawlStatus, crawlProgress, dbProgress } = useSocket()
+  const { 
+    joinRestaurantRoom, 
+    leaveRestaurantRoom, 
+    reviewCrawlStatus, 
+    crawlProgress, 
+    dbProgress,
+    reviewSummaryStatus,
+    summaryProgress
+  } = useSocket()
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -115,6 +123,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   // 크롤링 중인지 체크
   const isCrawling = reviewCrawlStatus.status === 'active'
+  const isSummarizing = reviewSummaryStatus.status === 'active'
 
   // 레스토랑 정보 로딩 중
   if (restaurantLoading) {
@@ -192,6 +201,47 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                     }
                   ]} 
                 />
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* 리뷰 요약 진행 상태 표시 */}
+      {isSummarizing && (
+        <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
+            🤖 AI 리뷰 요약 중...
+          </Text>
+          
+          {summaryProgress && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressInfo}>
+                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>요약 진행</Text>
+                <Text style={[styles.progressText, { color: colors.text }]}>
+                  {summaryProgress.current} / {summaryProgress.total} ({summaryProgress.percentage}%)
+                </Text>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View 
+                  style={[
+                    styles.progressBarFill, 
+                    { 
+                      backgroundColor: '#9c27b0',
+                      width: `${summaryProgress.percentage}%` 
+                    }
+                  ]} 
+                />
+              </View>
+              <View style={styles.progressStats}>
+                <Text style={[styles.progressStat, { color: '#4caf50' }]}>
+                  ✓ 완료: {summaryProgress.completed}
+                </Text>
+                {summaryProgress.failed > 0 && (
+                  <Text style={[styles.progressStat, { color: '#f44336' }]}>
+                    ✗ 실패: {summaryProgress.failed}
+                  </Text>
+                )}
               </View>
             </View>
           )}
@@ -591,6 +641,15 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  progressStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  progressStat: {
+    fontSize: 13,
+    fontWeight: '500' as '500',
   },
   loadMoreButtonContainer: {
     padding: 20,
