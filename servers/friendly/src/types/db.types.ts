@@ -153,6 +153,7 @@ export interface ReviewSummaryData {
 export interface ReviewSummaryDB {
   id: number;
   review_id: number;
+  restaurant_id: number;
   status: ReviewSummaryStatus;
   summary_data: string | null;
   error_message: string | null;
@@ -166,6 +167,7 @@ export interface ReviewSummaryDB {
  */
 export interface ReviewSummaryInput {
   review_id: number;
+  restaurant_id: number;
   status?: ReviewSummaryStatus;
   summary_data?: ReviewSummaryData | null;
 }

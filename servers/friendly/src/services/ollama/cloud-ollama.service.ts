@@ -100,14 +100,14 @@ export abstract class BaseCloudOllamaService extends BaseOllamaService {
    * @param prompts - 처리할 프롬프트 배열
    * @param options - 생성 옵션
    * @param parallelSize - 동시 처리 크기 (기본값: 생성자에서 설정한 값)
-   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number) => void
+   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number, batchResults?: string[]) => void
    * @returns 생성된 응답 배열 (실패 시 빈 문자열)
    */
   async generateBatch(
     prompts: string[],
     options?: GenerateOptions,
     parallelSize?: number,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number, batchResults?: string[]) => void
   ): Promise<string[]> {
     const batchSize = parallelSize ?? this.parallelSize;
     const results: string[] = [];
@@ -135,23 +135,26 @@ export abstract class BaseCloudOllamaService extends BaseOllamaService {
 
       // 결과 처리
       let successCount = 0;
+      const batchResults: string[] = [];
       for (const result of batchSettledResults) {
         if (result.status === 'fulfilled') {
           results.push(result.value);
+          batchResults.push(result.value);
           successCount++;
         } else {
           console.error(`  ⚠️ 요청 실패:`, result.reason?.message || result.reason);
           results.push('');
+          batchResults.push('');
         }
       }
 
       const batchTime = Date.now() - batchStart;
       console.log(`  ✅ 배치 완료: ${(batchTime / 1000).toFixed(2)}초 (${successCount}/${batch.length} 성공)`);
       
-      // 진행 상황 콜백 호출
+      // 진행 상황 콜백 호출 (배치 결과 포함)
       if (onProgress) {
         const currentProgress = Math.min(i + batchSize, totalPrompts);
-        onProgress(currentProgress, totalPrompts);
+        onProgress(currentProgress, totalPrompts, batchResults);
       }
     }
 

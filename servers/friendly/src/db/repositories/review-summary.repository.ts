@@ -17,10 +17,11 @@ export class ReviewSummaryRepository {
    */
   async create(input: ReviewSummaryInput): Promise<void> {
     await db.run(`
-      INSERT INTO review_summaries (review_id, status, summary_data)
-      VALUES (?, ?, ?)
+      INSERT INTO review_summaries (review_id, restaurant_id, status, summary_data)
+      VALUES (?, ?, ?, ?)
     `, [
       input.review_id,
+      input.restaurant_id,
       input.status || 'pending',
       input.summary_data ? JSON.stringify(input.summary_data) : null
     ]);
@@ -58,6 +59,49 @@ export class ReviewSummaryRepository {
           updated_at = CURRENT_TIMESTAMP
       WHERE review_id = ?
     `, [JSON.stringify(summaryData), reviewId]);
+  }
+
+  /**
+   * 배치 요약 데이터 업데이트 (트랜잭션)
+   */
+  async updateSummaryBatch(
+    updates: Array<{ reviewId: number; summaryData: ReviewSummaryData | null; errorMessage?: string }>
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    
+    // 트랜잭션으로 일괄 업데이트
+    await db.run('BEGIN TRANSACTION');
+    
+    try {
+      for (const update of updates) {
+        if (update.summaryData && update.summaryData.summary) {
+          // 성공: completed 상태로 업데이트
+          await db.run(`
+            UPDATE review_summaries 
+            SET summary_data = ?,
+                status = 'completed',
+                error_message = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE review_id = ?
+          `, [JSON.stringify(update.summaryData), update.reviewId]);
+        } else {
+          // 실패: failed 상태로 업데이트
+          await db.run(`
+            UPDATE review_summaries 
+            SET status = 'failed',
+                error_message = ?,
+                retry_count = retry_count + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE review_id = ?
+          `, [update.errorMessage || 'AI 요약 생성 실패', update.reviewId]);
+        }
+      }
+      
+      await db.run('COMMIT');
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
   }
 
   /**
@@ -110,48 +154,105 @@ export class ReviewSummaryRepository {
   }
 
   /**
-   * 레스토랑의 미완료 요약 조회
+   * 레스토랑의 미완료 요약 조회 (restaurant_id로 직접 조회, 페이지네이션)
    */
-  async findIncompleteByRestaurant(restaurantId: number): Promise<ReviewSummaryDB[]> {
+  async findIncompleteByRestaurant(
+    restaurantId: number, 
+    limit: number = 1000, 
+    offset: number = 0
+  ): Promise<ReviewSummaryDB[]> {
     return await db.all<ReviewSummaryDB>(`
-      SELECT rs.* 
-      FROM review_summaries rs
-      INNER JOIN reviews r ON rs.review_id = r.id
-      WHERE r.restaurant_id = ? 
-        AND rs.status IN ('pending', 'failed')
-      ORDER BY rs.created_at ASC
-    `, [restaurantId]);
+      SELECT * 
+      FROM review_summaries
+      WHERE restaurant_id = ? 
+        AND status IN ('pending', 'failed')
+      ORDER BY created_at ASC
+      LIMIT ? OFFSET ?
+    `, [restaurantId, limit, offset]);
   }
 
   /**
-   * 레스토랑의 미완료 요약 개수
+   * 레스토랑의 모든 요약 review_id 목록 조회 (효율적)
+   */
+  async findReviewIdsByRestaurantId(restaurantId: number): Promise<number[]> {
+    const rows = await db.all<{ review_id: number }>(`
+      SELECT review_id 
+      FROM review_summaries
+      WHERE restaurant_id = ?
+      ORDER BY review_id ASC
+    `, [restaurantId]);
+    return rows.map(row => row.review_id);
+  }
+
+  /**
+   * 특정 review_id들의 요약 일괄 생성
+   */
+  async createBatch(restaurantId: number, reviewIds: number[]): Promise<void> {
+    if (reviewIds.length === 0) return;
+    
+    const values = reviewIds.map(reviewId => 
+      `(${reviewId}, ${restaurantId}, 'pending', NULL)`
+    ).join(', ');
+    
+    await db.run(`
+      INSERT INTO review_summaries (review_id, restaurant_id, status, summary_data)
+      VALUES ${values}
+    `);
+  }
+
+  /**
+   * 특정 review_id들의 요약 일괄 삭제
+   */
+  async deleteBatchByReviewIds(reviewIds: number[]): Promise<void> {
+    if (reviewIds.length === 0) return;
+    
+    const placeholders = reviewIds.map(() => '?').join(', ');
+    await db.run(`
+      DELETE FROM review_summaries 
+      WHERE review_id IN (${placeholders})
+    `, reviewIds);
+  }
+
+  /**
+   * 레스토랑의 미완료 요약 개수 (restaurant_id로 직접 조회)
    */
   async countIncompleteByRestaurant(restaurantId: number): Promise<number> {
     const result = await db.get<{ count: number }>(`
       SELECT COUNT(*) as count
-      FROM review_summaries rs
-      INNER JOIN reviews r ON rs.review_id = r.id
-      WHERE r.restaurant_id = ? 
-        AND rs.status IN ('pending', 'failed')
+      FROM review_summaries
+      WHERE restaurant_id = ? 
+        AND status IN ('pending', 'failed')
     `, [restaurantId]);
     
     return result?.count || 0;
   }
 
   /**
-   * 레스토랑의 완료된 요약 조회
+   * 레스토랑의 요약 전체 개수 (restaurant_id로 직접 조회)
+   */
+  async countByRestaurant(restaurantId: number): Promise<number> {
+    const result = await db.get<{ count: number }>(`
+      SELECT COUNT(*) as count
+      FROM review_summaries
+      WHERE restaurant_id = ?
+    `, [restaurantId]);
+    
+    return result?.count || 0;
+  }
+
+  /**
+   * 레스토랑의 완료된 요약 조회 (restaurant_id로 직접 조회)
    */
   async findCompletedByRestaurant(restaurantId: number): Promise<Array<{
     reviewId: number;
     summary: ReviewSummaryData;
   }>> {
-    const rows = await db.all<ReviewSummaryDB & { review_id: number }>(`
-      SELECT rs.* 
-      FROM review_summaries rs
-      INNER JOIN reviews r ON rs.review_id = r.id
-      WHERE r.restaurant_id = ? 
-        AND rs.status = 'completed'
-      ORDER BY r.visit_date DESC
+    const rows = await db.all<ReviewSummaryDB>(`
+      SELECT * 
+      FROM review_summaries
+      WHERE restaurant_id = ? 
+        AND status = 'completed'
+      ORDER BY created_at DESC
     `, [restaurantId]);
 
     return rows.map(row => ({
@@ -168,14 +269,11 @@ export class ReviewSummaryRepository {
   }
 
   /**
-   * 레스토랑의 모든 요약 삭제
+   * 레스토랑의 모든 요약 삭제 (restaurant_id로 직접 삭제)
    */
   async deleteByRestaurantId(restaurantId: number): Promise<void> {
     await db.run(`
-      DELETE FROM review_summaries 
-      WHERE review_id IN (
-        SELECT id FROM reviews WHERE restaurant_id = ?
-      )
+      DELETE FROM review_summaries WHERE restaurant_id = ?
     `, [restaurantId]);
   }
 }

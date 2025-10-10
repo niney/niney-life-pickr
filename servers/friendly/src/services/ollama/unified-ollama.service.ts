@@ -135,13 +135,13 @@ export class UnifiedOllamaService {
    * 
    * @param prompts - 프롬프트 배열
    * @param options - 생성 옵션
-   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number) => void
+   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number, batchResults?: string[]) => void
    * @returns 응답 배열 (prompts와 같은 순서)
    */
   async generateBatch(
     prompts: string[], 
     options?: GenerateOptions,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number, batchResults?: string[]) => void
   ): Promise<string[]> {
     if (prompts.length === 0) {
       return [];
@@ -183,7 +183,7 @@ export class UnifiedOllamaService {
   private async generateBatchLocal(
     prompts: string[], 
     options?: GenerateOptions,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number, batchResults?: string[]) => void
   ): Promise<string[]> {
     if (!this.localService) {
       throw new Error('❌ Local Ollama 서비스가 없습니다');
@@ -205,9 +205,9 @@ export class UnifiedOllamaService {
         failCount++;
       }
       
-      // 진행 상황 콜백 호출
+      // 진행 상황 콜백 호출 (Local은 1개씩 처리하므로 단일 결과 배열로 전달)
       if (onProgress) {
-        onProgress(i + 1, prompts.length);
+        onProgress(i + 1, prompts.length, [results[i]]);
       }
     }
 

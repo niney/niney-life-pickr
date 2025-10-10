@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS review_summaries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   review_id INTEGER NOT NULL UNIQUE,
+  restaurant_id INTEGER NOT NULL,
   
   -- 상태 관리
   status TEXT NOT NULL DEFAULT 'pending',   -- 'pending' | 'processing' | 'completed' | 'failed'
@@ -18,7 +19,8 @@ CREATE TABLE IF NOT EXISTS review_summaries (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   
-  FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE
+  FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
 );
 
 -- 인덱스
@@ -27,3 +29,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_review_summaries_review
   
 CREATE INDEX IF NOT EXISTS idx_review_summaries_status 
   ON review_summaries(status);
+
+CREATE INDEX IF NOT EXISTS idx_review_summaries_restaurant
+  ON review_summaries(restaurant_id);

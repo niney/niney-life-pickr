@@ -12,12 +12,12 @@ class ReviewSummaryService extends UnifiedOllamaService {
   /**
    * 여러 리뷰를 개별적으로 요약 (병렬/순차)
    * @param reviews - 리뷰 배열
-   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number) => void
+   * @param onProgress - 진행 상황 콜백 (선택) (current: number, total: number, batchResults?: string[]) => void
    * @returns 각 리뷰의 요약 결과 배열
    */
   async summarizeReviews(
     reviews: ReviewDB[],
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number, batchResults?: string[]) => void
   ): Promise<ReviewSummaryData[]> {
     if (reviews.length === 0) {
       return [];
@@ -72,6 +72,11 @@ ${reviewText}
 방문 키워드: ${visitKeywords}
 감정 키워드: ${keywords}
 
+중요 규칙:
+- 반드시 JSON 형식으로만 응답하세요
+- 일반 텍스트나 설명 문장을 절대 포함하지 마세요
+- 리뷰 내용이 없거나 분석이 불가능한 경우, summary에 "요약 내용이 없습니다"를 반환하세요
+
 분석 요구사항:
 1. 핵심 요약: 리뷰의 핵심 내용을 1-2문장으로 요약
 2. 주요 키워드: 리뷰에서 중요한 키워드 3-5개 추출
@@ -83,7 +88,7 @@ ${reviewText}
 5. 만족도 점수: 1-100 사이 숫자로 평가
 6. 팁: 이 리뷰에서 얻을 수 있는 유용한 팁 1-3개 (없으면 빈 배열)
 
-JSON 형식으로 출력:
+JSON 형식:
 {
   "summary": "핵심 요약",
   "keyKeywords": ["키워드1", "키워드2", "키워드3"],
@@ -123,7 +128,17 @@ JSON 형식으로 출력:
   "tips": []
 }
 
-JSON 응답만 출력하세요:`;
+예시 4 (리뷰 내용 없음/분석 불가):
+{
+  "summary": "요약 내용이 없습니다",
+  "keyKeywords": [],
+  "sentiment": "neutral",
+  "sentimentReason": "",
+  "satisfactionScore": 0,
+  "tips": []
+}
+
+반드시 위 형식의 JSON만 출력하세요. 다른 텍스트는 포함하지 마세요.`;
   }
 
   /**
@@ -140,6 +155,21 @@ JSON 응답만 출력하세요:`;
       satisfactionScore: undefined,
       tips: []
     };
+  }
+
+  /**
+   * JSON 응답 파싱 (Public 메서드)
+   */
+  parseResponse(response: string): ReviewSummaryData | null {
+    const parsed = this.parseJsonResponse<ReviewSummaryData>(response);
+    
+    // parsed가 없거나 summary 속성이 없으면 null 반환
+    // 빈 문자열("")은 유효한 응답으로 처리
+    if (!parsed || parsed.summary === undefined || parsed.summary === null) {
+      return null;
+    }
+
+    return parsed;
   }
 }
 
