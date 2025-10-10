@@ -149,6 +149,15 @@ export interface ReviewInfo {
   visitInfo: VisitInfo;
 }
 
+export interface ReviewSummary {
+  summary: string;
+  keyKeywords: string[];
+  sentiment: 'positive' | 'negative' | 'neutral';
+  sentimentReason: string;
+  satisfactionScore: number | null;
+  tips: string[];
+}
+
 export interface ReviewData {
   id: number;
   userName: string | null;
@@ -159,6 +168,7 @@ export interface ReviewData {
   visitInfo: VisitInfo;
   crawledAt: string;
   createdAt: string;
+  summary?: ReviewSummary | null;
 }
 
 export interface ReviewListResponse {
@@ -166,6 +176,11 @@ export interface ReviewListResponse {
   limit: number;
   offset: number;
   reviews: ReviewData[];
+}
+
+export interface RestaurantDetailResponse {
+  restaurant: RestaurantData;
+  menus: MenuItem[];
 }
 
 export interface ReviewCrawlProgress {
@@ -246,12 +261,71 @@ class ApiService {
   }
 
   /**
-   * 네이버 맵 음식점 크롤링
+   * 네이버 맵 음식점 크롤링 (deprecated - crawl 사용 권장)
+   * @deprecated Use crawl() instead
    */
   async crawlRestaurant(request: CrawlRestaurantRequest): Promise<ApiResponse<RestaurantInfo>> {
-    return this.request<RestaurantInfo>('/api/crawler/restaurant', {
+    // 내부적으로 통합 API 사용
+    const response = await this.crawl({
+      url: request.url,
+      crawlMenus: request.crawlMenus,
+      crawlReviews: request.crawlReviews,
+      createSummary: false // 명시적으로 지정
+    });
+
+    // 기존 인터페이스 유지를 위해 변환
+    if (response.result && response.data?.restaurantInfo) {
+      return {
+        ...response,
+        data: response.data.restaurantInfo
+      };
+    }
+
+    return response as any;
+  }
+
+  /**
+   * 통합 크롤링 API (신규 크롤링 + 재크롤링)
+   */
+  async crawl(options: {
+    url?: string;
+    restaurantId?: number;
+    crawlMenus?: boolean;
+    crawlReviews?: boolean;
+    createSummary?: boolean;
+  }): Promise<ApiResponse<{
+    restaurantId: number;
+    isNewCrawl: boolean;
+    crawlMenus: boolean;
+    crawlReviews: boolean;
+    createSummary: boolean;
+    reviewJobId?: string;
+    restaurantInfo?: RestaurantInfo;
+  }>> {
+    return this.request('/api/crawler/crawl', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify(options),
+    });
+  }
+
+  /**
+   * 레스토랑 재크롤링 (deprecated - crawl 사용 권장)
+   * @deprecated Use crawl() instead
+   */
+  async recrawlRestaurant(
+    restaurantId: number,
+    options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }
+  ): Promise<ApiResponse<{
+    restaurantId: number;
+    crawlMenus: boolean;
+    crawlReviews: boolean;
+    createSummary: boolean;
+    reviewJobId?: string;
+  }>> {
+    // 내부적으로 통합 API 사용
+    return this.crawl({
+      restaurantId,
+      ...options
     });
   }
 
@@ -269,6 +343,15 @@ class ApiService {
    */
   async getRestaurants(limit: number = 20, offset: number = 0): Promise<ApiResponse<RestaurantListResponse>> {
     return this.request<RestaurantListResponse>(`/api/restaurants?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 음식점 상세 조회 (메뉴 포함)
+   */
+  async getRestaurantById(id: number): Promise<ApiResponse<RestaurantDetailResponse>> {
+    return this.request<RestaurantDetailResponse>(`/api/restaurants/${id}`, {
       method: 'GET',
     });
   }

@@ -21,6 +21,16 @@ const VisitInfoSchema = Type.Object({
   verificationMethod: Type.Union([Type.String(), Type.Null()], { description: '인증 방법 (예: 영수증 인증)' })
 });
 
+// 리뷰 요약 스키마
+const ReviewSummarySchema = Type.Object({
+  summary: Type.String({ description: '핵심 요약' }),
+  keyKeywords: Type.Array(Type.String(), { description: '주요 키워드' }),
+  sentiment: Type.String({ description: '감정 (positive/negative/neutral)' }),
+  sentimentReason: Type.String({ description: '감정 이유' }),
+  satisfactionScore: Type.Union([Type.Number(), Type.Null()], { description: '만족도 점수 (1-100)' }),
+  tips: Type.Array(Type.String(), { description: '팁' })
+});
+
 // 리뷰 스키마
 const ReviewSchema = Type.Object({
   id: Type.Number({ description: '리뷰 ID' }),
@@ -31,7 +41,8 @@ const ReviewSchema = Type.Object({
   emotionKeywords: Type.Array(Type.String(), { description: '감정 키워드 (예: ["맛있어요", "친절해요"])' }),
   visitInfo: VisitInfoSchema,
   crawledAt: Type.String({ description: '크롤링 시간 (ISO 8601)' }),
-  createdAt: Type.String({ description: '생성 시간 (ISO 8601)' })
+  createdAt: Type.String({ description: '생성 시간 (ISO 8601)' }),
+  summary: Type.Optional(Type.Union([ReviewSummarySchema, Type.Null()], { description: 'AI 요약 데이터 (있는 경우)' }))
 });
 
 /**
@@ -215,28 +226,50 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
         return ResponseHelper.notFound(reply, `Restaurant ID ${id}에 해당하는 음식점을 찾을 수 없습니다`);
       }
 
-      // 2. 리뷰 조회
-      const [reviewsDB, total] = await Promise.all([
-        reviewRepository.findByRestaurantId(id, limit, offset),
+      // 2. 리뷰 조회 (요약 데이터 포함 - LEFT JOIN 사용)
+      const [reviewsWithSummary, total] = await Promise.all([
+        reviewRepository.findByRestaurantIdWithSummary(id, limit, offset),
         reviewRepository.countByRestaurantId(id)
       ]);
 
-      // 3. DB 데이터를 API 응답 형식으로 변환 (쉼표 구분 문자열 → 배열)
-      const reviews = reviewsDB.map(review => ({
-        id: review.id,
-        userName: review.user_name,
-        visitKeywords: review.visit_keywords ? review.visit_keywords.split(',') : [],
-        waitTime: review.wait_time,
-        reviewText: review.review_text,
-        emotionKeywords: review.emotion_keywords ? review.emotion_keywords.split(',') : [],
-        visitInfo: {
-          visitDate: review.visit_date,
-          visitCount: review.visit_count,
-          verificationMethod: review.verification_method
-        },
-        crawledAt: review.crawled_at,
-        createdAt: review.created_at
-      }));
+      // 3. DB 데이터를 API 응답 형식으로 변환
+      const reviews = reviewsWithSummary.map(row => {
+        let summaryData = null;
+        
+        // summary_data가 있으면 JSON 파싱
+        if (row.summary_data) {
+          try {
+            const parsed = JSON.parse(row.summary_data);
+            summaryData = {
+              summary: parsed.summary || '',
+              keyKeywords: parsed.keyKeywords || [],
+              sentiment: parsed.sentiment || 'neutral',
+              sentimentReason: parsed.sentimentReason || '',
+              satisfactionScore: parsed.satisfactionScore,
+              tips: parsed.tips || []
+            };
+          } catch (error) {
+            console.error(`Failed to parse summary_data for review ${row.id}:`, error);
+          }
+        }
+
+        return {
+          id: row.id,
+          userName: row.user_name,
+          visitKeywords: row.visit_keywords ? row.visit_keywords.split(',') : [],
+          waitTime: row.wait_time,
+          reviewText: row.review_text,
+          emotionKeywords: row.emotion_keywords ? row.emotion_keywords.split(',') : [],
+          visitInfo: {
+            visitDate: row.visit_date,
+            visitCount: row.visit_count,
+            verificationMethod: row.verification_method
+          },
+          crawledAt: row.crawled_at,
+          createdAt: row.created_at,
+          summary: summaryData
+        };
+      });
 
       return ResponseHelper.success(
         reply,

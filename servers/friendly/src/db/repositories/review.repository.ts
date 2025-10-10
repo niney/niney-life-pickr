@@ -71,6 +71,23 @@ export class ReviewRepository {
   }
 
   /**
+   * 레스토랑의 리뷰 조회 (요약 데이터 포함 - JOIN 사용)
+   */
+  async findByRestaurantIdWithSummary(restaurantId: number, limit: number = 20, offset: number = 0): Promise<any[]> {
+    return await db.all<any>(`
+      SELECT 
+        r.*,
+        rs.summary_data,
+        rs.status as summary_status
+      FROM reviews r
+      LEFT JOIN review_summaries rs ON r.id = rs.review_id AND rs.status = 'completed'
+      WHERE r.restaurant_id = ?
+      ORDER BY r.visit_date DESC, r.id DESC
+      LIMIT ? OFFSET ?
+    `, [restaurantId, limit, offset]);
+  }
+
+  /**
    * 레스토랑의 리뷰 개수
    */
   async countByRestaurantId(restaurantId: number): Promise<number> {

@@ -15,12 +15,27 @@ interface ReviewCrawlStatus {
   reviews: any[]
 }
 
+interface SummaryProgress {
+  current: number
+  total: number
+  percentage: number
+  completed: number
+  failed: number
+}
+
+interface ReviewSummaryStatus {
+  status: 'idle' | 'active' | 'completed' | 'failed'
+  error?: string
+}
+
 interface SocketContextValue {
   socket: Socket | null
   isConnected: boolean
   reviewCrawlStatus: ReviewCrawlStatus
   crawlProgress: CrawlProgress | null
   dbProgress: CrawlProgress | null
+  reviewSummaryStatus: ReviewSummaryStatus
+  summaryProgress: SummaryProgress | null
   joinRestaurantRoom: (restaurantId: string) => void
   leaveRestaurantRoom: (restaurantId: string) => void
   setRestaurantCallbacks: (callbacks: {
@@ -28,6 +43,7 @@ interface SocketContextValue {
     onError?: (data: { restaurantId: string; error: string }) => void
   }) => void
   resetCrawlStatus: () => void
+  resetSummaryStatus: () => void
 }
 
 const SocketContext = createContext<SocketContextValue | undefined>(undefined)
@@ -47,7 +63,7 @@ const getServerUrl = (customUrl?: string): string => {
   if (customUrl) return customUrl
 
   const isWeb = Platform.OS === 'web'
-  
+
   if (isWeb) {
     // Web: 현재 호스트의 4000 포트 사용
     if (typeof window !== 'undefined') {
@@ -83,6 +99,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   })
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null)
   const [dbProgress, setDbProgress] = useState<CrawlProgress | null>(null)
+  const [reviewSummaryStatus, setReviewSummaryStatus] = useState<ReviewSummaryStatus>({
+    status: 'idle'
+  })
+  const [summaryProgress, setSummaryProgress] = useState<SummaryProgress | null>(null)
   const callbacksRef = useRef<{
     onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
     onError?: (data: { restaurantId: string; error: string }) => void
@@ -92,7 +112,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   // Socket.io 연결 초기화 (앱 전체에서 단 한 번)
   useEffect(() => {
     console.log('[Socket.io] Connecting to:', resolvedServerUrl)
-    
+
     const socket = io(resolvedServerUrl, {
       transports: ['websocket', 'polling']
     })
@@ -175,11 +195,62 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       }
     })
 
+    // 리뷰 요약 시작
+    socket.on('review_summary:started', (data: any) => {
+      console.log('[Socket.io] Summary Started:', data)
+      setReviewSummaryStatus({ status: 'active' })
+      setSummaryProgress({
+        current: 0,
+        total: data.total,
+        percentage: 0,
+        completed: 0,
+        failed: 0
+      })
+    })
+
+    // 리뷰 요약 진행
+    socket.on('review_summary:progress', (data: any) => {
+      console.log('[Socket.io] Summary Progress:', data)
+      setSummaryProgress({
+        current: data.current,
+        total: data.total,
+        percentage: data.percentage,
+        completed: data.completed,
+        failed: data.failed
+      })
+    })
+
+    // 리뷰 요약 완료
+    socket.on('review_summary:completed', (data: any) => {
+      console.log('[Socket.io] Summary Completed:', data)
+      setReviewSummaryStatus({ status: 'completed' })
+      setSummaryProgress({
+        current: data.total,
+        total: data.total,
+        percentage: 100,
+        completed: data.completed,
+        failed: data.failed
+      })
+    })
+
+    // 리뷰 요약 에러
+    socket.on('review_summary:error', (data: any) => {
+      console.error('[Socket.io] Summary Error:', data)
+      const errorMessage = data.error || '요약 중 오류가 발생했습니다'
+      setReviewSummaryStatus({ status: 'failed', error: errorMessage })
+      setSummaryProgress(null)
+      Alert.error('요약 실패', errorMessage)
+    })
+
     return () => {
       socket.off('review:crawl_progress')
       socket.off('review:db_progress')
       socket.off('review:completed')
       socket.off('review:error')
+      socket.off('review_summary:started')
+      socket.off('review_summary:progress')
+      socket.off('review_summary:completed')
+      socket.off('review_summary:error')
     }
   }, [])
 
@@ -233,16 +304,25 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setDbProgress(null)
   }
 
+  // 요약 상태 초기화
+  const resetSummaryStatus = () => {
+    setReviewSummaryStatus({ status: 'idle' })
+    setSummaryProgress(null)
+  }
+
   const value: SocketContextValue = {
     socket: socketRef.current,
     isConnected,
     reviewCrawlStatus,
     crawlProgress,
     dbProgress,
+    reviewSummaryStatus,
+    summaryProgress,
     joinRestaurantRoom,
     leaveRestaurantRoom,
     setRestaurantCallbacks,
     resetCrawlStatus,
+    resetSummaryStatus,
   }
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>

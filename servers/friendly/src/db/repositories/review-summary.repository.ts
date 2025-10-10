@@ -133,6 +133,22 @@ export class ReviewSummaryRepository {
   }
 
   /**
+   * 여러 리뷰 ID로 요약 일괄 조회
+   */
+  async findByReviewIds(reviewIds: number[]): Promise<ReviewSummaryDB[]> {
+    if (reviewIds.length === 0) {
+      return [];
+    }
+
+    const placeholders = reviewIds.map(() => '?').join(',');
+    return await db.all<ReviewSummaryDB>(`
+      SELECT * FROM review_summaries 
+      WHERE review_id IN (${placeholders})
+      ORDER BY review_id ASC
+    `, reviewIds);
+  }
+
+  /**
    * 특정 상태의 요약 조회
    */
   async findByStatus(status: ReviewSummaryStatus): Promise<ReviewSummaryDB[]> {
