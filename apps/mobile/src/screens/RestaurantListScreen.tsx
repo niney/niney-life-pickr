@@ -39,6 +39,31 @@ const RestaurantListScreen: React.FC = () => {
   // Pull to refresh 상태
   const [refreshing, setRefreshing] = useState(false);
 
+  // iOS TextInput 성능 최적화를 위한 스타일 메모이제이션
+  const inputStyle = React.useMemo(
+    () => [
+      styles.input,
+      {
+        borderColor: colors.border,
+        color: colors.text,
+        backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
+      },
+    ],
+    [colors.border, colors.text, colors.surface, theme]
+  );
+
+  const searchButtonStyle = React.useMemo(
+    () => [
+      styles.searchButton,
+      {
+        backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+      },
+    ],
+    [colors.surface, colors.border, theme]
+  );
+
   // shared 훅 사용 (플랫폼 독립적)
   const {
     url,
@@ -145,28 +170,15 @@ const RestaurantListScreen: React.FC = () => {
         {/* 검색 입력 */}
         <View style={styles.searchContainer}>
           <TextInput
-            style={[
-              styles.input, 
-              { 
-                borderColor: colors.border, 
-                color: colors.text,
-                backgroundColor: theme === 'light' ? '#ffffff' : colors.surface
-              }
-            ]}
+            style={inputStyle}
             placeholder="URL 또는 Place ID를 입력하세요"
             placeholderTextColor={colors.textSecondary}
             value={url}
             onChangeText={setUrl}
+            keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
           />
           <TouchableOpacity
-            style={[
-              styles.searchButton, 
-              { 
-                backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface,
-                borderWidth: 1, 
-                borderColor: colors.border 
-              }
-            ]}
+            style={searchButtonStyle}
             onPress={handleCrawl}
             disabled={loading}
           >
