@@ -13,9 +13,10 @@ export interface ProgressData {
 }
 
 /**
- * 리뷰 크롤링 상태
+ * 리뷰 크롤링 상태 (클라이언트 전용)
+ * 서버 API의 ReviewCrawlStatus와 구분하기 위해 Client prefix 추가
  */
-export interface ReviewCrawlStatus {
+export interface ClientReviewCrawlStatus {
   status: 'idle' | 'active' | 'completed' | 'failed';
   error?: string;
 }

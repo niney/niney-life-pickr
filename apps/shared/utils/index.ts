@@ -8,7 +8,7 @@ export { storage, STORAGE_KEYS } from './storage.utils';
 // Socket utility (클라이언트 타입만)
 export type {
   ProgressData,
-  ReviewCrawlStatus,
+  ClientReviewCrawlStatus,
   SummaryProgress,
   ReviewSummaryStatus
 } from './socket.utils';

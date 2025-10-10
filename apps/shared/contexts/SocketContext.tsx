@@ -4,7 +4,7 @@ import { Platform } from 'react-native'
 import {
   Alert,
   type ProgressData,
-  type ReviewCrawlStatus,
+  type ClientReviewCrawlStatus,
   type SummaryProgress,
   type ReviewSummaryStatus
 } from '../utils'
@@ -12,7 +12,7 @@ import {
 interface SocketContextValue {
   socket: Socket | null
   isConnected: boolean
-  reviewCrawlStatus: ReviewCrawlStatus
+  reviewCrawlStatus: ClientReviewCrawlStatus
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
   reviewSummaryStatus: ReviewSummaryStatus
@@ -74,7 +74,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const resolvedServerUrl = getServerUrl(serverUrl)
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const [reviewCrawlStatus, setReviewCrawlStatus] = useState<ReviewCrawlStatus>({
+  const [reviewCrawlStatus, setReviewCrawlStatus] = useState<ClientReviewCrawlStatus>({
     status: 'idle'
   })
   const [crawlProgress, setCrawlProgress] = useState<ProgressData | null>(null)

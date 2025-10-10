@@ -1,15 +1,6 @@
 import { useState, useEffect } from 'react';
 import { storage } from '../utils';
-
-export interface User {
-  id: number;
-  email: string;
-  username: string;
-  provider?: string;
-  created_at?: string;
-  last_login?: string;
-  is_active?: boolean;
-}
+import type { User } from '../services';
 
 export interface AuthHookReturn {
   user: User | null;
