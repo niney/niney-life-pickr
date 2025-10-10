@@ -162,11 +162,9 @@ const RestaurantDetailScreen: React.FC = () => {
     fetchMenus();
   }, []);
 
-  // Sticky header 인덱스 계산 (크롤링/요약 상태 유무에 따라 달라짐)
+  // 크롤링/요약 상태 체크
   const isCrawling = reviewCrawlStatus.status === 'active';
   const isSummarizing = reviewSummaryStatus.status === 'active';
-  const hasProgress = isCrawling || isSummarizing;
-  const stickyHeaderIndex = hasProgress ? 2 : 1;
 
   // 스크롤 이벤트 처리 (무한 스크롤)
   const handleScroll = useCallback((event: any) => {
@@ -198,7 +196,7 @@ const RestaurantDetailScreen: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[stickyHeaderIndex]} // 탭 메뉴를 sticky로 설정
+        stickyHeaderIndices={[1]} // 항상 두 번째 요소 (탭 메뉴)를 sticky로 고정
         snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
         snapToEnd={false}
         decelerationRate="normal"
@@ -283,7 +281,7 @@ const RestaurantDetailScreen: React.FC = () => {
           )}
 
           {/* 리뷰 요약 진행 상태 */}
-          {reviewSummaryStatus.status === 'active' && (
+          {(reviewSummaryStatus.status === 'active' || summaryProgress) && (
             <View style={styles.crawlProgressContainer}>
               <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
                 <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
