@@ -5,6 +5,7 @@ import reviewRepository from '../db/repositories/review.repository';
 import crawlJobRepository from '../db/repositories/crawl-job.repository';
 import jobManager from './job-manager.service';
 import { generateReviewHash } from '../utils/hash.utils';
+import reviewSummaryProcessor from './review-summary-processor.service';
 import type { ReviewInfo } from '../types/crawler.types';
 
 /**
@@ -23,12 +24,7 @@ export class ReviewCrawlerProcessor {
       jobManager.updateStatus(jobId, 'active', { startedAt: new Date() });
       await crawlJobRepository.updateStatus(jobId, 'active', { startedAt: new Date() });
 
-      // Place room과 Restaurant room 모두에 이벤트 발행 (호환성)
-      io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
-        placeId,
-        restaurantId,
-        url
-      });
+      // Restaurant room에 이벤트 발행
       io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
         placeId,
         restaurantId,
@@ -49,11 +45,6 @@ export class ReviewCrawlerProcessor {
           savedToDb: reviews.length
         });
 
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
-          placeId,
-          restaurantId,
-          totalReviews: reviews.length
-        });
         io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
           placeId,
           restaurantId,
@@ -73,15 +64,18 @@ export class ReviewCrawlerProcessor {
           savedToDb: reviews.length
         });
 
-        // 완료 이벤트 (Place room과 Restaurant room 모두)
+        // 완료 이벤트
         const completedData = {
           placeId,
           restaurantId,
           totalReviews: reviews.length,
           savedToDb: reviews.length
         };
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, completedData);
         io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, completedData);
+
+        // 4. 리뷰 크롤링 완료 후 자동으로 요약 시작
+        console.log(`[Job ${jobId}] 리뷰 요약 시작...`);
+        this.startReviewSummary(restaurantId, jobId);
       }
 
     } catch (error) {
@@ -99,7 +93,6 @@ export class ReviewCrawlerProcessor {
         restaurantId,
         error: errorMessage
       };
-      io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, errorData);
       io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, errorData);
 
       throw error;
@@ -161,7 +154,6 @@ export class ReviewCrawlerProcessor {
           total,
           percentage
         };
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_DB_PROGRESS, dbProgressData);
         io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_DB_PROGRESS, dbProgressData);
         console.log(`[Job ${jobId}] DB 저장 진행: ${current}/${total} (${percentage}%)`);
       }
@@ -178,7 +170,6 @@ export class ReviewCrawlerProcessor {
           total,
           percentage
         };
-        io.to(`place:${placeId}`).emit(SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS, crawlProgressData);
         io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS, crawlProgressData);
         
         console.log(`[Job ${jobId}] 크롤링 진행: ${current}/${total} (${percentage}%)`);
@@ -186,6 +177,22 @@ export class ReviewCrawlerProcessor {
     );
 
     return reviews;
+  }
+
+  /**
+   * 리뷰 요약 시작 (백그라운드)
+   * - 크롤링 완료 후 자동 실행
+   * - Cloud AI 우선 사용 (실패 시 Local)
+   */
+  private startReviewSummary(restaurantId: number, jobId: string): void {
+    // 백그라운드로 실행 (비동기, 에러 무시)
+    reviewSummaryProcessor.processIncompleteReviews(restaurantId, true) // useCloud=true
+      .then(() => {
+        console.log(`[Job ${jobId}] 리뷰 요약 완료`);
+      })
+      .catch(error => {
+        console.error(`[Job ${jobId}] 리뷰 요약 실패:`, error instanceof Error ? error.message : error);
+      });
   }
 }
 

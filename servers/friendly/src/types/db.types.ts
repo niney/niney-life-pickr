@@ -129,3 +129,43 @@ export interface CrawlJobInput {
   url: string;
   status: string;
 }
+
+/**
+ * Review Summary 상태
+ */
+export type ReviewSummaryStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * AI 요약 데이터 (JSON)
+ */
+export interface ReviewSummaryData {
+  summary: string;
+  keyKeywords: string[];
+  sentiment: 'positive' | 'negative' | 'neutral';
+  sentimentReason: string;
+  satisfactionScore?: number;
+  tips?: string[];
+}
+
+/**
+ * Review Summary DB entity
+ */
+export interface ReviewSummaryDB {
+  id: number;
+  review_id: number;
+  status: ReviewSummaryStatus;
+  summary_data: string | null;
+  error_message: string | null;
+  retry_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Review Summary Input
+ */
+export interface ReviewSummaryInput {
+  review_id: number;
+  status?: ReviewSummaryStatus;
+  summary_data?: ReviewSummaryData | null;
+}

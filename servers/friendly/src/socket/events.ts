@@ -9,6 +9,12 @@ export const SOCKET_EVENTS = {
   REVIEW_COMPLETED: 'review:completed',
   REVIEW_ERROR: 'review:error',
   REVIEW_CANCELLED: 'review:cancelled',
+  
+  // 리뷰 요약 이벤트
+  REVIEW_SUMMARY_STARTED: 'review_summary:started',
+  REVIEW_SUMMARY_PROGRESS: 'review_summary:progress',
+  REVIEW_SUMMARY_COMPLETED: 'review_summary:completed',
+  REVIEW_SUMMARY_ERROR: 'review_summary:error',
 } as const;
 
 export type SocketEventType = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];

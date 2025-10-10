@@ -1,6 +1,7 @@
 import db from '../database';
 import type { ReviewDB, ReviewInput } from '../../types/db.types';
 import type { ReviewInfo } from '../../types/crawler.types';
+import reviewSummaryRepository from './review-summary.repository';
 
 /**
  * Review Repository
@@ -9,8 +10,9 @@ import type { ReviewInfo } from '../../types/crawler.types';
 export class ReviewRepository {
   /**
    * 리뷰 UPSERT (해시 기반 중복 방지)
+   * + 요약 레코드 자동 생성 (pending 상태)
    */
-  async upsertReview(restaurantId: number, review: ReviewInfo, reviewHash: string): Promise<void> {
+  async upsertReview(restaurantId: number, review: ReviewInfo, reviewHash: string): Promise<number> {
     const input: ReviewInput = {
       restaurant_id: restaurantId,
       user_name: review.userName,
@@ -25,6 +27,7 @@ export class ReviewRepository {
       crawled_at: new Date().toISOString()
     };
 
+    // 1. 리뷰 저장
     await db.run(`
       INSERT INTO reviews (
         restaurant_id, user_name, visit_keywords, wait_time,
@@ -49,6 +52,30 @@ export class ReviewRepository {
       input.review_hash,
       input.crawled_at
     ]);
+
+    // 2. review_id 확인 (hash로 조회)
+    const savedReview = await this.findByHash(reviewHash);
+    if (!savedReview) {
+      throw new Error('리뷰 저장 후 조회 실패');
+    }
+    const reviewId = savedReview.id;
+
+    // 3. 요약 레코드 자동 생성 (pending 상태, 빈 데이터)
+    try {
+      await reviewSummaryRepository.create({
+        review_id: reviewId,
+        status: 'pending',
+        summary_data: null
+      });
+    } catch (error) {
+      // UNIQUE 제약 위반 시 무시 (이미 존재하는 경우)
+      const err = error as any;
+      if (!err.message?.includes('UNIQUE constraint')) {
+        console.error('요약 레코드 생성 실패:', error);
+      }
+    }
+
+    return reviewId;
   }
 
   /**
@@ -79,6 +106,16 @@ export class ReviewRepository {
     return await db.get<ReviewDB>(
       'SELECT * FROM reviews WHERE review_hash = ?',
       [reviewHash]
+    );
+  }
+
+  /**
+   * 리뷰 ID로 조회
+   */
+  async findById(reviewId: number): Promise<ReviewDB | undefined> {
+    return await db.get<ReviewDB>(
+      'SELECT * FROM reviews WHERE id = ?',
+      [reviewId]
     );
   }
 
