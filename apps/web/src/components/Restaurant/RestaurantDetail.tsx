@@ -426,14 +426,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                         </View>
                       )}
 
-                      {review.summary.sentimentReason && (
+                      {review.summary.sentimentReason ? (
                         <View style={styles.sentimentReason}>
-                          <Text style={[styles.sentimentReasonLabel, { color: colors.textSecondary }]}>감정 분석:</Text>
+                          <Text style={[styles.sentimentReasonLabel, { color: colors.textSecondary }]}>
+                            감정 분석:
+                          </Text>
                           <Text style={[styles.sentimentReasonText, { color: colors.text }]}>
                             {review.summary.sentimentReason}
                           </Text>
                         </View>
-                      )}
+                      ) : null}
                     </View>
                   )}
 
