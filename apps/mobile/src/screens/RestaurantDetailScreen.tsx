@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,16 @@ import {
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
-import { useTheme, useSocket, THEME_COLORS, apiService, Alert, type ReviewData, type MenuItem } from 'shared';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons';
+import { faStar as farStar } from '@fortawesome/free-regular-svg-icons';
+import {
+  useTheme,
+  useSocket,
+  THEME_COLORS,
+  useReviews,
+  useMenus
+} from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
@@ -47,22 +56,25 @@ const RestaurantDetailScreen: React.FC = () => {
   // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set());
 
-  const [reviews, setReviews] = useState<ReviewData[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [reviewsLoadingMore, setReviewsLoadingMore] = useState(false);
-  const [reviewsTotal, setReviewsTotal] = useState(0);
-  const [reviewsLimit] = useState(20);
-  const [reviewsOffset, setReviewsOffset] = useState(0);
-  const [hasMoreReviews, setHasMoreReviews] = useState(true);
-
-  const [menus, setMenus] = useState<MenuItem[]>([]);
-  const [menusLoading, setMenusLoading] = useState(false);
-
   // Pull to refresh 상태
   const [refreshing, setRefreshing] = useState(false);
 
-  // 중복 요청 방지를 위한 ref
-  const fetchingOffsetRef = useRef<number | null>(null);
+  // shared 훅 사용 (플랫폼 독립적)
+  const {
+    reviews,
+    reviewsLoading,
+    reviewsLoadingMore,
+    reviewsTotal,
+    hasMoreReviews,
+    fetchReviews,
+    loadMoreReviews,
+  } = useReviews();
+
+  const {
+    menus,
+    menusLoading,
+    fetchMenus,
+  } = useMenus();
 
   // Room 입장/퇴장 및 크롤링 완료 콜백 설정
   useEffect(() => {
@@ -72,15 +84,15 @@ const RestaurantDetailScreen: React.FC = () => {
     // 크롤링 완료 시 리뷰 갱신 콜백 설정
     setRestaurantCallbacks({
       onCompleted: async () => {
-        // 리뷰 다시 로드
-        await fetchReviews(0, false); // offset 0으로 초기화
+        // 리뷰 다시 로드 (shared 훅 사용)
+        await fetchReviews(restaurantId, 0, false); // offset 0으로 초기화
 
         // 메뉴도 함께 갱신
-        await fetchMenus();
+        await fetchMenus(restaurantId);
       },
       onError: async () => {
-        await fetchReviews(0, false);
-        await fetchMenus();
+        await fetchReviews(restaurantId, 0, false);
+        await fetchMenus(restaurantId);
       }
     });
 
@@ -109,80 +121,10 @@ const RestaurantDetailScreen: React.FC = () => {
     }
   }, [reviewSummaryStatus.status]);
 
-  // 리뷰 조회 (초기 로드)
-  const fetchReviews = async (offset: number = 0, append: boolean = false) => {
-    // 중복 요청 방지: 이미 같은 offset으로 요청 중이면 스킵
-    if (fetchingOffsetRef.current === offset) {
-      return;
-    }
-
-    // 요청 시작 - offset 기록
-    fetchingOffsetRef.current = offset;
-
-    if (append) {
-      setReviewsLoadingMore(true);
-    } else {
-      setReviewsLoading(true);
-    }
-
-    try {
-      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset);
-
-      if (response.result && response.data) {
-        const newReviews = response.data.reviews;
-
-        if (append) {
-          setReviews(prev => [...prev, ...newReviews]);
-        } else {
-          setReviews(newReviews);
-        }
-
-        setReviewsTotal(response.data.total);
-        setReviewsOffset(offset);
-
-        // 더 불러올 데이터가 있는지 확인
-        const hasMore = offset + newReviews.length < response.data.total;
-        setHasMoreReviews(hasMore);
-      }
-    } catch (err) {
-      console.error('리뷰 조회 실패:', err);
-      Alert.error('조회 실패', '리뷰를 불러오는데 실패했습니다');
-    } finally {
-      // 요청 완료 - offset 기록 초기화
-      fetchingOffsetRef.current = null;
-      setReviewsLoading(false);
-      setReviewsLoadingMore(false);
-    }
-  };
-
-  // 추가 리뷰 로드
-  const loadMoreReviews = useCallback(() => {
-    if (!reviewsLoadingMore && !reviewsLoading && hasMoreReviews && activeTab === 'review') {
-      const nextOffset = reviewsOffset + reviewsLimit;
-      fetchReviews(nextOffset, true);
-    }
-  }, [reviewsLoadingMore, reviewsLoading, hasMoreReviews, reviewsOffset, reviewsLimit, reviews.length, activeTab, reviewsTotal]);
-
-  // 메뉴 조회
-  const fetchMenus = async () => {
-    setMenusLoading(true);
-    try {
-      const response = await apiService.getRestaurantById(restaurantId);
-      if (response.result && response.data) {
-        setMenus(response.data.menus || []);
-      }
-    } catch (err) {
-      console.error('메뉴 조회 실패:', err);
-      Alert.error('조회 실패', '메뉴를 불러오는데 실패했습니다');
-    } finally {
-      setMenusLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchReviews();
-    fetchMenus();
-  }, []);
+    fetchReviews(restaurantId);
+    fetchMenus(restaurantId);
+  }, [restaurantId]);
 
   // 크롤링/요약 상태 체크
   const isCrawling = reviewCrawlStatus.status === 'active';
@@ -194,10 +136,10 @@ const RestaurantDetailScreen: React.FC = () => {
     const paddingToBottom = 100; // 하단에서 100px 전에 트리거
     const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
 
-    if (isNearBottom && activeTab === 'review') {
-      loadMoreReviews();
+    if (isNearBottom && activeTab === 'review' && !reviewsLoadingMore && !reviewsLoading && hasMoreReviews) {
+      loadMoreReviews(restaurantId);
     }
-  }, [activeTab, loadMoreReviews]);
+  }, [activeTab, restaurantId, reviewsLoadingMore, reviewsLoading, hasMoreReviews]);
 
   // 핵심 키워드 토글 함수
   const toggleKeywords = (reviewId: number) => {
@@ -212,14 +154,44 @@ const RestaurantDetailScreen: React.FC = () => {
     });
   };
 
+  // 별점 렌더링 함수 (0~100 점수를 1~5 별점으로 변환, 반별 포함)
+  const renderStars = (score: number) => {
+    const normalizedScore = score / 20; // 0-100 → 0-5
+
+    return [1, 2, 3, 4, 5].map((position) => {
+      const diff = normalizedScore - position + 1;
+      let icon: any;
+      let color = '#ffc107'; // 금색
+
+      if (diff >= 0.75) {
+        icon = faStar; // 채운 별
+      } else if (diff >= 0.25) {
+        icon = faStarHalfStroke; // 반별
+      } else {
+        icon = farStar; // 빈 별
+        color = colors.border; // 회색
+      }
+
+      return (
+        <FontAwesomeIcon
+          key={position}
+          icon={icon}
+          size={16}
+          color={color}
+          style={{ marginRight: 2 }}
+        />
+      );
+    });
+  };
+
   // Pull to refresh 핸들러
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       // 리뷰와 메뉴 동시에 새로고침
       await Promise.all([
-        fetchReviews(0, false),
-        fetchMenus()
+        fetchReviews(restaurantId, 0, false),
+        fetchMenus(restaurantId)
       ]);
     } catch (error) {
       console.error('새로고침 실패:', error);
@@ -554,13 +526,9 @@ const RestaurantDetailScreen: React.FC = () => {
                                 만족도:
                               </Text>
                               <View style={styles.scoreStars}>
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <Text key={star} style={styles.star}>
-                                    {star <= (review.summary?.satisfactionScore || 0) ? '⭐' : '☆'}
-                                  </Text>
-                                ))}
+                                {renderStars(review.summary.satisfactionScore)}
                                 <Text style={[styles.scoreNumber, { color: colors.text }]}>
-                                  {review.summary.satisfactionScore.toFixed(1)}
+                                  {review.summary.satisfactionScore}점
                                 </Text>
                               </View>
                             </View>

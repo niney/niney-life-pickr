@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BlurView } from '@react-native-community/blur';
-import { useTheme, useSocket, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData } from 'shared';
+import {
+  useTheme,
+  useSocket,
+  THEME_COLORS,
+  apiService,
+  Alert,
+  useRestaurantList,
+  type RestaurantData
+} from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 import RecrawlModal from '../components/RecrawlModal';
 
@@ -24,55 +32,37 @@ const RestaurantListScreen: React.FC = () => {
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
   const { setRestaurantCallbacks, resetCrawlStatus } = useSocket();
-  
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<RestaurantCategory[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [restaurants, setRestaurants] = useState<RestaurantData[]>([]);
-  const [restaurantsLoading, setRestaurantsLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
-  
+
   // Pull to refresh 상태
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchCategories = async () => {
-    setCategoriesLoading(true);
-    try {
-      const response = await apiService.getRestaurantCategories();
-      if (response.result && response.data) {
-        setCategories(response.data);
+  // shared 훅 사용 (플랫폼 독립적)
+  const {
+    url,
+    setUrl,
+    loading,
+    categories,
+    categoriesLoading,
+    restaurants,
+    restaurantsLoading,
+    total,
+    handleCrawl: sharedHandleCrawl,
+    fetchRestaurants,
+    fetchCategories,
+  } = useRestaurantList({
+    onCrawlSuccess: (restaurant: RestaurantData | null) => {
+      if (restaurant) {
+        // 정석적인 네비게이션: 상세 화면으로 이동
+        navigation.navigate('RestaurantDetail', {
+          restaurantId: restaurant.id,
+          restaurant: restaurant,
+        });
       }
-    } catch (err) {
-      console.error('카테고리 조회 실패:', err);
-    } finally {
-      setCategoriesLoading(false);
-    }
-  };
-
-  const fetchRestaurants = async () => {
-    setRestaurantsLoading(true);
-    try {
-      const response = await apiService.getRestaurants(20, 0);
-      if (response.result && response.data) {
-        setRestaurants(response.data.restaurants);
-        setTotal(response.data.total);
-        return response.data.restaurants;
-      }
-    } catch (err) {
-      console.error('레스토랑 목록 조회 실패:', err);
-    } finally {
-      setRestaurantsLoading(false);
-    }
-    return [];
-  };
-
-  useEffect(() => {
-    fetchCategories();
-    fetchRestaurants();
-  }, []);
+    },
+  });
 
   // Pull to refresh 핸들러
   const onRefresh = useCallback(async () => {
@@ -89,15 +79,10 @@ const RestaurantListScreen: React.FC = () => {
     }
   }, []);
 
+  // 모바일 전용 크롤링 핸들러 (Socket 콜백 설정 추가)
   const handleCrawl = async () => {
-    if (!url.trim()) {
-      Alert.error('오류', 'URL을 입력해주세요');
-      return;
-    }
-
-    setLoading(true);
     resetCrawlStatus();
-    
+
     setRestaurantCallbacks({
       onCompleted: async () => {
         await fetchRestaurants();
@@ -109,40 +94,7 @@ const RestaurantListScreen: React.FC = () => {
       }
     });
 
-    try {
-      const response = await apiService.crawlRestaurant({ 
-        url: url.trim(), 
-        crawlMenus: true, 
-        crawlReviews: true 
-      });
-
-      if (response.result && response.data) {
-        const placeId = response.data.placeId;
-        
-        if (placeId) {
-          const updatedRestaurants = await fetchRestaurants();
-          await fetchCategories();
-          
-          const restaurant = updatedRestaurants.find(r => r.place_id === placeId);
-          if (restaurant) {
-            // 정석적인 네비게이션: 상세 화면으로 이동
-            navigation.navigate('RestaurantDetail', {
-              restaurantId: restaurant.id,
-              restaurant: restaurant,
-            });
-          }
-        } else {
-          Alert.success('크롤링 완료', response.message || '크롤링을 완료했습니다');
-          await fetchRestaurants();
-          await fetchCategories();
-        }
-      }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || '크롤링 중 오류가 발생했습니다';
-      Alert.error('크롤링 실패', errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    await sharedHandleCrawl();
   };
 
   const handleRestaurantPress = (restaurant: RestaurantData) => {

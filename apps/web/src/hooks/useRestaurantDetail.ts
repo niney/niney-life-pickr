@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { apiService, type RestaurantData, Alert } from '@shared'
-import { useReviews } from './useReviews'
-import { useMenus } from './useMenus'
+import { apiService, type RestaurantData, Alert, useReviews, useMenus } from '@shared'
 
 export const useRestaurantDetail = () => {
   const { id } = useParams<{ id: string }>()
