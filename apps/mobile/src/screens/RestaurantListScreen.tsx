@@ -123,11 +123,24 @@ const RestaurantListScreen: React.FC = () => {
   };
 
   const handleRestaurantPress = (restaurant: RestaurantData) => {
-    // 정석적인 네비게이션: 상세 화면으로 이동
-    navigation.navigate('RestaurantDetail', {
-      restaurantId: restaurant.id,
-      restaurant: restaurant,
-    });
+    // 포커스 복원을 재시도하는 함수 (100ms 간격으로 최대 5번 시도)
+    const waitForFocus = (attempt: number = 0) => {
+      const maxAttempts = 5; // 최대 500ms
+      
+      if (navigation.isFocused()) {
+        // 포커스 확인 → 네비게이션 실행
+        navigation.navigate('RestaurantDetail', {
+          restaurantId: restaurant.id,
+          restaurant: restaurant,
+        });
+      } else if (attempt < maxAttempts - 1) {
+        // 아직 포커스 없음 → 100ms 후 재시도
+        setTimeout(() => waitForFocus(attempt + 1), 100);
+      }
+    };
+    
+    // 포커스 체크 시작
+    waitForFocus(0);
   };
 
   const handleRecrawlClick = (restaurant: RestaurantData, event: any) => {
