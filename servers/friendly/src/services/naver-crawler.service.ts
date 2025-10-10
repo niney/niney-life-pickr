@@ -126,22 +126,22 @@ class NaverCrawlerService {
     // URL 패턴 매칭 (http, https 포함)
     const urlPattern = /(https?:\/\/[^\s]+)/;
     const match = text.match(urlPattern);
-    
+
     if (match) {
       console.log('텍스트에서 URL 추출:', match[1]);
       return match[1];
     }
-    
+
     // naver.me 단축 URL 패턴 (http/https 없이도 감지)
     const naverMePattern = /(naver\.me\/[^\s]+)/;
     const naverMeMatch = text.match(naverMePattern);
-    
+
     if (naverMeMatch) {
       const url = `https://${naverMeMatch[1]}`;
       console.log('naver.me URL 추출:', url);
       return url;
     }
-    
+
     // URL이 아니면 전체 텍스트를 URL로 간주 (기존 동작 유지)
     return text.trim();
   }
@@ -578,7 +578,7 @@ class NaverCrawlerService {
       });
 
       // Place ID가 있으면 항상 표준 모바일 URL 포맷으로 저장
-      const standardUrl = placeId 
+      const standardUrl = placeId
         ? `https://m.place.naver.com/restaurant/${placeId}/home`
         : (finalUrl || url);
 
@@ -734,7 +734,8 @@ class NaverCrawlerService {
       let clickCount = 0;
       const maxClicks = 5000;
       let previousReviewCount = 0;
-      let stableCount = 0;
+      let stableCount = 0;      // 리뷰 개수 안정화 카운터
+      let errorCount = 0;       // 에러 발생 카운터
 
       while (clickCount < maxClicks) {
         try {
@@ -799,6 +800,7 @@ class NaverCrawlerService {
 
             if (clickResult) {
               clickCount++;
+              errorCount = 0;  // 성공 시 에러 카운터 리셋
               await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
               console.log('더보기 버튼 클릭 실패');
@@ -811,9 +813,9 @@ class NaverCrawlerService {
 
         } catch (error) {
           console.log('더보기 버튼 클릭 중 오류:', error);
-          stableCount++;
+          errorCount++;  // 에러 카운터만 증가
 
-          if (stableCount >= 3) {
+           if (errorCount >= 3) {
             console.log('연속 3번 실패, 크롤링 중단');
             break;
           }
@@ -962,7 +964,7 @@ class NaverCrawlerService {
       for (const review of rawReviews) {
         review.visitInfo.visitDate = parseVisitDate(review.visitInfo.visitDate);
       }
-      
+
       const reviews: ReviewInfo[] = rawReviews;
 
       startTime = this.logTiming('리뷰 정보 추출 완료', startTime);
