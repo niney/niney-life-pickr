@@ -64,7 +64,7 @@ const getServerUrl = (customUrl?: string): string => {
   }
 
   // iOS: localhost 사용
-  return 'http://localhost:4000'
+  return 'http://192.168.0.12:4000'
 }
 
 export const SocketProvider: React.FC<SocketProviderProps> = ({

@@ -21,7 +21,7 @@ const getDefaultApiUrl = (): string => {
   }
 
   // iOS 및 기타: localhost 사용
-  return `http://localhost:${API_PORT}`;
+  return `http://192.168.0.12:${API_PORT}`;
 }
 
 const API_BASE_URL = getDefaultApiUrl();
