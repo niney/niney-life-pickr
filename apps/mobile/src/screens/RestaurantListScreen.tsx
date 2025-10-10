@@ -18,6 +18,7 @@ import { apiService } from 'shared/services';
 import type { RestaurantCategory, RestaurantData } from 'shared/services';
 import { Alert } from 'shared/utils';
 import type { RestaurantStackParamList } from '../navigation/types';
+import RecrawlModal from '../components/RecrawlModal';
 
 type NavigationProp = NativeStackNavigationProp<RestaurantStackParamList, 'RestaurantList'>;
 
@@ -34,6 +35,8 @@ const RestaurantListScreen: React.FC = () => {
   const [restaurants, setRestaurants] = useState<RestaurantData[]>([]);
   const [restaurantsLoading, setRestaurantsLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
 
   const fetchCategories = async () => {
     setCategoriesLoading(true);
@@ -133,6 +136,28 @@ const RestaurantListScreen: React.FC = () => {
       restaurantId: restaurant.id,
       restaurant: restaurant,
     });
+  };
+
+  const handleRecrawlClick = (restaurant: RestaurantData, event: any) => {
+    event.stopPropagation();
+    setSelectedRestaurant(restaurant);
+    setRecrawlModalVisible(true);
+  };
+
+  const handleRecrawlConfirm = async (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }) => {
+    if (!selectedRestaurant) return;
+
+    try {
+      const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options);
+      if (response.result) {
+        Alert.alert('재크롤링 시작', '백그라운드에서 크롤링이 진행됩니다.');
+      } else {
+        Alert.alert('재크롤링 실패', response.message || '재크롤링을 시작할 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('Recrawl error:', error);
+      Alert.alert('오류', '재크롤링 중 오류가 발생했습니다.');
+    }
   };
 
   return (
@@ -242,18 +267,28 @@ const RestaurantListScreen: React.FC = () => {
                     reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
                     pointerEvents="none"
                   />
-                  <View style={styles.restaurantCardContent}>
-                    <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
-                    {restaurant.category && (
-                      <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>
-                        {restaurant.category}
+                  <View style={styles.restaurantCardContentWrapper}>
+                    <View style={styles.restaurantCardContent}>
+                      <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
+                        {restaurant.name}
                       </Text>
-                    )}
-                    {restaurant.address && (
-                      <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {restaurant.address}
-                      </Text>
-                    )}
+                      {restaurant.category && (
+                        <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {restaurant.category}
+                        </Text>
+                      )}
+                      {restaurant.address && (
+                        <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {restaurant.address}
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.recrawlButton, { backgroundColor: colors.border }]}
+                      onPress={(e: any) => handleRecrawlClick(restaurant, e)}
+                    >
+                      <Text style={[styles.recrawlIcon, { color: colors.text }]}>↻</Text>
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -263,6 +298,13 @@ const RestaurantListScreen: React.FC = () => {
           ) : null}
         </View>
       </ScrollView>
+
+      <RecrawlModal
+        visible={recrawlModalVisible}
+        onClose={() => setRecrawlModalVisible(false)}
+        onConfirm={handleRecrawlConfirm}
+        restaurantName={selectedRestaurant?.name || ''}
+      />
     </SafeAreaView>
   );
 };
@@ -376,7 +418,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 26, 26, 0.3)',
   },
   restaurantCardContent: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  restaurantCardContentWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
+  },
+  recrawlButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+    flexShrink: 0,
+  },
+  recrawlIcon: {
+    fontSize: 20,
+    fontWeight: '600',
   },
   restaurantName: {
     fontSize: 16,

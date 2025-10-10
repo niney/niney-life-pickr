@@ -577,6 +577,11 @@ class NaverCrawlerService {
         return null;
       });
 
+      // Place ID가 있으면 항상 표준 모바일 URL 포맷으로 저장
+      const standardUrl = placeId 
+        ? `https://m.place.naver.com/restaurant/${placeId}/home`
+        : (finalUrl || url);
+
       const result: RestaurantInfo = {
         name: restaurantInfo.name || 'Unknown',
         address: restaurantInfo.address || null,
@@ -585,8 +590,8 @@ class NaverCrawlerService {
         description: `${restaurantInfo.category || ''} - 메뉴 ${menuItems.length}개`,
         businessHours: null,
         coordinates,
-        url: finalUrl || url,
-        placeId: this.extractPlaceId(finalUrl || url),
+        url: standardUrl,
+        placeId,
         placeName: restaurantInfo.name,
         crawledAt: new Date().toISOString(),
         menuItems

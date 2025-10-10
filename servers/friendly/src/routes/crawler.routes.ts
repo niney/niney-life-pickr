@@ -380,6 +380,185 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /api/crawler/recrawl/:restaurantId
+   * 특정 레스토랑 재크롤링
+   */
+  fastify.post('/recrawl/:restaurantId', {
+    schema: {
+      tags: ['crawler'],
+      summary: '레스토랑 재크롤링',
+      description: '기존 레스토랑의 메뉴, 리뷰, 요약을 선택적으로 재크롤링합니다.',
+      params: Type.Object({
+        restaurantId: Type.Number({ description: '레스토랑 ID' })
+      }),
+      body: Type.Object({
+        crawlMenus: Type.Optional(Type.Boolean({
+          description: '메뉴 재크롤링 여부',
+          default: false
+        })),
+        crawlReviews: Type.Optional(Type.Boolean({
+          description: '리뷰 재크롤링 여부',
+          default: false
+        })),
+        createSummary: Type.Optional(Type.Boolean({
+          description: '리뷰 요약 생성 여부',
+          default: false
+        }))
+      }),
+      response: {
+        202: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            restaurantId: Type.Number(),
+            crawlMenus: Type.Boolean(),
+            crawlReviews: Type.Boolean(),
+            createSummary: Type.Boolean(),
+            reviewJobId: Type.Optional(Type.String())
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        404: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { restaurantId } = request.params as { restaurantId: number };
+    const { 
+      crawlMenus = false, 
+      crawlReviews = false, 
+      createSummary = false 
+    } = request.body as {
+      crawlMenus?: boolean;
+      crawlReviews?: boolean;
+      createSummary?: boolean;
+    };
+
+    // 최소 하나는 선택되어야 함
+    if (!crawlMenus && !crawlReviews && !createSummary) {
+      return ResponseHelper.validationError(
+        reply,
+        'At least one option (crawlMenus, crawlReviews, or createSummary) must be selected'
+      );
+    }
+
+    try {
+      // 레스토랑 존재 여부 확인
+      const restaurantRepository = await import('../db/repositories/restaurant.repository');
+      const restaurant = await restaurantRepository.default.findById(restaurantId);
+      
+      if (!restaurant) {
+        return ResponseHelper.error(reply, 'Restaurant not found', 404);
+      }
+
+      // URL 표준화: place_id가 있으면 표준 모바일 URL 생성
+      const standardUrl = restaurant.place_id 
+        ? `https://m.place.naver.com/restaurant/${restaurant.place_id}/home`
+        : restaurant.url;
+
+      let reviewJobId: string | undefined;
+
+      // 메뉴 재크롤링
+      if (crawlMenus && standardUrl) {
+        console.log(`[재크롤링] 레스토랑 ${restaurantId} 메뉴 크롤링 시작`);
+        await restaurantService.crawlAndSaveRestaurant(standardUrl, { 
+          crawlMenus: true, 
+          crawlReviews: false 
+        });
+      }
+
+      // 리뷰 재크롤링
+      if (crawlReviews && restaurant.place_id) {
+        console.log(`[재크롤링] 레스토랑 ${restaurantId} 리뷰 크롤링 시작`);
+        
+        // 표준 리뷰 URL 생성
+        const reviewUrl = `https://m.place.naver.com/restaurant/${restaurant.place_id}/review/visitor?reviewSort=recent`;
+        
+        // Job 생성
+        const jobId = `review-${Date.now()}-${restaurant.place_id}`;
+        
+        // JobManager에 Job 등록 (메모리)
+        jobManager.createJob(jobId, {
+          restaurantId: restaurant.id,
+          placeId: restaurant.place_id,
+          url: reviewUrl
+        });
+        
+        // DB에 Job 저장
+        await crawlJobRepository.create({
+          job_id: jobId,
+          place_id: restaurant.place_id,
+          restaurant_id: restaurant.id,
+          url: reviewUrl,
+          status: 'waiting'
+        });
+
+        // 백그라운드 실행
+        const reviewCrawlerProcessor = await import('../services/review-crawler-processor.service');
+        reviewCrawlerProcessor.default.process(
+          jobId, 
+          restaurant.place_id, 
+          reviewUrl, 
+          restaurant.id
+        ).catch(err => {
+          console.error(`[Job ${jobId}] Background processing error:`, err);
+        });
+
+        reviewJobId = jobId;
+      }
+
+      // 리뷰 요약 생성 (리뷰 크롤링과 독립적으로 실행 가능)
+      if (createSummary) {
+        console.log(`[재크롤링] 레스토랑 ${restaurantId} 리뷰 요약 생성 시작`);
+        
+        const reviewSummaryProcessor = await import('../services/review-summary-processor.service');
+        reviewSummaryProcessor.default.processIncompleteReviews(
+          restaurant.id, 
+          true // useCloud
+        ).catch(err => {
+          console.error(`[레스토랑 ${restaurant.id}] 요약 생성 오류:`, err);
+        });
+      }
+
+      return reply.code(202).send({
+        result: true,
+        message: 'Recrawl job(s) started',
+        data: {
+          restaurantId,
+          crawlMenus,
+          crawlReviews,
+          createSummary,
+          ...(reviewJobId && { reviewJobId })
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('재크롤링 실패:', error);
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Recrawl failed',
+        500
+      );
+    }
+  });
+
+  /**
    * POST /api/crawler/cleanup
    * 크롤링 서비스 정리 (현재는 불필요)
    */

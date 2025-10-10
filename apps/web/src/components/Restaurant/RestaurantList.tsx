@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,11 +8,14 @@ import {
   View
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { RestaurantCategory, RestaurantData, ReviewCrawlStatus } from '@shared/services'
 import { useLocation } from 'react-router-dom'
+import RecrawlModal from './RecrawlModal'
+import { apiService } from '@shared/services'
+import { Alert } from '@shared/utils'
 
 interface RestaurantListProps {
   url: string
@@ -53,6 +56,35 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   
   // URL에서 restaurant id 추출 (/restaurant/:id)
   const restaurantId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
+
+  // 재크롤링 모달 상태
+  const [recrawlModalVisible, setRecrawlModalVisible] = useState(false)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null)
+
+  // 재크롤링 버튼 클릭
+  const handleRecrawlClick = (restaurant: RestaurantData, event: React.MouseEvent) => {
+    event.stopPropagation() // 카드 클릭 이벤트 방지
+    setSelectedRestaurant(restaurant)
+    setRecrawlModalVisible(true)
+  }
+
+  // 재크롤링 실행
+  const handleRecrawlConfirm = async (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }) => {
+    if (!selectedRestaurant) return
+
+    try {
+      const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options)
+      
+      if (response.result) {
+        Alert.success('재크롤링 시작', '선택하신 항목의 크롤링이 시작되었습니다')
+      } else {
+        Alert.error('재크롤링 실패', response.message || '재크롤링에 실패했습니다')
+      }
+    } catch (error) {
+      console.error('재크롤링 오류:', error)
+      Alert.error('재크롤링 오류', '재크롤링 중 오류가 발생했습니다')
+    }
+  }
 
   return (
     <div 
@@ -208,20 +240,30 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                     ]}
                     onPress={() => handleRestaurantClick(restaurant)}
                   >
-                    <Text style={[
-                      styles.restaurantName, 
-                      { color: isSelected ? colors.primary : colors.text }
-                    ]}>
-                      {restaurant.name}
-                    </Text>
-                    {restaurant.category && (
-                      <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>{restaurant.category}</Text>
-                    )}
-                    {restaurant.address && (
-                      <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {restaurant.address}
-                      </Text>
-                    )}
+                    <View style={styles.restaurantCardContent}>
+                      <View style={styles.restaurantInfo}>
+                        <Text style={[
+                          styles.restaurantName, 
+                          { color: isSelected ? colors.primary : colors.text }
+                        ]}>
+                          {restaurant.name}
+                        </Text>
+                        {restaurant.category && (
+                          <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>{restaurant.category}</Text>
+                        )}
+                        {restaurant.address && (
+                          <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {restaurant.address}
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.recrawlButton, { backgroundColor: colors.border }]}
+                        onPress={(e: any) => handleRecrawlClick(restaurant, e)}
+                      >
+                        <FontAwesomeIcon icon={faRotate} style={{ fontSize: 14, color: colors.text }} />
+                      </TouchableOpacity>
+                    </View>
                   </TouchableOpacity>
                 )
               })}
@@ -230,6 +272,13 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
           ) : null}
         </View>
+
+        <RecrawlModal
+          visible={recrawlModalVisible}
+          onClose={() => setRecrawlModalVisible(false)}
+          onConfirm={handleRecrawlConfirm}
+          restaurantName={selectedRestaurant?.name || ''}
+        />
     </div>
   )
 }
@@ -356,6 +405,21 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 10,
     borderWidth: 1,
+  },
+  restaurantCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  restaurantInfo: {
+    flex: 1,
+  },
+  recrawlButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   restaurantName: {
     fontSize: 17,
