@@ -32,6 +32,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu')
 
+  // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
+  const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set())
+
   // 독립적으로 데이터 로드
   const {
     id,
@@ -124,6 +127,19 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   // 크롤링 중인지 체크
   const isCrawling = reviewCrawlStatus.status === 'active'
   const isSummarizing = reviewSummaryStatus.status === 'active'
+
+  // 핵심 키워드 토글 함수
+  const toggleKeywords = (reviewId: number) => {
+    setExpandedKeywords(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(reviewId)) {
+        newSet.delete(reviewId)
+      } else {
+        newSet.add(reviewId)
+      }
+      return newSet
+    })
+  }
 
   // 레스토랑 정보 로딩 중
   if (restaurantLoading) {
@@ -388,14 +404,24 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
                       {review.summary.keyKeywords.length > 0 && (
                         <View style={styles.summaryKeywords}>
-                          <Text style={[styles.summaryKeywordsTitle, { color: colors.textSecondary }]}>핵심 키워드:</Text>
-                          <View style={styles.keywordsContainer}>
-                            {review.summary.keyKeywords.map((keyword: string, idx: number) => (
-                              <View key={idx} style={[styles.summaryKeyword, { backgroundColor: '#e1bee7' }]}>
-                                <Text style={[styles.keywordText, { color: '#6a1b9a' }]}>{keyword}</Text>
-                              </View>
-                            ))}
-                          </View>
+                          <TouchableOpacity 
+                            style={styles.keywordsToggleButton}
+                            onPress={() => toggleKeywords(review.id)}
+                          >
+                            <Text style={[styles.summaryKeywordsTitle, { color: colors.textSecondary }]}>
+                              핵심 키워드 {expandedKeywords.has(review.id) ? '▼' : '▶'}
+                            </Text>
+                          </TouchableOpacity>
+                          
+                          {expandedKeywords.has(review.id) && (
+                            <View style={styles.keywordsContainer}>
+                              {review.summary.keyKeywords.map((keyword: string, idx: number) => (
+                                <View key={idx} style={[styles.summaryKeyword, { backgroundColor: '#e1bee7' }]}>
+                                  <Text style={[styles.keywordText, { color: '#6a1b9a' }]}>{keyword}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
                         </View>
                       )}
 
@@ -768,6 +794,10 @@ const styles = StyleSheet.create({
   },
   summaryKeywords: {
     marginBottom: 12,
+  },
+  keywordsToggleButton: {
+    paddingVertical: 4,
+    cursor: 'pointer',
   },
   summaryKeywordsTitle: {
     fontSize: 13,
