@@ -90,6 +90,8 @@ export interface ReviewInfo {
   emotionKeywords: string[];
   /** 방문 정보 */
   visitInfo: VisitInfo;
+  /** 리뷰 이미지 파일 경로 (예: ["/images/reviews/1234/abc123/0.jpg"]) */
+  images?: string[];
 }
 
 /**

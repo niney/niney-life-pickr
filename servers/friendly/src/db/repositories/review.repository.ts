@@ -22,6 +22,7 @@ export class ReviewRepository {
       visit_count: review.visitInfo.visitCount,
       verification_method: review.visitInfo.verificationMethod,
       review_hash: reviewHash,
+      images: review.images && review.images.length > 0 ? JSON.stringify(review.images) : null,
       crawled_at: new Date().toISOString()
     };
 
@@ -30,11 +31,12 @@ export class ReviewRepository {
       INSERT INTO reviews (
         restaurant_id, user_name, visit_keywords, wait_time,
         review_text, emotion_keywords, visit_date, visit_count,
-        verification_method, review_hash, crawled_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        verification_method, review_hash, images, crawled_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(review_hash) DO UPDATE SET
         review_text = excluded.review_text,
         emotion_keywords = excluded.emotion_keywords,
+        images = excluded.images,
         crawled_at = excluded.crawled_at,
         updated_at = CURRENT_TIMESTAMP
     `, [
@@ -48,6 +50,7 @@ export class ReviewRepository {
       input.visit_count,
       input.verification_method,
       input.review_hash,
+      input.images,
       input.crawled_at
     ]);
 

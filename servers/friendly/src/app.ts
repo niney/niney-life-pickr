@@ -2,11 +2,13 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
+import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import scalarApiReference from '@scalar/fastify-api-reference';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import dotenv from 'dotenv';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -50,6 +52,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   });
 
   await app.register(sensible);
+
+  // Register static file serving for images
+  await app.register(fastifyStatic, {
+    root: path.join(__dirname, '../data'),
+    prefix: '/data/',
+    decorateReply: false
+  });
 
   // Register Swagger for API documentation
   await app.register(swagger, {

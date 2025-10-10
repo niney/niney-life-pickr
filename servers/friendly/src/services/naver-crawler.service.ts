@@ -8,6 +8,8 @@ import type {
   CrawlOptions
 } from '../types/crawler.types';
 import { parseVisitDate } from '../utils/date.utils';
+import imageDownloader from '../utils/image-download.utils';
+import { generateReviewImageHash } from '../utils/hash.utils';
 
 /**
  * DOM 타입 선언 (page.evaluate() 내부에서 사용)
@@ -655,11 +657,12 @@ class NaverCrawlerService {
       page = await browser.newPage();
       startTime = this.logTiming('브라우저 페이지 생성', startTime);
 
-      // 성능 최적화를 위한 리소스 차단
+      // 성능 최적화를 위한 리소스 차단 (이미지는 허용 - URL 추출 필요)
       await page.setRequestInterception(true);
       page.on('request', (req) => {
         const resourceType = req.resourceType();
-        if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        // 이미지는 허용, 나머지 리소스만 차단
+        if (['stylesheet', 'font', 'media'].includes(resourceType)) {
           req.abort();
         } else {
           req.continue();
@@ -913,6 +916,35 @@ class NaverCrawlerService {
             const reviewTextElement = element.querySelector('.pui__vn15t2 a');
             const reviewText = reviewTextElement?.textContent?.trim() || null;
 
+            // 리뷰 이미지 URL 추출 (여러 선택자 시도)
+            const imageSelectors = [
+              '.flicking-camera .HH5sZ img',  // 일반 구조
+              '.flicking-camera img',          // 간단한 구조
+              '.lazyload-wrapper img',         // lazyload 컨테이너
+              'img[src*="blogfiles"]'          // 네이버 블로그 이미지
+            ];
+
+            const imageUrls: string[] = [];
+            const seenUrls = new Set<string>();
+
+            for (const selector of imageSelectors) {
+              const imageElements = element.querySelectorAll(selector);
+              imageElements.forEach(img => {
+                const src = img.getAttribute('src') || img.getAttribute('data-src');
+                if (src &&
+                    !src.includes('blank.gif') &&
+                    !src.includes('placeholder') &&
+                    !src.includes('data:image') &&
+                    !seenUrls.has(src)) {
+                  seenUrls.add(src);
+                  imageUrls.push(src);
+                }
+              });
+
+              // 이미지를 찾았으면 다음 선택자 시도 안 함
+              if (imageUrls.length > 0) break;
+            }
+
             // 감정 키워드 (중복 제거)
             const emotionKeywords: string[] = [];
             const seenEmotions = new Set<string>();
@@ -967,7 +999,8 @@ class NaverCrawlerService {
                   visitDate, // 원본 데이터 ("8.16.토", "24.10.6.일" 등)
                   visitCount,
                   verificationMethod
-                }
+                },
+                imageUrls  // 이미지 URL 배열 추가
               });
             }
           } catch (error) {
@@ -978,8 +1011,41 @@ class NaverCrawlerService {
         return reviews;
       });
 
+      // Place ID 추출 (이미지 저장 경로용)
+      const placeId = this.extractPlaceId(finalUrl);
+
+      // 리뷰 날짜 파싱 및 이미지 다운로드
       for (const review of rawReviews) {
+        // 날짜 파싱
         review.visitInfo.visitDate = parseVisitDate(review.visitInfo.visitDate);
+
+        // 이미지 다운로드
+        if (placeId && review.imageUrls && review.imageUrls.length > 0) {
+          console.log(`📷 리뷰 이미지 다운로드 시작 (${review.imageUrls.length}개)...`);
+
+          // 리뷰 해시 생성 (이미지 저장 폴더명용)
+          const imageHash = generateReviewImageHash(
+            placeId,
+            review.userName,
+            review.visitInfo.visitDate,
+            review.visitInfo.visitCount,
+            review.visitInfo.verificationMethod
+          );
+
+          // 이미지 다운로드 (병렬 처리, 최대 3개 동시)
+          const downloadedPaths = await imageDownloader.downloadImages(
+            review.imageUrls,
+            placeId,
+            imageHash
+          );
+
+          // 다운로드된 이미지 경로로 교체
+          review.images = downloadedPaths;
+          console.log(`✅ ${downloadedPaths.length}개 이미지 다운로드 완료`);
+        }
+
+        // imageUrls 제거 (임시 데이터)
+        delete (review as any).imageUrls;
       }
 
       const reviews: ReviewInfo[] = rawReviews;

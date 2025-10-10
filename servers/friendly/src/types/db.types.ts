@@ -76,6 +76,7 @@ export interface ReviewDB {
   visit_count: string | null;
   verification_method: string | null;
   review_hash: string;
+  images: string | null;                // JSON 배열 문자열 (이미지 경로)
   crawled_at: string;
   created_at: string;
   updated_at: string;
@@ -95,6 +96,7 @@ export interface ReviewInput {
   visit_count: string | null;
   verification_method: string | null;
   review_hash: string;
+  images: string | null;  // JSON 배열 문자열 (이미지 경로)
   crawled_at: string;
 }
 

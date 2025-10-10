@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   visit_count TEXT,                   -- "1번째 방문"
   verification_method TEXT,           -- "인증 수단영수증"
   review_hash TEXT UNIQUE NOT NULL,   -- MD5 해시 (placeId+userName+visitDate+visitCount+receiptVerified)
+  images TEXT,                         -- JSON 배열 문자열 (이미지 파일 경로)
   crawled_at DATETIME NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
