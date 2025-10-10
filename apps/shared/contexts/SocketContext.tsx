@@ -119,24 +119,38 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     const socket = socketRef.current
     if (!socket) return
 
-    // 크롤링 진행 상황
+    // 크롤링 진행 상황 (subscribe 시점 + 실시간 업데이트)
     socket.on('review:crawl_progress', (data: any) => {
       console.log('[Socket.io] Crawl Progress:', data)
+      
+      // 통합 데이터 구조: { jobId, type, restaurantId, status, current, total, percentage, sequence, timestamp, ... }
       setCrawlProgress({
-        current: data.current,
-        total: data.total,
-        percentage: data.percentage
+        current: data.current || 0,
+        total: data.total || 0,
+        percentage: data.percentage || 0
       })
-      setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
+      
+      // status가 'progress'면 진행 중
+      if (data.status === 'progress') {
+        setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
+      }
+    })
+
+    // 크롤링 진행 없음 (subscribe 시점에 활성 Job이 없을 때)
+    socket.on('review:no_active_job', (data: any) => {
+      console.log('[Socket.io] No Active Crawl Job:', data)
+      setReviewCrawlStatus({ status: 'idle' })
+      setCrawlProgress(null)
+      setDbProgress(null)
     })
 
     // DB 저장 진행 상황
     socket.on('review:db_progress', (data: any) => {
       console.log('[Socket.io] DB Progress:', data)
       setDbProgress({
-        current: data.current,
-        total: data.total,
-        percentage: data.percentage
+        current: data.current || 0,
+        total: data.total || 0,
+        percentage: data.percentage || 0
       })
       setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
     })
@@ -151,7 +165,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       // 콜백 호출
       if (callbacksRef.current.onCompleted) {
         callbacksRef.current.onCompleted({
-          restaurantId: data.restaurantId,
+          restaurantId: data.restaurantId?.toString() || '',
           totalReviews: data.totalReviews || 0
         })
       }
@@ -169,7 +183,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       // 콜백 호출
       if (callbacksRef.current.onError) {
         callbacksRef.current.onError({
-          restaurantId: data.restaurantId,
+          restaurantId: data.restaurantId?.toString() || '',
           error: errorMessage
         })
       }
@@ -181,23 +195,37 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setReviewSummaryStatus({ status: 'active' })
       setSummaryProgress({
         current: 0,
-        total: data.total,
+        total: data.total || 0,
         percentage: 0,
         completed: 0,
         failed: 0
       })
     })
 
-    // 리뷰 요약 진행
+    // 리뷰 요약 진행 (subscribe 시점 + 실시간 업데이트)
     socket.on('review_summary:progress', (data: any) => {
       console.log('[Socket.io] Summary Progress:', data)
+      
+      // 통합 데이터 구조 지원
       setSummaryProgress({
-        current: data.current,
-        total: data.total,
-        percentage: data.percentage,
-        completed: data.completed,
-        failed: data.failed
+        current: data.current || 0,
+        total: data.total || 0,
+        percentage: data.percentage || 0,
+        completed: data.completed || 0,
+        failed: data.failed || 0
       })
+      
+      // status가 'progress'면 진행 중으로 상태 업데이트
+      if (data.status === 'progress') {
+        setReviewSummaryStatus({ status: 'active' })
+      }
+    })
+
+    // 리뷰 요약 진행 없음 (subscribe 시점에 활성 Job이 없을 때)
+    socket.on('review_summary:no_active_job', (data: any) => {
+      console.log('[Socket.io] No Active Summary Job:', data)
+      setReviewSummaryStatus({ status: 'idle' })
+      setSummaryProgress(null)
     })
 
     // 리뷰 요약 완료
@@ -218,11 +246,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
     return () => {
       socket.off('review:crawl_progress')
+      socket.off('review:no_active_job')
       socket.off('review:db_progress')
       socket.off('review:completed')
       socket.off('review:error')
       socket.off('review_summary:started')
       socket.off('review_summary:progress')
+      socket.off('review_summary:no_active_job')
       socket.off('review_summary:completed')
       socket.off('review_summary:error')
     }
