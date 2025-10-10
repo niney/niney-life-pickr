@@ -60,10 +60,11 @@ class NaverCrawlerService {
   /**
    * 브라우저 인스턴스 생성
    */
-  async launchBrowser(): Promise<Browser> {
+  async launchBrowser(protocolTimeout: number = 30000): Promise<Browser> {
     const chromePath = await this.getChromePath();
     const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
       headless: false, // 디버깅을 위해 브라우저 창 표시
+      protocolTimeout, // 파라미터로 받은 타임아웃 사용
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -647,7 +648,8 @@ class NaverCrawlerService {
     let page: Page | null = null;
 
     try {
-      browser = await this.launchBrowser();
+      // 리뷰 크롤링은 타임아웃을 길게 설정 (10분)
+      browser = await this.launchBrowser(600000);
       startTime = this.logTiming('브라우저 시작', startTime);
 
       page = await browser.newPage();
@@ -734,54 +736,32 @@ class NaverCrawlerService {
       let clickCount = 0;
       const maxClicks = 5000;
       let previousReviewCount = 0;
-      let stableCount = 0;      // 리뷰 개수 안정화 카운터
       let errorCount = 0;       // 에러 발생 카운터
 
       while (clickCount < maxClicks) {
         try {
-          const currentReviewCount = await page.evaluate(() => {
-            return document.querySelectorAll('#_review_list li.place_apply_pui').length;
-          });
+          // 더보기 버튼 클릭 작업에 30초 타임아웃 설정
+          const operationTimeout = 30000; // 30초
+          
+          const currentReviewCount = await Promise.race([
+            page.evaluate(() => {
+              return document.querySelectorAll('#_review_list li.place_apply_pui').length;
+            }),
+            new Promise<number>((_, reject) => 
+              setTimeout(() => reject(new Error('리뷰 개수 확인 타임아웃')), operationTimeout)
+            )
+          ]);
 
           console.log(`현재 로드된 리뷰 개수: ${currentReviewCount}`);
 
           // 리뷰가 증가했을 때 크롤링 진행 상황 콜백 호출
           if (currentReviewCount !== previousReviewCount && onCrawlProgress) {
             onCrawlProgress(currentReviewCount, totalReviewCount || currentReviewCount);
-          }
-
-          if (currentReviewCount === previousReviewCount) {
-            stableCount++;
-          } else {
-            stableCount = 0;
             previousReviewCount = currentReviewCount;
           }
 
-          if (stableCount >= 2) {
-            console.log('리뷰 개수가 2번 연속 변하지 않음, 로딩 완료로 간주');
-            break;
-          }
-
-          const moreButtonExists = await page.evaluate(() => {
-            const buttons = document.querySelectorAll('a.fvwqf');
-            for (let i = 0; i < buttons.length; i++) {
-              const button = buttons[i];
-              const text = button.textContent?.trim() || '';
-
-              if (text.includes('펼쳐서 더보기') &&
-                  !text.includes('팔로우') &&
-                  !text.includes('follow') &&
-                  !text.includes('구독')) {
-                return true;
-              }
-            }
-            return false;
-          });
-
-          if (moreButtonExists) {
-            console.log(`리뷰 더보기 버튼 클릭 시도 ${clickCount + 1}/${maxClicks}`);
-
-            const clickResult = await page.evaluate(() => {
+          const moreButtonExists = await Promise.race([
+            page.evaluate(() => {
               const buttons = document.querySelectorAll('a.fvwqf');
               for (let i = 0; i < buttons.length; i++) {
                 const button = buttons[i];
@@ -791,12 +771,40 @@ class NaverCrawlerService {
                     !text.includes('팔로우') &&
                     !text.includes('follow') &&
                     !text.includes('구독')) {
-                  (button as HTMLElement).click();
                   return true;
                 }
               }
               return false;
-            });
+            }),
+            new Promise<boolean>((_, reject) => 
+              setTimeout(() => reject(new Error('더보기 버튼 확인 타임아웃')), operationTimeout)
+            )
+          ]);
+
+          if (moreButtonExists) {
+            console.log(`리뷰 더보기 버튼 클릭 시도 ${clickCount + 1}/${maxClicks}`);
+
+            const clickResult = await Promise.race([
+              page.evaluate(() => {
+                const buttons = document.querySelectorAll('a.fvwqf');
+                for (let i = 0; i < buttons.length; i++) {
+                  const button = buttons[i];
+                  const text = button.textContent?.trim() || '';
+
+                  if (text.includes('펼쳐서 더보기') &&
+                      !text.includes('팔로우') &&
+                      !text.includes('follow') &&
+                      !text.includes('구독')) {
+                    (button as HTMLElement).click();
+                    return true;
+                  }
+                }
+                return false;
+              }),
+              new Promise<boolean>((_, reject) => 
+                setTimeout(() => reject(new Error('더보기 버튼 클릭 타임아웃')), operationTimeout)
+              )
+            ]);
 
             if (clickResult) {
               clickCount++;
@@ -804,7 +812,7 @@ class NaverCrawlerService {
               await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
               console.log('더보기 버튼 클릭 실패');
-              stableCount++;
+              break;
             }
           } else {
             console.log('더보기 버튼을 찾을 수 없음, 모든 리뷰 로드 완료');
@@ -812,11 +820,19 @@ class NaverCrawlerService {
           }
 
         } catch (error) {
-          console.log('더보기 버튼 클릭 중 오류:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.log('더보기 버튼 클릭 중 오류:', errorMessage);
+          
+          // 타임아웃 에러인 경우 즉시 중단
+          if (errorMessage.includes('타임아웃')) {
+            console.log('작업 타임아웃으로 크롤링 중단');
+            break;
+          }
+          
           errorCount++;  // 에러 카운터만 증가
 
-           if (errorCount >= 3) {
-            console.log('연속 3번 실패, 크롤링 중단');
+           if (errorCount >= 2) {
+            console.log('연속 2번 실패, 크롤링 중단');
             break;
           }
         }
@@ -855,6 +871,7 @@ class NaverCrawlerService {
 
       // 리뷰 정보 추출
       console.log('리뷰 정보 추출 시작...');
+      
       const rawReviews = await page.evaluate(() => {
         const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
         console.log(`발견된 리뷰 요소 수: ${reviewElements.length}`);
