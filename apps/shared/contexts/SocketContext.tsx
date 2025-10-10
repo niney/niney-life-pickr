@@ -1,39 +1,20 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { Platform } from 'react-native'
-import { Alert } from '../utils'
-
-interface CrawlProgress {
-  current: number
-  total: number
-  percentage: number
-}
-
-interface ReviewCrawlStatus {
-  status: 'idle' | 'active' | 'completed' | 'failed'
-  error?: string
-  reviews: any[]
-}
-
-interface SummaryProgress {
-  current: number
-  total: number
-  percentage: number
-  completed: number
-  failed: number
-}
-
-interface ReviewSummaryStatus {
-  status: 'idle' | 'active' | 'completed' | 'failed'
-  error?: string
-}
+import {
+  Alert,
+  type ProgressData,
+  type ReviewCrawlStatus,
+  type SummaryProgress,
+  type ReviewSummaryStatus
+} from '../utils'
 
 interface SocketContextValue {
   socket: Socket | null
   isConnected: boolean
   reviewCrawlStatus: ReviewCrawlStatus
-  crawlProgress: CrawlProgress | null
-  dbProgress: CrawlProgress | null
+  crawlProgress: ProgressData | null
+  dbProgress: ProgressData | null
   reviewSummaryStatus: ReviewSummaryStatus
   summaryProgress: SummaryProgress | null
   joinRestaurantRoom: (restaurantId: string) => void
@@ -94,11 +75,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [reviewCrawlStatus, setReviewCrawlStatus] = useState<ReviewCrawlStatus>({
-    status: 'idle',
-    reviews: []
+    status: 'idle'
   })
-  const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null)
-  const [dbProgress, setDbProgress] = useState<CrawlProgress | null>(null)
+  const [crawlProgress, setCrawlProgress] = useState<ProgressData | null>(null)
+  const [dbProgress, setDbProgress] = useState<ProgressData | null>(null)
   const [reviewSummaryStatus, setReviewSummaryStatus] = useState<ReviewSummaryStatus>({
     status: 'idle'
   })
@@ -164,7 +144,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // 크롤링 완료
     socket.on('review:completed', (data: any) => {
       console.log('[Socket.io] Completed:', data)
-      setReviewCrawlStatus({ status: 'completed', reviews: [] })
+      setReviewCrawlStatus({ status: 'completed' })
       setCrawlProgress(null)
       setDbProgress(null)
 
@@ -181,7 +161,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     socket.on('review:error', (data: any) => {
       console.error('[Socket.io] Error:', data)
       const errorMessage = data.error || '크롤링 중 오류가 발생했습니다'
-      setReviewCrawlStatus({ status: 'failed', error: errorMessage, reviews: [] })
+      setReviewCrawlStatus({ status: 'failed', error: errorMessage })
       setCrawlProgress(null)
       setDbProgress(null)
       Alert.error('크롤링 실패', errorMessage)
@@ -224,13 +204,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     socket.on('review_summary:completed', (data: any) => {
       console.log('[Socket.io] Summary Completed:', data)
       setReviewSummaryStatus({ status: 'completed' })
-      setSummaryProgress({
-        current: data.total,
-        total: data.total,
-        percentage: 100,
-        completed: data.completed,
-        failed: data.failed
-      })
+      setSummaryProgress(null) // ✅ 완료 시 진행 상태 초기화
     })
 
     // 리뷰 요약 에러
@@ -299,7 +273,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
   // 크롤링 상태 초기화
   const resetCrawlStatus = () => {
-    setReviewCrawlStatus({ status: 'idle', reviews: [] })
+    setReviewCrawlStatus({ status: 'idle' })
     setCrawlProgress(null)
     setDbProgress(null)
   }

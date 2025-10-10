@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { apiService } from '@shared/services'
-import type { RestaurantData } from '@shared/services'
-import { Alert } from '@shared/utils'
+import { apiService, type RestaurantData, Alert } from '@shared'
 import { useReviews } from './useReviews'
 import { useMenus } from './useMenus'
 

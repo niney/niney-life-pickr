@@ -39,15 +39,20 @@ const reviewSummaryRoutes: FastifyPluginAsync = async (fastify) => {
       return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID', 400);
     }
     
-    // 백그라운드 실행 (비동기)
-    reviewSummaryProcessor.processIncompleteReviews(restaurantId, useCloud)
-      .catch(err => console.error('❌ 리뷰 요약 실패:', err));
-    
-    return ResponseHelper.success(
-      reply, 
-      null, 
-      '미완료 리뷰 요약 처리가 시작되었습니다. Socket으로 진행 상황을 확인하세요.'
-    );
+    try {
+      // Job 시작 및 jobId 반환
+      const jobId = await reviewSummaryProcessor.processIncompleteReviews(restaurantId, useCloud);
+      
+      return ResponseHelper.success(
+        reply, 
+        { jobId, restaurantId }, 
+        '미완료 리뷰 요약 처리가 시작되었습니다. Socket 또는 Job API로 진행 상황을 확인하세요.'
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ 리뷰 요약 실패:', errorMessage);
+      return ResponseHelper.error(reply, errorMessage, 500);
+    }
   });
 
   /**

@@ -1,7 +1,5 @@
 import { useState, useRef } from 'react'
-import { apiService } from '@shared/services'
-import type { ReviewData } from '@shared/services'
-import { Alert } from '@shared/utils'
+import { apiService, type ReviewData, Alert } from '@shared'
 
 export const useReviews = () => {
   const [reviews, setReviews] = useState<ReviewData[]>([])

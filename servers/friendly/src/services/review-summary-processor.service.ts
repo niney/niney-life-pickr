@@ -1,10 +1,9 @@
 /**
  * 리뷰 요약 프로세서
- * Socket.io와 통합하여 실시간 상태 업데이트
+ * JobService 통합으로 DB 저장 + Socket 이벤트 자동 발행
  */
 
-import { getSocketIO } from '../socket/socket';
-import { SOCKET_EVENTS } from '../socket/events';
+import jobService from './job-socket.service';
 import reviewRepository from '../db/repositories/review.repository';
 import reviewSummaryRepository from '../db/repositories/review-summary.repository';
 import { createReviewSummaryService } from './review-summary.service';
@@ -13,18 +12,18 @@ import type { ReviewDB } from '../types/db.types';
 export class ReviewSummaryProcessor {
   
   /**
-   * 레스토랑의 미완료 요약 처리 (Socket 이벤트 발행)
+   * 레스토랑의 미완료 요약 처리 (JobService 통합)
    * - 리뷰 ID와 요약 ID 비교하여 차이분만 처리
    * - pending 데이터를 1000개씩 페이지네이션으로 처리
-   * - 실시간 진행 상황 Socket으로 전송
+   * - JobService를 통한 DB 저장 + Socket 이벤트 자동 발행
    */
   async processIncompleteReviews(
     restaurantId: number,
     useCloud: boolean = false
-  ): Promise<void> {
-    const io = getSocketIO();
-    
+  ): Promise<string> {
     console.log(`🤖 레스토랑 ${restaurantId} 미완료 요약 처리 시작...`);
+    
+    let jobId: string | null = null;
     
     try {
       // 1. 리뷰 ID 목록과 요약 review_id 목록 조회 (효율적)
@@ -73,16 +72,21 @@ export class ReviewSummaryProcessor {
       
       if (totalIncomplete === 0) {
         console.log('✅ 모든 요약이 완료되었습니다.');
-        return;
+        // Job 없이 종료 (처리할 것이 없음)
+        throw new Error('NO_INCOMPLETE_REVIEWS');
       }
       
       console.log(`🔄 총 ${totalIncomplete}개 미완료 요약 처리 시작`);
       console.log(`🤖 ${serviceType.toUpperCase()} AI 사용`);
 
-      // Socket 시작 이벤트
-      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_STARTED, {
+      // Job 시작 (DB 저장 + Socket 이벤트 자동 발행)
+      jobId = await jobService.start({
+        type: 'review_summary',
         restaurantId,
-        total: totalIncomplete
+        metadata: {
+          total: totalIncomplete,
+          serviceType
+        }
       });
 
       const globalStartTime = Date.now();
@@ -120,7 +124,10 @@ export class ReviewSummaryProcessor {
       
       if (allReviews.length === 0) {
         console.log('⚠️ 처리할 리뷰가 없습니다.');
-        return;
+        if (jobId) {
+          await jobService.complete(jobId, { message: '처리할 리뷰 없음' });
+        }
+        throw new Error('NO_REVIEWS_TO_PROCESS');
       }
       
       console.log(`✅ 총 ${allReviews.length}개 리뷰 데이터 조회 완료`);
@@ -131,9 +138,7 @@ export class ReviewSummaryProcessor {
       
       await summaryService.summarizeReviews(
         allReviews,
-        (current, total, batchResults) => {
-          const percentage = Math.floor((current / total) * 100);
-          
+        async (current, total, batchResults) => {
           // AI 배치 완료 시 콜백으로 결과 받아서 일괄 저장
           if (batchResults && batchResults.length > 0) {
             const batchStartIndex = processedCount;
@@ -158,15 +163,13 @@ export class ReviewSummaryProcessor {
             processedCount = batchEndIndex;
           }
           
-          // Socket 진행률 업데이트
-          io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_PROGRESS, {
-            restaurantId,
-            current,
-            total,
-            percentage,
-            completed: globalCompletedCount,
-            failed: globalFailedCount
-          });
+          // JobService를 통한 진행률 업데이트 (DB 저장 + Socket 이벤트 자동 발행)
+          if (jobId) {
+            await jobService.progress(jobId, current, total, {
+              completed: globalCompletedCount,
+              failed: globalFailedCount
+            });
+          }
         }
       );
       
@@ -178,24 +181,33 @@ export class ReviewSummaryProcessor {
       console.log(`\n✅ 전체 처리 완료 (${(globalElapsed / 1000).toFixed(2)}초)`);
       console.log(`   성공: ${globalCompletedCount}개, 실패: ${globalFailedCount}개`);
       
-      // Socket 완료 이벤트
-      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_COMPLETED, {
-        restaurantId,
-        total: allReviews.length,
-        completed: globalCompletedCount,
-        failed: globalFailedCount,
-        elapsed: Math.floor(globalElapsed / 1000)
-      });
+      // JobService를 통한 완료 처리 (DB 저장 + Socket 이벤트 자동 발행)
+      if (jobId) {
+        await jobService.complete(jobId, {
+          total: allReviews.length,
+          completed: globalCompletedCount,
+          failed: globalFailedCount,
+          elapsed: Math.floor(globalElapsed / 1000)
+        });
+      }
+
+      return jobId!;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // NO_INCOMPLETE_REVIEWS, NO_REVIEWS_TO_PROCESS는 에러가 아님
+      if (errorMessage === 'NO_INCOMPLETE_REVIEWS' || errorMessage === 'NO_REVIEWS_TO_PROCESS') {
+        console.log('✅ 처리할 항목 없음');
+        return jobId || 'NO_JOB';
+      }
+      
       console.error('❌ 요약 처리 중 오류:', errorMessage);
       
-      // Socket 에러 이벤트
-      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_SUMMARY_ERROR, {
-        restaurantId,
-        error: errorMessage
-      });
+      // JobService를 통한 에러 처리 (DB 저장 + Socket 이벤트 자동 발행)
+      if (jobId) {
+        await jobService.error(jobId, errorMessage);
+      }
       
       throw error;
     }

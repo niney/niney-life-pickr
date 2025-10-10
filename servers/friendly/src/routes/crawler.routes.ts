@@ -1,8 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import restaurantService from '../services/restaurant.service';
-import jobManager from '../services/job-manager.service';
-import crawlJobRepository from '../db/repositories/crawl-job.repository';
 import { ResponseHelper } from '../utils/response.utils';
 
 /**
@@ -259,33 +257,19 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
           console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 리뷰 크롤링 시작`);
           
           const reviewUrl = `https://m.place.naver.com/restaurant/${restaurant.place_id}/review/visitor?reviewSort=recent`;
-          const jobId = `review-${Date.now()}-${restaurant.place_id}`;
-          
-          jobManager.createJob(jobId, {
-            restaurantId: restaurant.id,
-            placeId: restaurant.place_id,
-            url: reviewUrl
-          });
-          
-          await crawlJobRepository.create({
-            job_id: jobId,
-            place_id: restaurant.place_id,
-            restaurant_id: restaurant.id,
-            url: reviewUrl,
-            status: 'waiting'
-          });
 
+          // Job 생성은 review-crawler-processor.process()에서 자동 처리
           const reviewCrawlerProcessor = await import('../services/review-crawler-processor.service');
           reviewCrawlerProcessor.default.process(
-            jobId, 
             restaurant.place_id, 
             reviewUrl, 
             restaurant.id
           ).catch(err => {
-            console.error(`[Job ${jobId}] Background processing error:`, err);
+            console.error(`[Restaurant ${restaurant.id}] Background processing error:`, err);
           });
 
-          reviewJobId = jobId;
+          // reviewJobId는 processor 내부에서 생성되므로 추적 불가
+          reviewJobId = undefined;
         }
 
         // 리뷰 요약 생성

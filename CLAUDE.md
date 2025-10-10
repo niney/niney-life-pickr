@@ -1,6 +1,21 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working wi    │   │   ├── db/             # Database layer
+    │   │   │   ├── database.ts # SQLite connection manager
+    │   │   │   ├── migrate.ts  # Migration runner
+    │   │   │   ├── migrations/ # SQL migration files
+    │   │   │   └── repositories/ # Data access layer
+    │   │   │       ├── restaurant.repository.ts # Restaurant/menu CRUD operations
+    │   │   │       ├── review.repository.ts     # Review storage with deduplication
+    │   │   │       ├── job.repository.ts        # Job state persistence (DB)
+    │   │   │       └── review-summary.repository.ts # Review summary storage
+    │   │   ├── socket/         # Socket.io real-time communication
+    │   │   │   ├── socket.ts   # Socket.io server initialization
+    │   │   │   └── events.ts   # Socket event constants + JobEventData types + getSocketEvent()
+    │   │   ├── utils/          # Utility functions
+    │   │   └── types/          # TypeScript type definitions
+    │   │       ├── crawler.types.ts # Crawler service types
+    │   │       └── db.types.ts      # Database entity types (JobType, JobProgress, etc.) this repository.
 
 > **Note**: For general usage instructions, setup guides, and testing examples, see [README.md](./README.md).
 
@@ -75,10 +90,17 @@ niney-life-pickr/
     │   │   │   ├── api.routes.ts    # General API endpoints
     │   │   │   ├── docs.routes.ts   # API documentation endpoints
     │   │   │   ├── crawler.routes.ts # Naver Map crawler endpoints
-    │   │   │   └── restaurant.routes.ts # Restaurant data management endpoints
+    │   │   │   ├── restaurant.routes.ts # Restaurant data management endpoints
+    │   │   │   ├── job.routes.ts    # Job status management endpoints
+    │   │   │   └── review-summary.routes.ts # Review summary processing endpoints
     │   │   ├── services/       # Business logic
     │   │   │   ├── naver-crawler.service.ts # Puppeteer-based web crawler
-    │   │   │   └── restaurant.service.ts    # Restaurant data management (crawler + DB)
+    │   │   │   ├── restaurant.service.ts    # Restaurant data management (crawler + DB)
+    │   │   │   ├── job-socket.service.ts    # Unified Job + Socket management
+    │   │   │   ├── job-manager.service.ts   # In-memory job state with AbortController
+    │   │   │   ├── review-crawler-processor.service.ts  # Review crawling with JobService
+    │   │   │   ├── review-summary-processor.service.ts  # Review summarization with JobService
+    │   │   │   └── review-summary.service.ts # AI-based review summarization (local/cloud)
     │   │   ├── db/             # Database layer
     │   │   │   ├── database.ts # SQLite connection manager
     │   │   │   ├── migrate.ts  # Migration runner
@@ -229,21 +251,22 @@ wait_time TEXT
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
 
--- crawl_jobs table (Background job tracking)
+-- jobs table (범용 작업 추적 - 리뷰 크롤링, 리뷰 요약, 레스토랑 크롤링)
 id TEXT PRIMARY KEY  -- UUID
-place_id TEXT NOT NULL
-url TEXT NOT NULL
-restaurant_id INTEGER
-status TEXT NOT NULL  -- pending, active, completed, failed, cancelled
-current INTEGER DEFAULT 0
-total INTEGER DEFAULT 0
-percentage INTEGER DEFAULT 0
-total_reviews INTEGER
-saved_to_db INTEGER
+type TEXT NOT NULL  -- 'review_crawl', 'review_summary', 'restaurant_crawl'
+restaurant_id INTEGER NOT NULL
+status TEXT NOT NULL DEFAULT 'pending'  -- 'pending', 'active', 'completed', 'failed', 'cancelled'
+progress_current INTEGER DEFAULT 0
+progress_total INTEGER DEFAULT 0
+progress_percentage INTEGER DEFAULT 0
+metadata TEXT  -- JSON string (작업별 커스텀 데이터)
+result TEXT  -- JSON string (작업별 결과 데이터)
 error_message TEXT
 started_at DATETIME
 completed_at DATETIME
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
 ```
 
 ### Migration System
@@ -365,15 +388,43 @@ The shared module uses the Barrel Export Pattern for clean, organized imports:
 import { Button, InputField } from '@shared/components'
 import { useLogin, useAuth } from '@shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from '@shared/constants'
-import { Alert, storage, STORAGE_KEYS } from '@shared/utils'
+import { 
+  Alert, 
+  storage, 
+  STORAGE_KEYS,
+  SOCKET_EVENTS,
+  getSocketEvent,
+  type JobEventData,
+  type ProgressData,
+  type ReviewCrawlStatus,
+  type SummaryProgress
+} from '@shared/utils'
 import { apiService } from '@shared/services'
 
 // Mobile app imports (using 'shared' from metro.config.js)
 import { Button, InputField } from 'shared/components'
 import { useLogin, useAuth } from 'shared/hooks'
 import { APP_INFO_CONSTANTS, AUTH_CONSTANTS } from 'shared/constants'
-import { Alert, storage, STORAGE_KEYS } from 'shared/utils'
+import { 
+  Alert, 
+  storage, 
+  STORAGE_KEYS,
+  SOCKET_EVENTS,
+  getSocketEvent,
+  type JobEventData,
+  type ProgressData,
+  type ReviewCrawlStatus,
+  type SummaryProgress
+} from 'shared/utils'
 import { apiService } from 'shared/services'
+
+// Socket utility types and functions (shared/utils/socket.utils.ts)
+// - SOCKET_EVENTS: All Socket event names (review:started, review_summary:progress, etc.)
+// - getSocketEvent(type, status): Auto-mapping function (JobType + JobEventType → event name)
+// - JobEventData: Unified event data structure
+// - ProgressData: { current, total, percentage }
+// - ReviewCrawlStatus: { status: 'idle' | 'active' | 'completed' | 'failed', error? }
+// - SummaryProgress: extends ProgressData with { completed, failed }
 
 // Each folder has its own index.ts barrel export
 // This maintains clean separation of concerns
@@ -429,6 +480,20 @@ const { email, password, handleLogin } = useLogin()
 - pytest testing environment for smart server
 - YAML-based configuration system
 - Network access support (0.0.0.0 binding, local IP detection)
+- **Unified Job + Socket Management System:**
+  - JobSocketService: Single service for all job types (review_crawl, review_summary, restaurant_crawl)
+  - Automatic DB persistence via job.repository.ts
+  - Automatic Socket event emission via getSocketEvent()
+  - 90% parameter reduction (options objects eliminated)
+  - Job lifecycle: start() → progress() → complete()/error()/cancel()
+  - Real-time cancellation support for review_crawl (AbortController)
+  - Restaurant room-based multi-user collaboration
+  - Job status API: GET /api/jobs/:jobId
+- **Review Summarization System:**
+  - AI-based review summarization (local/cloud)
+  - Batch processing with progress tracking
+  - JobService integration for DB + Socket
+  - Review summary storage and retrieval
 
 **Frontend:**
 - Web application with React Native Web and React Router
@@ -470,14 +535,14 @@ const { email, password, handleLogin } = useLogin()
   - Maestro E2E tests for mobile application
   - Login flow with alert handling (both platforms)
 - Clean module separation (components/hooks/contexts/constants/services/types/utils)
-
-- **Socket.io Real-time Review Crawling System:**
-  - Place-based room subscription for multi-user collaboration
-  - Real-time progress updates during crawling and DB saving
-  - Background job processing with job manager
-  - Review hash-based duplicate prevention
-  - Automatic review list refresh on completion
-  - Integration tests for crawl jobs and review storage
+- **Socket.io Real-time System:**
+  - SocketContext with unified state management
+  - Restaurant room-based subscriptions
+  - Real-time progress updates for crawling and summarization
+  - Shared types from shared/utils/socket.utils.ts
+  - Auto-subscribe/unsubscribe on restaurant selection
+  - Client-side status tracking (reviewCrawlStatus, reviewSummaryStatus)
+  - Progress tracking (crawlProgress, dbProgress, summaryProgress)
 
 ### 🔲 In Progress
 - JWT token authentication implementation
@@ -485,119 +550,183 @@ const { email, password, handleLogin } = useLogin()
 - ML model integration in smart server
 - Production database (PostgreSQL)
 
-## Socket.io Real-time Review Crawling System
+## Socket.io Real-time System with Unified Job Management
 
-### Overview
-Real-time system for collaborative review crawling with Socket.io, allowing multiple users to see live progress when crawling the same restaurant.
+### Architecture Overview
+**Unified Job + Socket Management** via `JobSocketService`:
+- All job types (`review_crawl`, `review_summary`, `restaurant_crawl`) use a single service
+- Automatic DB storage + Socket event emission
+- Restaurant room-based real-time updates for multi-user collaboration
+- Job ID tracking for status queries and cancellation
 
-### Architecture Components
-- **Socket Server**: `servers/friendly/src/socket/socket.ts` - Socket.io initialization and room management
-- **Event Constants**: `servers/friendly/src/socket/events.ts` - Socket event type definitions
-- **Job Manager**: `servers/friendly/src/services/job-manager.service.ts` - In-memory job state management
-- **Crawler Processor**: `servers/friendly/src/services/review-crawler-processor.service.ts` - Background crawling with real-time updates
-- **Job Repository**: `servers/friendly/src/db/repositories/crawl-job.repository.ts` - Database persistence
-- **Review Repository**: `servers/friendly/src/db/repositories/review.repository.ts` - Review storage with hash-based deduplication
+### Core Components
+- **JobSocketService** (`job-socket.service.ts`): Unified Job + Socket management
+  - Methods: `start()`, `progress()`, `complete()`, `error()`, `cancel()`
+  - Automatic DB persistence via `job.repository.ts`
+  - Automatic Socket event emission via `getSocketEvent()`
+  - Single source of truth for all job operations
+- **JobManager** (`job-manager.service.ts`): In-memory state with AbortController
+  - Only for `review_crawl` jobs (real-time cancellation support)
+  - Provides `isCancelled()` for interrupt-based cancellation
+- **Event Constants** (`socket/events.ts`): Socket event definitions + utilities
+  - `SOCKET_EVENTS`: All event names (review_crawl, review_summary)
+  - `getSocketEvent(type, status)`: Auto-mapping function (type + status → event name)
+  - `JobEventData`: Unified event data structure
+- **Processors**:
+  - `review-crawler-processor.service.ts`: Review crawling with JobService
+  - `review-summary-processor.service.ts`: Review summarization with JobService
+- **Client** (`shared/contexts/SocketContext.tsx`): React Context for Socket.io
+  - Auto-subscribes to restaurant rooms
+  - Manages crawl/summary status with shared types from `shared/utils/socket.utils.ts`
+
+### Unified Job Lifecycle
+```typescript
+// 1. START - Create job (DB + Socket)
+const jobId = await jobService.start({
+  type: 'review_crawl', // or 'review_summary', 'restaurant_crawl'
+  restaurantId: 123,
+  metadata: { placeId, url }
+});
+// → DB에 저장 + Socket: review:started
+
+// 2. PROGRESS - Update progress (DB + Socket)
+await jobService.progress(jobId, current, total, { metadata });
+// → DB 업데이트 + Socket: review:crawl_progress
+
+// 3. COMPLETE - Finish job (DB + Socket)
+await jobService.complete(jobId, { totalReviews, savedToDb });
+// → DB 업데이트 + Socket: review:completed
+
+// 4. ERROR - Handle failure (DB + Socket)
+await jobService.error(jobId, errorMessage, { metadata });
+// → DB 업데이트 + Socket: review:error
+
+// 5. CANCEL - Cancel job (DB + Socket, review_crawl only)
+await jobService.cancel(jobId, { metadata });
+// → DB 업데이트 + Socket: review:cancelled
+```
 
 ### Socket.io Room Strategy
 **Restaurant ID-based Rooms** (`restaurant:${restaurantId}`):
-- All users viewing the same restaurant subscribe to the same restaurant room
-- When ANY user starts crawling, ALL subscribers receive real-time updates
-- Enables multi-user collaboration and prevents duplicate crawling
-- Auto-subscription when selecting a restaurant, auto-unsubscription when leaving
-- **Legacy support**: Place-based rooms (`place:${placeId}`) still supported for backward compatibility
+- All users viewing the same restaurant subscribe to the same room
+- When ANY user starts a job, ALL subscribers receive real-time updates
+- Enables multi-user collaboration and prevents duplicate work
+- Auto-subscription/unsubscription on restaurant selection/deselection
 
 ```typescript
-// Server: Restaurant room subscription
+// Server: Room subscription
 socket.on('subscribe:restaurant', (restaurantId: string) => {
   socket.join(`restaurant:${restaurantId}`)
 })
 
-// Client: Auto-subscribe on restaurant selection
-useEffect(() => {
-  if (restaurantId) {
-    socketRef.current.emit('subscribe:restaurant', restaurantId)
-    return () => socketRef.current?.emit('unsubscribe:restaurant', restaurantId)
-  }
-}, [restaurantId])
-```
-
-### Real-time Event Flow
-1. **REVIEW_STARTED** - Crawling begins, sent to restaurant room
-2. **REVIEW_PROGRESS** - Progress updates (every 10 reviews or at completion)
-   - Includes: `restaurantId`, `placeId`, `current`, `total`, `percentage`
-3. **REVIEW_ITEM** - Individual review data (every 5 reviews or at completion)
-   - Includes: `restaurantId`, `placeId`, `review`, `index`
-4. **REVIEW_COMPLETED** - Crawling finished successfully
-   - Includes: `restaurantId`, `placeId`, `totalReviews`, `savedToDb`
-5. **REVIEW_ERROR** - Error occurred during crawling
-   - Includes: `restaurantId`, `placeId`, `error`
-6. **REVIEW_CANCELLED** - User cancelled the job
-
-### Background Job Processing
-- Jobs tracked in `crawl_jobs` table with UUID
-- In-memory job manager for quick state access
-- Callback-based progress tracking during crawling
-- DB persistence at every review save for durability
-- Support for job cancellation (though not yet exposed in UI)
-
-### Review Deduplication System
-Review hash generated from:
-```typescript
-generateReviewHash(placeId, userName, visitDate, visitCount, verificationMethod)
-```
-- Prevents duplicate reviews from multiple crawls
-- Uses MD5 hash of combined fields
-- UNIQUE constraint on `review_hash` column
-- UPSERT pattern for safe re-crawling
-
-### Client Integration Pattern
-```typescript
-// Frontend automatically handles:
-1. Subscribe to restaurant room on restaurant selection (by ID)
-2. Listen for progress/item/completed/error events
-3. Update UI with real-time crawling status
-4. Refresh review list on completion
-5. Unsubscribe when leaving restaurant view
-
-// SocketContext API
-const {
-  joinRestaurantRoom,      // Join restaurant:${restaurantId} room
-  leaveRestaurantRoom,     // Leave restaurant room
-  setRestaurantCallbacks,  // Set onCompleted/onError callbacks
-  reviewCrawlStatus,       // { status: 'idle' | 'active' | 'completed' | 'failed', error?, reviews[] }
-  crawlProgress,           // { current, total, percentage } | null
-  dbProgress,              // { current, total, percentage } | null
-} = useSocket()
-
-// Usage in Web (RestaurantDetail.tsx)
+// Client: Auto-subscribe via SocketContext
 useEffect(() => {
   if (restaurantId) {
     joinRestaurantRoom(restaurantId)
     return () => leaveRestaurantRoom(restaurantId)
   }
 }, [restaurantId])
+```
 
-// Usage in Mobile (RestaurantScreen.tsx)
-const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null)
+### Socket Event Types
+**Review Crawling Events**:
+1. **review:started** - Job started
+2. **review:crawl_progress** - Web crawling progress
+3. **review:db_progress** - DB saving progress
+4. **review:completed** - Job completed
+5. **review:error** - Job failed
+6. **review:cancelled** - Job cancelled (review_crawl only)
 
-useEffect(() => {
-  if (selectedRestaurantId) {
-    joinRestaurantRoom(selectedRestaurantId)
-    return () => leaveRestaurantRoom(selectedRestaurantId)
-  }
-}, [selectedRestaurantId])
+**Review Summary Events**:
+1. **review_summary:started** - Summarization started
+2. **review_summary:progress** - AI processing progress
+3. **review_summary:completed** - Summarization completed
+4. **review_summary:error** - Summarization failed
 
-const handleRestaurantClick = (restaurant: RestaurantData) => {
-  setSelectedRestaurantId(String(restaurant.id))
-  fetchReviews(restaurant.id)  // Use restaurant ID, not place_id
+**Unified Event Data Structure** (`JobEventData`):
+```typescript
+interface JobEventData {
+  jobId: string;
+  type: JobType; // 'review_crawl' | 'review_summary' | 'restaurant_crawl'
+  restaurantId: number;
+  status: JobEventType; // 'started' | 'progress' | 'completed' | 'error' | 'cancelled'
+  timestamp: number;
+  
+  // Progress-specific
+  current?: number;
+  total?: number;
+  percentage?: number;
+  
+  // Error-specific
+  error?: string;
+  
+  // Additional metadata
+  [key: string]: any;
 }
 ```
 
+### Job Cancellation System
+**Only for `review_crawl`** (long-running, interruptible):
+- Memory job created with `AbortController`
+- `jobService.isCancelled(jobId)` checks abort signal
+- Processor checks cancellation in loops (crawling, DB saving)
+- Cancellation signal propagates immediately via memory
+
+```typescript
+// In review-crawler-processor.service.ts
+for (const review of reviews) {
+  if (jobService.isCancelled(jobId)) {
+    await jobService.cancel(jobId, { totalReviews: reviews.length });
+    return; // Stop crawling immediately
+  }
+  // Process review...
+}
+```
+
+### Client Integration (SocketContext)
+```typescript
+// Shared types from apps/shared/utils/socket.utils.ts
+import { 
+  SOCKET_EVENTS,
+  JobEventData,
+  ProgressData,
+  ReviewCrawlStatus,
+  SummaryProgress,
+  ReviewSummaryStatus
+} from '../utils'
+
+// SocketContext API
+const {
+  socket,                  // Socket.io instance
+  isConnected,             // Connection status
+  reviewCrawlStatus,       // Review crawl state
+  crawlProgress,           // Web crawling progress
+  dbProgress,              // DB saving progress
+  reviewSummaryStatus,     // Summary state
+  summaryProgress,         // AI processing progress
+  joinRestaurantRoom,      // Join room
+  leaveRestaurantRoom,     // Leave room
+  setRestaurantCallbacks,  // Set completion/error callbacks
+  resetCrawlStatus,        // Reset crawl state
+  resetSummaryStatus,      // Reset summary state
+} = useSocket()
+
+// Auto-subscribe to restaurant room
+useEffect(() => {
+  if (restaurantId) {
+    joinRestaurantRoom(restaurantId)
+    return () => leaveRestaurantRoom(restaurantId)
+  }
+}, [restaurantId])
+```
+
 ### Key Implementation Details
-- **Batch Updates**: Progress emitted every 10 reviews to reduce socket traffic
-- **Review Items**: Sent every 5 reviews for smoother UI updates
-- **Error Resilience**: Failed DB saves logged but don't stop crawling
-- **Multi-user Sync**: All users see identical progress regardless of who started crawling
+- **90% Parameter Reduction**: Options objects completely eliminated
+- **Automatic DB Lookup**: `progress()`, `complete()`, `error()`, `cancel()` auto-fetch type/restaurantId from DB
+- **Socket Auto-Mapping**: `getSocketEvent(type, status)` automatically selects correct event name
+- **Single Source of Truth**: `socket/events.ts` defines all events, types, and mapping logic
+- **Type Safety**: Unified `JobEventData` structure with TypeScript validation
+- **Multi-user Sync**: All users see identical progress regardless of who started the job
 
 ## Common Development Tasks
 

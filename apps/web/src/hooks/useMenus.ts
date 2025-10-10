@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import { apiService } from '@shared/services'
-import type { MenuItem } from '@shared/services'
-import { Alert } from '@shared/utils'
+import { apiService, type MenuItem, Alert } from '@shared'
 
 export const useMenus = () => {
   const [menus, setMenus] = useState<MenuItem[]>([])

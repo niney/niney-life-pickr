@@ -99,7 +99,112 @@ export interface ReviewInput {
 }
 
 /**
- * Crawl Job DB entity
+ * Job Types (범용 작업 타입)
+ */
+export type JobType = 
+  | 'review_crawl'      // 리뷰 크롤링
+  | 'review_summary'    // 리뷰 요약
+  | 'restaurant_crawl'; // 레스토랑 정보 크롤링
+
+/**
+ * Job Status (작업 상태)
+ */
+export type JobStatus = 
+  | 'pending'    // 대기 중
+  | 'active'     // 진행 중
+  | 'completed'  // 완료
+  | 'failed'     // 실패
+  | 'cancelled'; // 취소됨
+
+/**
+ * Job Progress (진행률)
+ */
+export interface JobProgress {
+  current: number;
+  total: number;
+  percentage: number;
+}
+
+/**
+ * Job DB entity (범용 작업 추적)
+ */
+export interface JobDB {
+  id: string;
+  type: JobType;
+  restaurant_id: number;
+  status: JobStatus;
+  progress_current: number;
+  progress_total: number;
+  progress_percentage: number;
+  metadata: string | null;  // JSON string
+  result: string | null;    // JSON string
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 타입별 메타데이터
+ */
+export interface ReviewCrawlMetadata {
+  placeId: string;
+  url: string;
+  batchSize?: number;
+}
+
+export interface ReviewSummaryMetadata {
+  useCloud: boolean;
+  aiService: 'local' | 'cloud';
+  batchSize?: number;
+}
+
+export interface RestaurantCrawlMetadata {
+  placeId: string;
+  url: string;
+  includeMenus: boolean;
+}
+
+/**
+ * 타입별 결과 데이터
+ */
+export interface ReviewCrawlResult {
+  totalReviews: number;
+  savedToDb: number;
+  duplicates: number;
+  crawlDuration: number;
+}
+
+export interface ReviewSummaryResult {
+  total: number;
+  completed: number;
+  failed: number;
+  duration: number;
+  aiService: string;
+}
+
+export interface RestaurantCrawlResult {
+  restaurantId: number;
+  menusCount: number;
+  imagesCount: number;
+}
+
+/**
+ * Job 생성 파라미터
+ */
+export interface JobCreateParams<T extends JobType = JobType> {
+  type: T;
+  restaurantId: number;
+  metadata?: T extends 'review_crawl' ? ReviewCrawlMetadata :
+             T extends 'review_summary' ? ReviewSummaryMetadata :
+             T extends 'restaurant_crawl' ? RestaurantCrawlMetadata :
+             Record<string, any>;
+}
+
+/**
+ * Crawl Job DB entity (Deprecated - 호환성 유지용)
+ * @deprecated Use JobDB instead
  */
 export interface CrawlJobDB {
   id: number;
@@ -121,6 +226,7 @@ export interface CrawlJobDB {
 
 /**
  * Crawl Job Input (for creation)
+ * @deprecated Use JobCreateParams instead
  */
 export interface CrawlJobInput {
   job_id: string;

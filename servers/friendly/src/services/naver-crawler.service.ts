@@ -63,7 +63,7 @@ class NaverCrawlerService {
   async launchBrowser(protocolTimeout: number = 30000): Promise<Browser> {
     const chromePath = await this.getChromePath();
     const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
-      headless: false, // 디버깅을 위해 브라우저 창 표시
+      headless: true, // 디버깅을 위해 브라우저 창 표시
       protocolTimeout, // 파라미터로 받은 타임아웃 사용
       args: [
         '--no-sandbox',
@@ -742,12 +742,12 @@ class NaverCrawlerService {
         try {
           // 더보기 버튼 클릭 작업에 30초 타임아웃 설정
           const operationTimeout = 30000; // 30초
-          
+
           const currentReviewCount = await Promise.race([
             page.evaluate(() => {
               return document.querySelectorAll('#_review_list li.place_apply_pui').length;
             }),
-            new Promise<number>((_, reject) => 
+            new Promise<number>((_, reject) =>
               setTimeout(() => reject(new Error('리뷰 개수 확인 타임아웃')), operationTimeout)
             )
           ]);
@@ -776,7 +776,7 @@ class NaverCrawlerService {
               }
               return false;
             }),
-            new Promise<boolean>((_, reject) => 
+            new Promise<boolean>((_, reject) =>
               setTimeout(() => reject(new Error('더보기 버튼 확인 타임아웃')), operationTimeout)
             )
           ]);
@@ -801,7 +801,7 @@ class NaverCrawlerService {
                 }
                 return false;
               }),
-              new Promise<boolean>((_, reject) => 
+              new Promise<boolean>((_, reject) =>
                 setTimeout(() => reject(new Error('더보기 버튼 클릭 타임아웃')), operationTimeout)
               )
             ]);
@@ -822,13 +822,13 @@ class NaverCrawlerService {
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.log('더보기 버튼 클릭 중 오류:', errorMessage);
-          
+
           // 타임아웃 에러인 경우 즉시 중단
           if (errorMessage.includes('타임아웃')) {
             console.log('작업 타임아웃으로 크롤링 중단');
             break;
           }
-          
+
           errorCount++;  // 에러 카운터만 증가
 
            if (errorCount >= 2) {
@@ -871,7 +871,7 @@ class NaverCrawlerService {
 
       // 리뷰 정보 추출
       console.log('리뷰 정보 추출 시작...');
-      
+
       const rawReviews = await page.evaluate(() => {
         const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
         console.log(`발견된 리뷰 요소 수: ${reviewElements.length}`);

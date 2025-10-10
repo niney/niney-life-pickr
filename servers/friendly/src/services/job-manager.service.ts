@@ -1,8 +1,9 @@
 export interface JobData {
   jobId: string;
   restaurantId: number;
-  placeId: string;
-  url: string;
+  type?: string;
+  placeId?: string;
+  url?: string;
   status: 'waiting' | 'active' | 'completed' | 'failed' | 'cancelled';
   progress: {
     current: number;
@@ -32,12 +33,17 @@ class JobManager {
    */
   createJob(jobId: string, data: {
     restaurantId: number;
-    placeId: string;
-    url: string;
+    type?: string;
+    placeId?: string;
+    url?: string;
+    [key: string]: any;
   }): JobData {
     const jobData: JobData = {
       jobId,
-      ...data,
+      restaurantId: data.restaurantId,
+      type: data.type,
+      placeId: data.placeId,
+      url: data.url,
       status: 'waiting',
       progress: { current: 0, total: 0, percentage: 0 },
       createdAt: new Date()

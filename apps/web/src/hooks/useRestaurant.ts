@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiService } from '@shared/services'
-import type { RestaurantCategory, RestaurantData } from '@shared/services'
-import { Alert } from '@shared/utils'
+import { apiService, type RestaurantCategory, type RestaurantData, Alert } from '@shared'
 
 export const useRestaurant = () => {
   const navigate = useNavigate()

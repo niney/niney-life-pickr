@@ -13,11 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BlurView } from '@react-native-community/blur';
-import { useTheme, useSocket } from 'shared/contexts';
-import { THEME_COLORS } from 'shared/constants';
-import { apiService } from 'shared/services';
-import type { RestaurantCategory, RestaurantData } from 'shared/services';
-import { Alert } from 'shared/utils';
+import { useTheme, useSocket, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 import RecrawlModal from '../components/RecrawlModal';
 

@@ -11,11 +11,7 @@ import {
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
-import { useTheme, useSocket } from 'shared/contexts';
-import { THEME_COLORS } from 'shared/constants';
-import { apiService } from 'shared/services';
-import type { ReviewData, MenuItem } from 'shared/services';
-import { Alert } from 'shared/utils';
+import { useTheme, useSocket, THEME_COLORS, apiService, Alert, type ReviewData, type MenuItem } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
@@ -37,7 +33,9 @@ const RestaurantDetailScreen: React.FC = () => {
     summaryProgress,
     joinRestaurantRoom,
     leaveRestaurantRoom,
-    setRestaurantCallbacks
+    setRestaurantCallbacks,
+    resetCrawlStatus,
+    resetSummaryStatus
   } = useSocket();
 
   // 레스토랑 정보 섹션 높이 추적
@@ -90,6 +88,26 @@ const RestaurantDetailScreen: React.FC = () => {
       leaveRestaurantRoom(restaurantIdStr);
     };
   }, [restaurantId]);
+
+  // 크롤링 완료 후 3초 뒤 상태 초기화
+  useEffect(() => {
+    if (reviewCrawlStatus.status === 'completed') {
+      const timer = setTimeout(() => {
+        resetCrawlStatus();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [reviewCrawlStatus.status]);
+
+  // 요약 완료 후 3초 뒤 상태 초기화
+  useEffect(() => {
+    if (reviewSummaryStatus.status === 'completed') {
+      const timer = setTimeout(() => {
+        resetSummaryStatus();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [reviewSummaryStatus.status]);
 
   // 리뷰 조회 (초기 로드)
   const fetchReviews = async (offset: number = 0, append: boolean = false) => {

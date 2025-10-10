@@ -2,8 +2,6 @@ import naverCrawlerService from './naver-crawler.service';
 import restaurantRepository from '../db/repositories/restaurant.repository';
 import { RestaurantInput, MenuInput } from '../types/db.types';
 import { RestaurantInfo, MenuItem } from '../types/crawler.types';
-import jobManager from './job-manager.service';
-import crawlJobRepository from '../db/repositories/crawl-job.repository';
 import reviewCrawlerProcessor from './review-crawler-processor.service';
 import { normalizeMenuItems } from './menu-normalization.service';
 
@@ -103,38 +101,18 @@ export class RestaurantService {
         console.log('[RestaurantService] DB 저장 완료:', restaurantId);
 
         // 3. 리뷰 크롤링 시작 (옵션이 true인 경우)
-        let reviewJobId: string | undefined = undefined;
         if (options.crawlReviews && restaurantInfo.placeId) {
           try {
-            const { v4: uuidv4 } = await import('uuid');
-            reviewJobId = uuidv4();
-
             // 리뷰 URL 생성
             const reviewUrl = `https://m.place.naver.com/restaurant/${restaurantInfo.placeId}/review/visitor?reviewSort=recent`;
 
-            console.log('[RestaurantService] 리뷰 크롤링 Job 생성:', reviewJobId);
+            console.log('[RestaurantService] 리뷰 크롤링 Job 시작');
 
-            // Job 생성
-            jobManager.createJob(reviewJobId, {
-              restaurantId,
-              placeId: restaurantInfo.placeId,
-              url: reviewUrl
-            });
-
-            // DB에 Job 기록
-            await crawlJobRepository.create({
-              job_id: reviewJobId,
-              restaurant_id: restaurantId,
-              place_id: restaurantInfo.placeId,
-              url: reviewUrl,
-              status: 'pending'
-            });
-
-            // 백그라운드로 리뷰 크롤링 시작
-            reviewCrawlerProcessor.process(reviewJobId, restaurantInfo.placeId, reviewUrl, restaurantId)
+            // 백그라운드로 리뷰 크롤링 시작 (Job ID는 자동 생성)
+            reviewCrawlerProcessor.process(restaurantInfo.placeId, reviewUrl, restaurantId)
               .catch(err => console.error('[RestaurantService] 리뷰 크롤링 에러:', err));
 
-            console.log('[RestaurantService] 리뷰 크롤링 Job 시작됨:', reviewJobId);
+            console.log('[RestaurantService] 리뷰 크롤링 백그라운드 시작됨');
           } catch (reviewError) {
             console.error('[RestaurantService] 리뷰 크롤링 Job 생성 실패:', reviewError);
             // 리뷰 크롤링 실패해도 레스토랑 크롤링은 성공으로 처리
@@ -161,8 +139,7 @@ export class RestaurantService {
         return {
           restaurantInfo,
           savedToDb: true,
-          restaurantId,
-          reviewJobId
+          restaurantId
         };
       } catch (dbError) {
         // DB 저장 실패해도 크롤링 결과는 반환

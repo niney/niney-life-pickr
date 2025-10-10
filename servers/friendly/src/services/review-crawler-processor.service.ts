@@ -1,34 +1,32 @@
-import { getSocketIO } from '../socket/socket';
-import { SOCKET_EVENTS } from '../socket/events';
 import naverCrawlerService from './naver-crawler.service';
 import reviewRepository from '../db/repositories/review.repository';
-import crawlJobRepository from '../db/repositories/crawl-job.repository';
-import jobManager from './job-manager.service';
+import jobService from './job-socket.service';
 import { generateReviewHash } from '../utils/hash.utils';
 import reviewSummaryProcessor from './review-summary-processor.service';
 import type { ReviewInfo } from '../types/crawler.types';
 
 /**
  * 리뷰 크롤링 Processor
- * Job Manager + Socket.io + DB 저장 통합
+ * Job Service를 통한 통합 Job 관리 + Socket 이벤트 자동화 (단순화 버전)
  */
 export class ReviewCrawlerProcessor {
   /**
    * 리뷰 크롤링 실행 (백그라운드)
    */
-  async process(jobId: string, placeId: string, url: string, restaurantId: number): Promise<void> {
-    const io = getSocketIO();
+  async process(placeId: string, url: string, restaurantId: number): Promise<void> {
+    const startTime = Date.now();
+    let jobId: string | undefined;
 
     try {
-      // 1. Job 시작
-      jobManager.updateStatus(jobId, 'active', { startedAt: new Date() });
-      await crawlJobRepository.updateStatus(jobId, 'active', { startedAt: new Date() });
-
-      // Restaurant room에 이벤트 발행
-      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_STARTED, {
-        placeId,
+      // 1. Job 시작 (ID 자동 생성 + Socket 시작 알림)
+      jobId = await jobService.start({
+        type: 'review_crawl',
         restaurantId,
-        url
+        metadata: {
+          placeId,
+          url,
+          batchSize: 10
+        }
       });
 
       console.log(`[Job ${jobId}] 리뷰 크롤링 시작`);
@@ -37,63 +35,39 @@ export class ReviewCrawlerProcessor {
       const reviews = await this.crawlWithProgress(jobId, placeId, url, restaurantId);
 
       // 3. 완료 처리
-      if (jobManager.isCancelled(jobId)) {
+      if (jobService.isCancelled(jobId)) {
         console.log(`[Job ${jobId}] 크롤링 취소됨`);
-        await crawlJobRepository.updateStatus(jobId, 'cancelled', {
-          completedAt: new Date(),
-          totalReviews: reviews.length,
-          savedToDb: reviews.length
-        });
-
-        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_CANCELLED, {
+        
+        // Job 취소 + Socket CANCELLED 이벤트 자동 발행
+        await jobService.cancel(jobId, {
           placeId,
-          restaurantId,
           totalReviews: reviews.length
         });
       } else {
         console.log(`[Job ${jobId}] 리뷰 크롤링 완료: ${reviews.length}개`);
 
-        jobManager.completeJob(jobId, {
-          totalReviews: reviews.length,
-          savedToDb: reviews.length
-        });
-
-        await crawlJobRepository.updateStatus(jobId, 'completed', {
-          completedAt: new Date(),
-          totalReviews: reviews.length,
-          savedToDb: reviews.length
-        });
-
-        // 완료 이벤트
-        const completedData = {
+        // Job 완료 + Socket COMPLETED 이벤트 자동 발행
+        await jobService.complete(jobId, {
           placeId,
-          restaurantId,
           totalReviews: reviews.length,
-          savedToDb: reviews.length
-        };
-        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_COMPLETED, completedData);
+          savedToDb: reviews.length,
+          duplicates: 0,
+          crawlDuration: Date.now() - startTime
+        });
 
         // 4. 리뷰 크롤링 완료 후 자동으로 요약 시작
         console.log(`[Job ${jobId}] 리뷰 요약 시작...`);
-        this.startReviewSummary(restaurantId, jobId);
+        this.startReviewSummary(restaurantId);
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[Job ${jobId}] 리뷰 크롤링 실패:`, errorMessage);
 
-      jobManager.failJob(jobId, errorMessage);
-      await crawlJobRepository.updateStatus(jobId, 'failed', {
-        completedAt: new Date(),
-        errorMessage
-      });
-
-      const errorData = {
-        placeId,
-        restaurantId,
-        error: errorMessage
-      };
-      io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_ERROR, errorData);
+      // Job 실패 처리 + Socket ERROR 이벤트 자동 발행
+      if (jobId) {
+        await jobService.error(jobId, errorMessage, { placeId });
+      }
 
       throw error;
     }
@@ -108,7 +82,6 @@ export class ReviewCrawlerProcessor {
     url: string,
     restaurantId: number
   ): Promise<ReviewInfo[]> {
-    const io = getSocketIO();
     const reviews: ReviewInfo[] = [];
 
     // 리뷰 크롤링 시작 (콜백으로 실시간 전송)
@@ -116,7 +89,7 @@ export class ReviewCrawlerProcessor {
       url,
       async (current, total, review) => {
       // 중단 체크
-      if (jobManager.isCancelled(jobId)) {
+      if (jobService.isCancelled(jobId)) {
         console.log(`[Job ${jobId}] 중단 감지 (리뷰 ${current}/${total})`);
         return;
       }
@@ -139,40 +112,26 @@ export class ReviewCrawlerProcessor {
         console.error(`[Job ${jobId}] 리뷰 DB 저장 실패 (${current}):`, dbError);
       }
 
-      // 진행 상황 업데이트
-      const percentage = Math.floor((current / total) * 100);
-
-      jobManager.updateProgress(jobId, current, total);
-      await crawlJobRepository.updateProgress(jobId, current, total, percentage);
-
       // Socket 이벤트: DB 저장 진행 상황 (10개마다 또는 마지막)
       if (current % 10 === 0 || current === total) {
-        const dbProgressData = {
-          placeId,
-          restaurantId,
+        jobService.emitCrawlProgress(jobId, restaurantId, 'db_save', {
           current,
           total,
-          percentage
-        };
-        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_DB_PROGRESS, dbProgressData);
-        console.log(`[Job ${jobId}] DB 저장 진행: ${current}/${total} (${percentage}%)`);
+          placeId
+        });
+        console.log(`[Job ${jobId}] DB 저장 진행: ${current}/${total}`);
       }
     },
       // 크롤링 진행 상황 콜백
       (current, total) => {
-        const percentage = Math.floor((current / total) * 100);
-        
         // Socket 이벤트: 크롤링 진행 상황
-        const crawlProgressData = {
-          placeId,
-          restaurantId,
+        jobService.emitCrawlProgress(jobId, restaurantId, 'crawl', {
           current,
           total,
-          percentage
-        };
-        io.to(`restaurant:${restaurantId}`).emit(SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS, crawlProgressData);
+          placeId
+        });
         
-        console.log(`[Job ${jobId}] 크롤링 진행: ${current}/${total} (${percentage}%)`);
+        console.log(`[Job ${jobId}] 크롤링 진행: ${current}/${total}`);
       }
     );
 
@@ -184,14 +143,14 @@ export class ReviewCrawlerProcessor {
    * - 크롤링 완료 후 자동 실행
    * - Cloud AI 우선 사용 (실패 시 Local)
    */
-  private startReviewSummary(restaurantId: number, jobId: string): void {
+  private startReviewSummary(restaurantId: number): void {
     // 백그라운드로 실행 (비동기, 에러 무시)
     reviewSummaryProcessor.processIncompleteReviews(restaurantId, true) // useCloud=true
       .then(() => {
-        console.log(`[Job ${jobId}] 리뷰 요약 완료`);
+        console.log(`[레스토랑 ${restaurantId}] 리뷰 요약 완료`);
       })
       .catch(error => {
-        console.error(`[Job ${jobId}] 리뷰 요약 실패:`, error instanceof Error ? error.message : error);
+        console.error(`[레스토랑 ${restaurantId}] 리뷰 요약 실패:`, error instanceof Error ? error.message : error);
       });
   }
 }

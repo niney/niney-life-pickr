@@ -1,7 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import jobManager from '../services/job-manager.service';
-import crawlJobRepository from '../db/repositories/crawl-job.repository';
+import jobRepository from '../db/repositories/job.repository';
+import jobService from '../services/job-socket.service';
 import { ResponseHelper } from '../utils/response.utils';
 
 /**
@@ -37,27 +38,27 @@ const jobRoutes: FastifyPluginAsync = async (fastify) => {
 
     // 없으면 DB에서 조회
     if (!job) {
-      const dbJob = await crawlJobRepository.findById(jobId);
+      const dbJob = await jobRepository.findById(jobId);
       if (!dbJob) {
         return ResponseHelper.notFound(reply, 'Job not found');
       }
 
       // DB 데이터를 Job 형식으로 변환
+      const metadata = dbJob.metadata ? JSON.parse(dbJob.metadata) : {};
+      const result = dbJob.result ? JSON.parse(dbJob.result) : undefined;
+      
       job = {
-        jobId: dbJob.job_id,
+        jobId: dbJob.id,
         restaurantId: dbJob.restaurant_id,
-        placeId: dbJob.place_id,
-        url: dbJob.url,
-        status: dbJob.status,
+        placeId: metadata.placeId || '',
+        url: metadata.url || '',
+        status: dbJob.status as any,
         progress: {
           current: dbJob.progress_current,
           total: dbJob.progress_total,
           percentage: dbJob.progress_percentage
         },
-        result: dbJob.total_reviews !== null ? {
-          totalReviews: dbJob.total_reviews!,
-          savedToDb: dbJob.saved_to_db!
-        } : undefined,
+        result: result,
         error: dbJob.error_message || undefined,
         createdAt: new Date(dbJob.created_at),
         startedAt: dbJob.started_at ? new Date(dbJob.started_at) : undefined,
@@ -92,20 +93,23 @@ const jobRoutes: FastifyPluginAsync = async (fastify) => {
   }, async (request, reply) => {
     const { jobId } = request.params as { jobId: string };
 
-    const job = jobManager.getJob(jobId);
-    if (!job) {
+    // Job 조회 (메모리 우선, 없으면 DB)
+    const jobInfo = await jobService.getJob(jobId);
+    if (!jobInfo) {
       return ResponseHelper.notFound(reply, 'Job not found');
     }
 
+    const job = jobInfo.job as any;
+    
     if (job.status !== 'active' && job.status !== 'waiting') {
       return ResponseHelper.error(reply, `Cannot cancel job with status: ${job.status}`, 400);
     }
 
-    // Job 취소
-    jobManager.cancelJob(jobId);
-    await crawlJobRepository.updateStatus(jobId, 'cancelled', {
-      completedAt: new Date()
-    });
+    // Job 취소 (메모리 + DB 동시, Socket 이벤트 없음 - API 응답으로 충분)
+    if (jobInfo.source === 'memory') {
+      jobManager.cancelJob(jobId);
+    }
+    await jobRepository.cancel(jobId);
 
     return ResponseHelper.success(reply, {
       jobId,
@@ -141,19 +145,24 @@ const jobRoutes: FastifyPluginAsync = async (fastify) => {
 
     // In-Memory + DB 조합
     const memoryJobs = jobManager.getAllJobs(status);
-    const dbJobs = await crawlJobRepository.findAll(status, limit);
+    
+    // DB에서 최근 Job 조회
+    const dbJobs = status 
+      ? await jobRepository.findAllActive()
+      : await jobRepository.findByRestaurant(0, limit); // 전체 조회는 개선 필요
 
     // 중복 제거 (Memory 우선)
     const jobMap = new Map();
     memoryJobs.forEach(job => jobMap.set(job.jobId, job));
 
-    dbJobs.forEach(dbJob => {
-      if (!jobMap.has(dbJob.job_id)) {
-        jobMap.set(dbJob.job_id, {
-          jobId: dbJob.job_id,
+    dbJobs.forEach((dbJob) => {
+      if (!jobMap.has(dbJob.id)) {
+        const metadata = dbJob.metadata ? JSON.parse(dbJob.metadata) : {};
+        jobMap.set(dbJob.id, {
+          jobId: dbJob.id,
           restaurantId: dbJob.restaurant_id,
-          placeId: dbJob.place_id,
-          url: dbJob.url,
+          placeId: metadata.placeId || '',
+          url: metadata.url || '',
           status: dbJob.status,
           progress: {
             current: dbJob.progress_current,
