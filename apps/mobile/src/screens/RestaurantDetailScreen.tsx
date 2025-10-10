@@ -45,6 +45,9 @@ const RestaurantDetailScreen: React.FC = () => {
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu');
 
+  // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
+  const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set());
+
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsLoadingMore, setReviewsLoadingMore] = useState(false);
@@ -175,6 +178,19 @@ const RestaurantDetailScreen: React.FC = () => {
       loadMoreReviews();
     }
   }, [activeTab, loadMoreReviews]);
+
+  // 핵심 키워드 토글 함수
+  const toggleKeywords = (reviewId: number) => {
+    setExpandedKeywords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reviewId)) {
+        newSet.delete(reviewId);
+      } else {
+        newSet.add(reviewId);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -444,6 +460,93 @@ const RestaurantDetailScreen: React.FC = () => {
                   {review.reviewText && (
                     <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
                   )}
+
+                  {/* AI 요약 데이터 표시 */}
+                  {review.summary ? (
+                    <View style={[styles.summaryContainer, { backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e', borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44' }]}>
+                      <View style={styles.summaryHeader}>
+                        <Text style={styles.summaryTitle}>🤖 AI 요약</Text>
+                        <View style={styles.sentimentBadge}>
+                          <Text style={[styles.sentimentText, { 
+                            color: review.summary.sentiment === 'positive' ? '#4caf50' : 
+                                   review.summary.sentiment === 'negative' ? '#f44336' : '#ff9800' 
+                          }]}>
+                            {review.summary.sentiment === 'positive' ? '😊 긍정' : 
+                             review.summary.sentiment === 'negative' ? '😞 부정' : '😐 중립'}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <Text style={[styles.summaryText, { color: colors.text }]}>
+                        {review.summary.summary}
+                      </Text>
+
+                      {review.summary.keyKeywords.length > 0 && (
+                        <View style={styles.summaryKeywords}>
+                          <TouchableOpacity 
+                            style={styles.keywordsToggleButton}
+                            onPress={() => toggleKeywords(review.id)}
+                          >
+                            <Text style={[styles.summaryKeywordsTitle, { color: colors.textSecondary }]}>
+                              핵심 키워드 {expandedKeywords.has(review.id) ? '▼' : '▶'}
+                            </Text>
+                          </TouchableOpacity>
+                          
+                          {expandedKeywords.has(review.id) && (
+                            <View style={styles.keywordsContainer}>
+                              {review.summary.keyKeywords.map((keyword: string, idx: number) => (
+                                <View key={idx} style={styles.summaryKeyword}>
+                                  <Text style={styles.summaryKeywordText}>{keyword}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {review.summary.satisfactionScore !== null && (
+                        <View style={styles.satisfactionScore}>
+                          <Text style={[styles.satisfactionLabel, { color: colors.textSecondary }]}>
+                            만족도:
+                          </Text>
+                          <View style={styles.scoreStars}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={styles.star}>
+                                {star <= (review.summary?.satisfactionScore || 0) ? '⭐' : '☆'}
+                              </Text>
+                            ))}
+                            <Text style={[styles.scoreNumber, { color: colors.text }]}>
+                              {review.summary.satisfactionScore.toFixed(1)}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {review.summary.tips.length > 0 && (
+                        <View style={styles.tipsSection}>
+                          <Text style={[styles.tipsTitle, { color: colors.textSecondary }]}>
+                            💡 팁:
+                          </Text>
+                          {review.summary.tips.map((tip: string, idx: number) => (
+                            <Text key={idx} style={[styles.tipText, { color: colors.text }]}>
+                              • {tip}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      {review.summary.sentimentReason ? (
+                        <View style={styles.sentimentReason}>
+                          <Text style={[styles.sentimentReasonLabel, { color: colors.textSecondary }]}>
+                            감정 분석:
+                          </Text>
+                          <Text style={[styles.sentimentReasonText, { color: colors.text }]}>
+                            {review.summary.sentimentReason}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
 
                   {review.emotionKeywords.length > 0 && (
                     <View style={styles.keywordsContainer}>
@@ -757,6 +860,116 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  // AI 요약 스타일
+  summaryContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6366f1',
+  },
+  sentimentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  sentimentText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  summaryKeywords: {
+    marginTop: 8,
+  },
+  keywordsToggleButton: {
+    paddingVertical: 4,
+  },
+  summaryKeywordsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  summaryKeyword: {
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  summaryKeywordText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#1976d2',
+  },
+  satisfactionScore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  satisfactionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  scoreStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  star: {
+    fontSize: 14,
+  },
+  scoreNumber: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  tipsSection: {
+    marginTop: 8,
+  },
+  tipsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  tipText: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 2,
+  },
+  sentimentReason: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  sentimentReasonLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  sentimentReasonText: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
 });
 
