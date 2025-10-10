@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft, faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons'
+import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { ReviewData } from '@shared/services'
@@ -138,6 +139,34 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         newSet.add(reviewId)
       }
       return newSet
+    })
+  }
+
+  // 별점 렌더링 함수 (0~100 점수를 1~5 별점으로 변환, 반별 포함)
+  const renderStars = (score: number) => {
+    const normalizedScore = score / 20 // 0-100 → 0-5
+
+    return [1, 2, 3, 4, 5].map((position) => {
+      const diff = normalizedScore - position + 1
+      let icon
+      let color = '#ffc107' // 금색
+
+      if (diff >= 0.75) {
+        icon = faStar // 채운 별
+      } else if (diff >= 0.25) {
+        icon = faStarHalfStroke // 반별
+      } else {
+        icon = farStar // 빈 별
+        color = colors.border // 회색
+      }
+
+      return (
+        <FontAwesomeIcon
+          key={position}
+          icon={icon}
+          style={{ fontSize: 16, color, marginRight: 2 }}
+        />
+      )
     })
   }
 
@@ -429,13 +458,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                         <View style={styles.satisfactionScore}>
                           <Text style={[styles.satisfactionLabel, { color: colors.textSecondary }]}>만족도:</Text>
                           <View style={styles.scoreStars}>
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Text key={star} style={styles.star}>
-                                {star <= (review.summary?.satisfactionScore || 0) ? '⭐' : '☆'}
-                              </Text>
-                            ))}
+                            {renderStars(review.summary.satisfactionScore)}
                             <Text style={[styles.scoreNumber, { color: colors.text }]}>
-                              {review.summary.satisfactionScore.toFixed(1)}
+                              {review.summary.satisfactionScore}점
                             </Text>
                           </View>
                         </View>

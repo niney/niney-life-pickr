@@ -74,7 +74,7 @@ const RestaurantDetailScreen: React.FC = () => {
       onCompleted: async () => {
         // 리뷰 다시 로드
         await fetchReviews(0, false); // offset 0으로 초기화
-        
+
         // 메뉴도 함께 갱신
         await fetchMenus();
       },
@@ -118,28 +118,28 @@ const RestaurantDetailScreen: React.FC = () => {
 
     // 요청 시작 - offset 기록
     fetchingOffsetRef.current = offset;
-    
+
     if (append) {
       setReviewsLoadingMore(true);
     } else {
       setReviewsLoading(true);
     }
-    
+
     try {
       const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset);
-      
+
       if (response.result && response.data) {
         const newReviews = response.data.reviews;
-        
+
         if (append) {
           setReviews(prev => [...prev, ...newReviews]);
         } else {
           setReviews(newReviews);
         }
-        
+
         setReviewsTotal(response.data.total);
         setReviewsOffset(offset);
-        
+
         // 더 불러올 데이터가 있는지 확인
         const hasMore = offset + newReviews.length < response.data.total;
         setHasMoreReviews(hasMore);
@@ -193,7 +193,7 @@ const RestaurantDetailScreen: React.FC = () => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const paddingToBottom = 100; // 하단에서 100px 전에 트리거
     const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
-    
+
     if (isNearBottom && activeTab === 'review') {
       loadMoreReviews();
     }
@@ -274,56 +274,56 @@ const RestaurantDetailScreen: React.FC = () => {
           {/* 크롤링 진행 상태 */}
           {reviewCrawlStatus.status === 'active' && (
             <View style={styles.crawlProgressContainer}>
-            <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
-              <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
-                🔄 리뷰 크롤링 중...
-              </Text>
+              <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
+                  🔄 리뷰 크롤링 중...
+                </Text>
 
-              {crawlProgress && (
-                <View style={styles.progressSection}>
-                  <View style={styles.progressInfo}>
-                    <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
-                    <Text style={[styles.progressText, { color: colors.text }]}>
-                      {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
-                    </Text>
+                {crawlProgress && (
+                  <View style={styles.progressSection}>
+                    <View style={styles.progressInfo}>
+                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
+                      <Text style={[styles.progressText, { color: colors.text }]}>
+                        {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
+                      </Text>
+                    </View>
+                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            backgroundColor: colors.primary,
+                            width: `${crawlProgress.percentage}%`
+                          }
+                        ]}
+                      />
+                    </View>
                   </View>
-                  <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          backgroundColor: colors.primary,
-                          width: `${crawlProgress.percentage}%`
-                        }
-                      ]}
-                    />
-                  </View>
-                </View>
-              )}
+                )}
 
-              {dbProgress && (
-                <View style={styles.progressSection}>
-                  <View style={styles.progressInfo}>
-                    <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-                    <Text style={[styles.progressText, { color: colors.text }]}>
-                      {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
-                    </Text>
+                {dbProgress && (
+                  <View style={styles.progressSection}>
+                    <View style={styles.progressInfo}>
+                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
+                      <Text style={[styles.progressText, { color: colors.text }]}>
+                        {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
+                      </Text>
+                    </View>
+                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            backgroundColor: '#4caf50',
+                            width: `${dbProgress.percentage}%`
+                          }
+                        ]}
+                      />
+                    </View>
                   </View>
-                  <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          backgroundColor: '#4caf50',
-                          width: `${dbProgress.percentage}%`
-                        }
-                      ]}
-                    />
-                  </View>
-                </View>
-              )}
+                )}
+              </View>
             </View>
-          </View>
           )}
 
           {/* 리뷰 요약 진행 상태 */}
@@ -466,178 +466,178 @@ const RestaurantDetailScreen: React.FC = () => {
               </View>
             ) : reviews.length > 0 ? (
               <View style={styles.reviewsList}>
-            {reviews.map((review) => (
-              <View
-                key={review.id}
-                style={[
-                  styles.reviewCardContainer,
-                  theme === 'dark' ? styles.reviewCardDark : styles.reviewCardLight,
-                ]}
-              >
-                <BlurView
-                  style={styles.blurContainer}
-                  blurType={theme === 'dark' ? 'dark' : 'light'}
-                  blurAmount={20}
-                  reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
-                  pointerEvents="none"
-                />
-                <View style={styles.reviewCardContent}>
-                  <View style={styles.reviewCardHeader}>
-                    <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
-                    {review.visitInfo.visitDate && (
-                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                        {review.visitInfo.visitDate}
-                      </Text>
-                    )}
-                  </View>
-
-                  {review.visitKeywords.length > 0 && (
-                    <View style={styles.keywordsContainer}>
-                      {review.visitKeywords.map((keyword: string, idx: number) => (
-                        <View key={idx} style={[styles.keyword, { backgroundColor: colors.border }]}>
-                          <Text style={[styles.keywordText, { color: colors.text }]}>{keyword}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {review.reviewText && (
-                    <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
-                  )}
-
-                  {/* AI 요약 데이터 표시 */}
-                  {review.summary ? (
-                    <View style={[styles.summaryContainer, { backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e', borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44' }]}>
-                      <View style={styles.summaryHeader}>
-                        <Text style={styles.summaryTitle}>🤖 AI 요약</Text>
-                        <View style={styles.sentimentBadge}>
-                          <Text style={[styles.sentimentText, { 
-                            color: review.summary.sentiment === 'positive' ? '#4caf50' : 
-                                   review.summary.sentiment === 'negative' ? '#f44336' : '#ff9800' 
-                          }]}>
-                            {review.summary.sentiment === 'positive' ? '😊 긍정' : 
-                             review.summary.sentiment === 'negative' ? '😞 부정' : '😐 중립'}
+                {reviews.map((review) => (
+                  <View
+                    key={review.id}
+                    style={[
+                      styles.reviewCardContainer,
+                      theme === 'dark' ? styles.reviewCardDark : styles.reviewCardLight,
+                    ]}
+                  >
+                    <BlurView
+                      style={styles.blurContainer}
+                      blurType={theme === 'dark' ? 'dark' : 'light'}
+                      blurAmount={20}
+                      reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+                      pointerEvents="none"
+                    />
+                    <View style={styles.reviewCardContent}>
+                      <View style={styles.reviewCardHeader}>
+                        <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
+                        {review.visitInfo.visitDate && (
+                          <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                            {review.visitInfo.visitDate}
                           </Text>
-                        </View>
+                        )}
                       </View>
-                      
-                      <Text style={[styles.summaryText, { color: colors.text }]}>
-                        {review.summary.summary}
-                      </Text>
 
-                      {review.summary.keyKeywords.length > 0 && (
-                        <View style={styles.summaryKeywords}>
-                          <TouchableOpacity 
-                            style={styles.keywordsToggleButton}
-                            onPress={() => toggleKeywords(review.id)}
-                          >
-                            <Text style={[styles.summaryKeywordsTitle, { color: colors.textSecondary }]}>
-                              핵심 키워드 {expandedKeywords.has(review.id) ? '▼' : '▶'}
-                            </Text>
-                          </TouchableOpacity>
-                          
-                          {expandedKeywords.has(review.id) && (
-                            <View style={styles.keywordsContainer}>
-                              {review.summary.keyKeywords.map((keyword: string, idx: number) => (
-                                <View key={idx} style={styles.summaryKeyword}>
-                                  <Text style={styles.summaryKeywordText}>{keyword}</Text>
-                                </View>
-                              ))}
+                      {review.visitKeywords.length > 0 && (
+                        <View style={styles.keywordsContainer}>
+                          {review.visitKeywords.map((keyword: string, idx: number) => (
+                            <View key={idx} style={[styles.keyword, { backgroundColor: colors.border }]}>
+                              <Text style={[styles.keywordText, { color: colors.text }]}>{keyword}</Text>
                             </View>
-                          )}
-                        </View>
-                      )}
-
-                      {review.summary.satisfactionScore !== null && (
-                        <View style={styles.satisfactionScore}>
-                          <Text style={[styles.satisfactionLabel, { color: colors.textSecondary }]}>
-                            만족도:
-                          </Text>
-                          <View style={styles.scoreStars}>
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Text key={star} style={styles.star}>
-                                {star <= (review.summary?.satisfactionScore || 0) ? '⭐' : '☆'}
-                              </Text>
-                            ))}
-                            <Text style={[styles.scoreNumber, { color: colors.text }]}>
-                              {review.summary.satisfactionScore.toFixed(1)}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-
-                      {review.summary.tips.length > 0 && (
-                        <View style={styles.tipsSection}>
-                          <Text style={[styles.tipsTitle, { color: colors.textSecondary }]}>
-                            💡 팁:
-                          </Text>
-                          {review.summary.tips.map((tip: string, idx: number) => (
-                            <Text key={idx} style={[styles.tipText, { color: colors.text }]}>
-                              • {tip}
-                            </Text>
                           ))}
                         </View>
                       )}
 
-                      {review.summary.sentimentReason ? (
-                        <View style={styles.sentimentReason}>
-                          <Text style={[styles.sentimentReasonLabel, { color: colors.textSecondary }]}>
-                            감정 분석:
+                      {review.reviewText && (
+                        <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
+                      )}
+
+                      {/* AI 요약 데이터 표시 */}
+                      {review.summary ? (
+                        <View style={[styles.summaryContainer, { backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e', borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44' }]}>
+                          <View style={styles.summaryHeader}>
+                            <Text style={styles.summaryTitle}>🤖 AI 요약</Text>
+                            <View style={styles.sentimentBadge}>
+                              <Text style={[styles.sentimentText, {
+                                color: review.summary.sentiment === 'positive' ? '#4caf50' :
+                                  review.summary.sentiment === 'negative' ? '#f44336' : '#ff9800'
+                              }]}>
+                                {review.summary.sentiment === 'positive' ? '😊 긍정' :
+                                  review.summary.sentiment === 'negative' ? '😞 부정' : '😐 중립'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Text style={[styles.summaryText, { color: colors.text }]}>
+                            {review.summary.summary}
                           </Text>
-                          <Text style={[styles.sentimentReasonText, { color: colors.text }]}>
-                            {review.summary.sentimentReason}
-                          </Text>
+
+                          {review.summary.keyKeywords.length > 0 && (
+                            <View style={styles.summaryKeywords}>
+                              <TouchableOpacity
+                                style={styles.keywordsToggleButton}
+                                onPress={() => toggleKeywords(review.id)}
+                              >
+                                <Text style={[styles.summaryKeywordsTitle, { color: colors.textSecondary }]}>
+                                  핵심 키워드 {expandedKeywords.has(review.id) ? '▼' : '▶'}
+                                </Text>
+                              </TouchableOpacity>
+
+                              {expandedKeywords.has(review.id) && (
+                                <View style={styles.keywordsContainer}>
+                                  {review.summary.keyKeywords.map((keyword: string, idx: number) => (
+                                    <View key={idx} style={styles.summaryKeyword}>
+                                      <Text style={styles.summaryKeywordText}>{keyword}</Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              )}
+                            </View>
+                          )}
+
+                          {review.summary.satisfactionScore !== null && (
+                            <View style={styles.satisfactionScore}>
+                              <Text style={[styles.satisfactionLabel, { color: colors.textSecondary }]}>
+                                만족도:
+                              </Text>
+                              <View style={styles.scoreStars}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Text key={star} style={styles.star}>
+                                    {star <= (review.summary?.satisfactionScore || 0) ? '⭐' : '☆'}
+                                  </Text>
+                                ))}
+                                <Text style={[styles.scoreNumber, { color: colors.text }]}>
+                                  {review.summary.satisfactionScore.toFixed(1)}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+
+                          {review.summary.tips.length > 0 && (
+                            <View style={styles.tipsSection}>
+                              <Text style={[styles.tipsTitle, { color: colors.textSecondary }]}>
+                                💡 팁:
+                              </Text>
+                              {review.summary.tips.map((tip: string, idx: number) => (
+                                <Text key={idx} style={[styles.tipText, { color: colors.text }]}>
+                                  • {tip}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+
+                          {review.summary.sentimentReason ? (
+                            <View style={styles.sentimentReason}>
+                              <Text style={[styles.sentimentReasonLabel, { color: colors.textSecondary }]}>
+                                감정 분석:
+                              </Text>
+                              <Text style={[styles.sentimentReasonText, { color: colors.text }]}>
+                                {review.summary.sentimentReason}
+                              </Text>
+                            </View>
+                          ) : null}
                         </View>
                       ) : null}
-                    </View>
-                  ) : null}
 
-                  {review.emotionKeywords.length > 0 && (
-                    <View style={styles.keywordsContainer}>
-                      {review.emotionKeywords.map((keyword: string, idx: number) => (
-                        <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
-                          <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
+                      {review.emotionKeywords.length > 0 && (
+                        <View style={styles.keywordsContainer}>
+                          {review.emotionKeywords.map((keyword: string, idx: number) => (
+                            <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
+                              <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
+                            </View>
+                          ))}
                         </View>
-                      ))}
-                    </View>
-                  )}
+                      )}
 
-                  <View style={styles.visitInfo}>
-                    {review.visitInfo.visitCount && (
-                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                        {review.visitInfo.visitCount}
-                      </Text>
-                    )}
-                    {review.visitInfo.verificationMethod && (
-                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                        • {review.visitInfo.verificationMethod}
-                      </Text>
-                    )}
-                    {review.waitTime && (
-                      <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
-                        • {review.waitTime}
-                      </Text>
-                    )}
+                      <View style={styles.visitInfo}>
+                        {review.visitInfo.visitCount && (
+                          <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                            {review.visitInfo.visitCount}
+                          </Text>
+                        )}
+                        {review.visitInfo.verificationMethod && (
+                          <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                            • {review.visitInfo.verificationMethod}
+                          </Text>
+                        )}
+                        {review.waitTime && (
+                          <Text style={[styles.visitInfoText, { color: colors.textSecondary }]}>
+                            • {review.waitTime}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
                   </View>
-                </View>
+                ))}
               </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
-          </View>
-        )}
-        
-        {/* 추가 로딩 인디케이터 */}
-        {reviewsLoadingMore && (
-          <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.footerLoaderText, { color: colors.textSecondary }]}>
-              리뷰 불러오는 중...
-            </Text>
-          </View>
-        )}
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
+              </View>
+            )}
+
+            {/* 추가 로딩 인디케이터 */}
+            {reviewsLoadingMore && (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.footerLoaderText, { color: colors.textSecondary }]}>
+                  리뷰 불러오는 중...
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
