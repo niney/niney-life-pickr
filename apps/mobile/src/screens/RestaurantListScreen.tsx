@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -37,6 +38,9 @@ const RestaurantListScreen: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
+  
+  // Pull to refresh 상태
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchCategories = async () => {
     setCategoriesLoading(true);
@@ -72,6 +76,21 @@ const RestaurantListScreen: React.FC = () => {
   useEffect(() => {
     fetchCategories();
     fetchRestaurants();
+  }, []);
+
+  // Pull to refresh 핸들러
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchCategories(),
+        fetchRestaurants()
+      ]);
+    } catch (error) {
+      console.error('새로고침 실패:', error);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   const handleCrawl = async () => {
@@ -166,6 +185,14 @@ const RestaurantListScreen: React.FC = () => {
         style={styles.scrollView} 
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* 검색 입력 */}
         <View style={styles.searchContainer}>

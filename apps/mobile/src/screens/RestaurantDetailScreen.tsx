@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,6 +59,9 @@ const RestaurantDetailScreen: React.FC = () => {
 
   const [menus, setMenus] = useState<MenuItem[]>([]);
   const [menusLoading, setMenusLoading] = useState(false);
+
+  // Pull to refresh 상태
+  const [refreshing, setRefreshing] = useState(false);
 
   // 중복 요청 방지를 위한 ref
   const fetchingOffsetRef = useRef<number | null>(null);
@@ -190,6 +194,22 @@ const RestaurantDetailScreen: React.FC = () => {
     });
   };
 
+  // Pull to refresh 핸들러
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // 리뷰와 메뉴 동시에 새로고침
+      await Promise.all([
+        fetchReviews(0, false),
+        fetchMenus()
+      ]);
+    } catch (error) {
+      console.error('새로고침 실패:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [restaurantId]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -202,6 +222,14 @@ const RestaurantDetailScreen: React.FC = () => {
         decelerationRate="normal"
         onScroll={handleScroll}
         scrollEventThrottle={400}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* 레스토랑 정보 + 크롤링 상태 헤더 (높이 측정용) */}
         <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
