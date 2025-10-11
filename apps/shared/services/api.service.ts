@@ -166,6 +166,7 @@ export interface ReviewData {
   reviewText: string | null;
   emotionKeywords: string[];
   visitInfo: VisitInfo;
+  images: string[];
   crawledAt: string;
   createdAt: string;
   summary?: ReviewSummary | null;

@@ -40,6 +40,7 @@ const ReviewSchema = Type.Object({
   reviewText: Type.Union([Type.String(), Type.Null()], { description: '리뷰 텍스트' }),
   emotionKeywords: Type.Array(Type.String(), { description: '감정 키워드 (예: ["맛있어요", "친절해요"])' }),
   visitInfo: VisitInfoSchema,
+  images: Type.Array(Type.String(), { description: '이미지 URL 배열 (예: ["/data/images/reviews/123/abc/0.jpg"])' }),
   crawledAt: Type.String({ description: '크롤링 시간 (ISO 8601)' }),
   createdAt: Type.String({ description: '생성 시간 (ISO 8601)' }),
   summary: Type.Optional(Type.Union([ReviewSummarySchema, Type.Null()], { description: 'AI 요약 데이터 (있는 경우)' }))
@@ -235,7 +236,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       // 3. DB 데이터를 API 응답 형식으로 변환
       const reviews = reviewsWithSummary.map(row => {
         let summaryData = null;
-        
+
         // summary_data가 있으면 JSON 파싱
         if (row.summary_data) {
           try {
@@ -253,6 +254,16 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
+        // images JSON 파싱
+        let images: string[] = [];
+        if (row.images) {
+          try {
+            images = JSON.parse(row.images);
+          } catch (error) {
+            console.error(`Failed to parse images for review ${row.id}:`, error);
+          }
+        }
+
         return {
           id: row.id,
           userName: row.user_name,
@@ -265,6 +276,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
             visitCount: row.visit_count,
             verificationMethod: row.verification_method
           },
+          images,
           crawledAt: row.crawled_at,
           createdAt: row.created_at,
           summary: summaryData
@@ -363,21 +375,34 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       ]);
 
       // 3. DB 데이터를 API 응답 형식으로 변환 (쉼표 구분 문자열 → 배열)
-      const reviews = reviewsDB.map(review => ({
-        id: review.id,
-        userName: review.user_name,
-        visitKeywords: review.visit_keywords ? review.visit_keywords.split(',') : [],
-        waitTime: review.wait_time,
-        reviewText: review.review_text,
-        emotionKeywords: review.emotion_keywords ? review.emotion_keywords.split(',') : [],
-        visitInfo: {
-          visitDate: review.visit_date,
-          visitCount: review.visit_count,
-          verificationMethod: review.verification_method
-        },
-        crawledAt: review.crawled_at,
-        createdAt: review.created_at
-      }));
+      const reviews = reviewsDB.map(review => {
+        // images JSON 파싱
+        let images: string[] = [];
+        if (review.images) {
+          try {
+            images = JSON.parse(review.images);
+          } catch (error) {
+            console.error(`Failed to parse images for review ${review.id}:`, error);
+          }
+        }
+
+        return {
+          id: review.id,
+          userName: review.user_name,
+          visitKeywords: review.visit_keywords ? review.visit_keywords.split(',') : [],
+          waitTime: review.wait_time,
+          reviewText: review.review_text,
+          emotionKeywords: review.emotion_keywords ? review.emotion_keywords.split(',') : [],
+          visitInfo: {
+            visitDate: review.visit_date,
+            visitCount: review.visit_count,
+            verificationMethod: review.verification_method
+          },
+          images,
+          crawledAt: review.crawled_at,
+          createdAt: review.created_at
+        };
+      });
 
       return ResponseHelper.success(
         reply,

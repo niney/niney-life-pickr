@@ -63,8 +63,8 @@ export class ImageDownloader {
       // 5. 파일 저장
       await fs.writeFile(filePath, buffer);
 
-      // 6. 상대 경로 반환 (API에서 서빙할 경로)
-      const relativePath = `/images/reviews/${placeId}/${reviewHash}/${filename}`;
+      // 6. 상대 경로 반환 (API에서 서빙할 경로, /data/ 프리픽스 포함)
+      const relativePath = `/data/images/reviews/${placeId}/${reviewHash}/${filename}`;
       console.log(`✅ 이미지 저장 완료: ${relativePath}`);
 
       return relativePath;

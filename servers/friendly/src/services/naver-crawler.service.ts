@@ -65,8 +65,8 @@ class NaverCrawlerService {
   async launchBrowser(protocolTimeout: number = 30000): Promise<Browser> {
     const chromePath = await this.getChromePath();
     const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
-      headless: true, // 디버깅을 위해 브라우저 창 표시
-      protocolTimeout, // 파라미터로 받은 타임아웃 사용
+      headless: false, // 디버깅을 위해 브라우저 창 표시
+      protocolTimeout, // 파라미터로 받은 타임xr아웃 사용
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -918,10 +918,8 @@ class NaverCrawlerService {
 
             // 리뷰 이미지 URL 추출 (여러 선택자 시도)
             const imageSelectors = [
-              '.flicking-camera .HH5sZ img',  // 일반 구조
               '.flicking-camera img',          // 간단한 구조
               '.lazyload-wrapper img',         // lazyload 컨테이너
-              'img[src*="blogfiles"]'          // 네이버 블로그 이미지
             ];
 
             const imageUrls: string[] = [];

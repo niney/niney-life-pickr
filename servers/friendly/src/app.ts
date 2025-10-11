@@ -57,7 +57,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(fastifyStatic, {
     root: path.join(__dirname, '../data'),
     prefix: '/data/',
-    decorateReply: false
+    decorateReply: false,
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    }
   });
 
   // Register Swagger for API documentation

@@ -8,6 +8,16 @@ import { THEME_COLORS } from '@shared/constants'
 import type { ReviewData } from '@shared/services'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
 
+// API 기본 URL (동적 호스트 감지)
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol
+    const hostname = window.location.hostname
+    return `${protocol}//${hostname}:4000`
+  }
+  return 'http://localhost:4000'
+}
+
 interface RestaurantDetailProps {
   isMobile?: boolean
 }
@@ -44,7 +54,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     reviews,
     reviewsLoading,
     reviewsTotal,
-    hasMore,
+    hasMoreReviews,
     loadMoreReviews,
     menus,
     menusLoading,
@@ -64,13 +74,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
-    if (id && hasMore && !reviewsLoading) {
+    if (id && hasMoreReviews && !reviewsLoading) {
       const restaurantId = parseInt(id, 10)
       if (!isNaN(restaurantId)) {
         loadMoreReviews(restaurantId)
       }
     }
-  }, [id, hasMore, reviewsLoading, loadMoreReviews])
+  }, [id, hasMoreReviews, reviewsLoading, loadMoreReviews])
 
   // 데스크톱 스크롤 이벤트 (스크롤 영역 감지)
   useEffect(() => {
@@ -411,6 +421,32 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                     <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
                   )}
 
+                  {/* 리뷰 이미지 표시 */}
+                  {review.images && review.images.length > 0 && (
+                    <View style={styles.reviewImagesContainer}>
+                      {review.images.map((imageUrl: string, idx: number) => {
+                        const apiBaseUrl = getApiBaseUrl()
+                        const fullImageUrl = `${apiBaseUrl}${imageUrl}`
+
+                        return (
+                          <img
+                            key={idx}
+                            src={fullImageUrl}
+                            alt={`리뷰 이미지 ${idx + 1}`}
+                            style={{
+                              width: review.images.length === 1 ? '100%' : 'calc(50% - 6px)',
+                              height: 200,
+                              objectFit: 'cover',
+                              borderRadius: 8,
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => window.open(fullImageUrl, '_blank')}
+                          />
+                        )
+                      })}
+                    </View>
+                  )}
+
                   {/* AI 요약 데이터 표시 */}
                   {review.summary && (
                     <View style={[styles.summaryContainer, { backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e', borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44' }]}>
@@ -522,7 +558,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             </View>
 
             {/* 무한 스크롤 트리거 (모바일) */}
-            {isMobile && hasMore && (
+            {isMobile && hasMoreReviews && (
               <div ref={loadMoreTriggerRef} style={{ padding: '20px', textAlign: 'center' }}>
                 {reviewsLoading && (
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -531,14 +567,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             )}
 
             {/* 로딩 인디케이터 (데스크톱) */}
-            {!isMobile && reviewsLoading && hasMore && (
+            {!isMobile && reviewsLoading && hasMoreReviews && (
               <View style={styles.loadMoreButtonContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
             )}
 
             {/* 모든 리뷰 로드 완료 표시 */}
-            {!hasMore && (
+            {!hasMoreReviews && (
               <View style={styles.endMessageContainer}>
                 <Text style={[styles.endMessageText, { color: colors.textSecondary }]}>
                   모든 리뷰를 불러왔습니다 ({reviewsTotal}개)
@@ -737,30 +773,30 @@ const styles = StyleSheet.create({
   },
   crawlProgressTitle: {
     fontSize: 16,
-    fontWeight: '700' as '700',
+    fontWeight: '700' as const,
     marginBottom: 16,
   },
   progressSection: {
     marginBottom: 12,
   },
   progressInfo: {
-    flexDirection: 'row' as 'row',
-    justifyContent: 'space-between' as 'space-between',
-    alignItems: 'center' as 'center',
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
     marginBottom: 8,
   },
   progressLabel: {
     fontSize: 14,
-    fontWeight: '600' as '600',
+    fontWeight: '600' as const,
   },
   progressText: {
     fontSize: 14,
-    fontWeight: '500' as '500',
+    fontWeight: '500' as const,
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
-    overflow: 'hidden' as 'hidden',
+    overflow: 'hidden' as const,
   },
   progressBarFill: {
     height: '100%',
@@ -773,7 +809,7 @@ const styles = StyleSheet.create({
   },
   progressStat: {
     fontSize: 13,
-    fontWeight: '500' as '500',
+    fontWeight: '500' as const,
   },
   loadMoreButtonContainer: {
     padding: 20,
@@ -882,6 +918,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+  reviewImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 12,
   },
 })
 
