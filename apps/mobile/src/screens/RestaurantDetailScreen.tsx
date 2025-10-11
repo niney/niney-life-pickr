@@ -82,8 +82,10 @@ const RestaurantDetailScreen: React.FC = () => {
     reviewsLoadingMore,
     reviewsTotal,
     hasMoreReviews,
+    sentimentFilter,
     fetchReviews,
     loadMoreReviews,
+    changeSentimentFilter,
   } = useReviews();
 
   const {
@@ -403,6 +405,73 @@ const RestaurantDetailScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           </View>
+
+          {/* 감정 필터 (리뷰 탭에서만 표시) */}
+          {activeTab === 'review' && (
+            <View style={styles.filterContainer}>
+              <View style={styles.filterButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    {
+                      backgroundColor: sentimentFilter === 'all' ? colors.primary : (theme === 'light' ? '#f5f5f5' : colors.surface),
+                      borderColor: sentimentFilter === 'all' ? colors.primary : colors.border
+                    }
+                  ]}
+                  onPress={() => changeSentimentFilter(restaurantId, 'all')}
+                >
+                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'all' ? '#fff' : colors.text }]}>
+                    전체
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    {
+                      backgroundColor: sentimentFilter === 'positive' ? '#4caf50' : (theme === 'light' ? '#f5f5f5' : colors.surface),
+                      borderColor: sentimentFilter === 'positive' ? '#4caf50' : colors.border
+                    }
+                  ]}
+                  onPress={() => changeSentimentFilter(restaurantId, 'positive')}
+                >
+                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'positive' ? '#fff' : colors.text }]}>
+                    😊 긍정
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    {
+                      backgroundColor: sentimentFilter === 'negative' ? '#f44336' : (theme === 'light' ? '#f5f5f5' : colors.surface),
+                      borderColor: sentimentFilter === 'negative' ? '#f44336' : colors.border
+                    }
+                  ]}
+                  onPress={() => changeSentimentFilter(restaurantId, 'negative')}
+                >
+                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'negative' ? '#fff' : colors.text }]}>
+                    😞 부정
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    {
+                      backgroundColor: sentimentFilter === 'neutral' ? '#ff9800' : (theme === 'light' ? '#f5f5f5' : colors.surface),
+                      borderColor: sentimentFilter === 'neutral' ? '#ff9800' : colors.border
+                    }
+                  ]}
+                  onPress={() => changeSentimentFilter(restaurantId, 'neutral')}
+                >
+                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'neutral' ? '#fff' : colors.text }]}>
+                    😐 중립
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* 메뉴 탭 */}
@@ -1042,6 +1111,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontStyle: 'italic',
+  },
+  filterContainer: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  filterButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { apiService, type ReviewData, Alert } from '../'
 
+export type SentimentFilter = 'all' | 'positive' | 'negative' | 'neutral'
+
 /**
  * 리뷰 관리 훅 (무한 스크롤 지원)
  * 플랫폼 독립적 - 웹/모바일 공통 사용
@@ -13,6 +15,7 @@ export const useReviews = () => {
   const [reviewsLimit] = useState(20)
   const [reviewsOffset, setReviewsOffset] = useState(0)
   const [hasMoreReviews, setHasMoreReviews] = useState(true)
+  const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>('all')
 
   // 중복 요청 방지를 위한 ref
   const fetchingOffsetRef = useRef<number | null>(null)
@@ -33,7 +36,9 @@ export const useReviews = () => {
     }
 
     try {
-      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset)
+      // sentiment 필터 적용
+      const sentiments = sentimentFilter === 'all' ? undefined : [sentimentFilter]
+      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset, sentiments)
       if (response.result && response.data) {
         const newReviews = response.data.reviews
 
@@ -77,6 +82,31 @@ export const useReviews = () => {
     fetchingOffsetRef.current = null // ref도 초기화
   }
 
+  const changeSentimentFilter = async (restaurantId: number, filter: SentimentFilter) => {
+    setSentimentFilter(filter)
+    // 필터가 변경되면 리뷰를 처음부터 다시 로드
+    clearReviews()
+    // 새 필터로 리뷰 재조회 (다음 렌더링에서 sentimentFilter가 업데이트되므로, 직접 전달)
+    const sentiments = filter === 'all' ? undefined : [filter]
+
+    setReviewsLoading(true)
+    try {
+      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, 0, sentiments)
+      if (response.result && response.data) {
+        setReviews(response.data.reviews)
+        setReviewsTotal(response.data.total)
+        setReviewsOffset(0)
+        const hasMore = response.data.reviews.length < response.data.total
+        setHasMoreReviews(hasMore)
+      }
+    } catch (err) {
+      console.error('리뷰 조회 실패:', err)
+      Alert.error('조회 실패', '리뷰를 불러오는데 실패했습니다')
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
   return {
     reviews,
     reviewsLoading,
@@ -85,9 +115,11 @@ export const useReviews = () => {
     reviewsLimit,
     reviewsOffset,
     hasMoreReviews,
+    sentimentFilter,
     fetchReviews,
     loadMoreReviews,
     clearReviews,
+    changeSentimentFilter,
   }
 }
 
