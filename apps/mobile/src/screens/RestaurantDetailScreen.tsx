@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,12 +21,21 @@ import {
   useSocket,
   THEME_COLORS,
   useReviews,
-  useMenus
+  useMenus,
+  apiService
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
 type TabType = 'menu' | 'review';
+
+// API Base URL 헬퍼 함수
+const getApiBaseUrl = (): string => {
+  // @ts-ignore - apiService.baseUrl는 private이지만 접근 가능
+  return (apiService as any).baseUrl || 'http://localhost:4000';
+};
 
 const RestaurantDetailScreen: React.FC = () => {
   const route = useRoute<RestaurantDetailRouteProp>();
@@ -477,6 +488,35 @@ const RestaurantDetailScreen: React.FC = () => {
                         <Text style={[styles.reviewText, { color: colors.text }]}>{review.reviewText}</Text>
                       )}
 
+                      {/* 리뷰 이미지 표시 */}
+                      {review.images && review.images.length > 0 && (
+                        <View style={styles.reviewImagesContainer}>
+                          {review.images.length === 1 ? (
+                            <Image
+                              source={{ uri: `${getApiBaseUrl()}${review.images[0]}` }}
+                              style={styles.reviewImageFull}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              style={styles.reviewImagesScrollView}
+                              contentContainerStyle={styles.reviewImagesScrollContent}
+                            >
+                              {review.images.map((imageUrl: string, idx: number) => (
+                                <Image
+                                  key={idx}
+                                  source={{ uri: `${getApiBaseUrl()}${imageUrl}` }}
+                                  style={styles.reviewImageScroll}
+                                  resizeMode="cover"
+                                />
+                              ))}
+                            </ScrollView>
+                          )}
+                        </View>
+                      )}
+
                       {/* AI 요약 데이터 표시 */}
                       {review.summary ? (
                         <View style={[styles.summaryContainer, { backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e', borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44' }]}>
@@ -841,6 +881,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 8,
+  },
+  reviewImagesContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  reviewImageFull: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  reviewImagesScrollView: {
+    marginHorizontal: -16, // 카드 패딩 상쇄
+  },
+  reviewImagesScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  reviewImageScroll: {
+    width: 160,
+    height: 120,
+    borderRadius: 12,
+    marginRight: 8,
   },
   visitInfo: {
     flexDirection: 'row',
