@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from '@react-native-community/blur';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons';
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons';
@@ -410,13 +409,6 @@ const RestaurantDetailScreen: React.FC = () => {
                         theme === 'dark' ? styles.menuCardDark : styles.menuCardLight,
                       ]}
                     >
-                      <BlurView
-                        style={styles.blurContainer}
-                        blurType={theme === 'dark' ? 'dark' : 'light'}
-                        blurAmount={20}
-                        reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
-                        pointerEvents="none"
-                      />
                       <View style={styles.menuCardContent}>
                         <View style={styles.menuInfo}>
                           <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
@@ -457,13 +449,6 @@ const RestaurantDetailScreen: React.FC = () => {
                       theme === 'dark' ? styles.reviewCardDark : styles.reviewCardLight,
                     ]}
                   >
-                    <BlurView
-                      style={styles.blurContainer}
-                      blurType={theme === 'dark' ? 'dark' : 'light'}
-                      blurAmount={20}
-                      reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
-                      pointerEvents="none"
-                    />
                     <View style={styles.reviewCardContent}>
                       <View style={styles.reviewCardHeader}>
                         <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
@@ -722,29 +707,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   menusList: {
-    gap: 12,
+    // gap 제거 - borderBottom으로 구분
   },
   menuCardContainer: {
     overflow: 'hidden',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    borderBottomWidth: 1,
+    paddingVertical: 12,
   },
   menuCardLight: {
-    borderColor: 'rgba(0, 0, 0, 0.08)',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'transparent',
   },
   menuCardDark: {
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    backgroundColor: 'rgba(26, 26, 26, 0.3)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'transparent',
   },
   menuCardContent: {
-    padding: 14,
+    paddingVertical: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -814,36 +793,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   reviewsList: {
-    gap: 12,
+    // gap 제거 - borderBottom으로 구분
   },
   reviewCardContainer: {
     overflow: 'hidden',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
+    borderBottomWidth: 1,
+    paddingVertical: 16,
   },
   reviewCardLight: {
-    borderColor: 'rgba(0, 0, 0, 0.08)',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'transparent',
   },
   reviewCardDark: {
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    backgroundColor: 'rgba(26, 26, 26, 0.3)',
-  },
-  blurContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'transparent',
   },
   reviewCardContent: {
-    padding: 16,
+    paddingVertical: 4,
   },
   reviewCardHeader: {
     flexDirection: 'row',
@@ -896,13 +862,13 @@ const styles = StyleSheet.create({
   },
   reviewImagesScrollContent: {
     paddingHorizontal: 16,
-    gap: 8,
+    gap: 4,
   },
   reviewImageScroll: {
     width: 160,
     height: 120,
     borderRadius: 12,
-    marginRight: 8,
+    marginRight: 4,
   },
   visitInfo: {
     flexDirection: 'row',
