@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 배경색 설정 -->
+    <item android:drawable="@color/splash_background"/>
+    
+    <!-- 중앙에 텍스트를 표시하려면 별도의 레이아웃이 필요하므로 
+         여기서는 배경색만 설정합니다 -->
+</layer-list>

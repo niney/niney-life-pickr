@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 스플래시 화면 배경색 (원하는 색상으로 변경하세요) -->
+    <color name="splash_background">#4A90E2</color>
+    <!-- 예시: #FFFFFF (흰색), #000000 (검정), #4A90E2 (파란색) -->
+</resources>
