@@ -5,7 +5,8 @@ import type {
   RestaurantInfo,
   ReviewInfo,
   CrawlResult,
-  CrawlOptions
+  CrawlOptions,
+  BrowserOptions
 } from '../types/crawler.types';
 import { parseVisitDate } from '../utils/date.utils';
 import imageDownloader from '../utils/image-download.utils';
@@ -62,11 +63,11 @@ class NaverCrawlerService {
   /**
    * 브라우저 인스턴스 생성
    */
-  async launchBrowser(protocolTimeout: number = 30000): Promise<Browser> {
+  async launchBrowser(protocolTimeout: number = 30000, headless: boolean = true): Promise<Browser> {
     const chromePath = await this.getChromePath();
     const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
-      headless: false, // 디버깅을 위해 브라우저 창 표시
-      protocolTimeout, // 파라미터로 받은 타임xr아웃 사용
+      headless, // headless 모드 설정 (기본: true)
+      protocolTimeout, // 파라미터로 받은 타임아웃 사용
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -90,6 +91,7 @@ class NaverCrawlerService {
       console.log('Using bundled Chromium');
     }
 
+    console.log(`브라우저 시작 모드: ${headless ? 'Headless' : 'Non-headless'}`);
     return await puppeteer.launch(launchOptions);
   }
 
@@ -634,8 +636,11 @@ class NaverCrawlerService {
   async crawlReviews(
     url: string,
     onProgress?: (current: number, total: number, review: ReviewInfo) => void,
-    onCrawlProgress?: (current: number, total: number) => void
+    onCrawlProgress?: (current: number, total: number) => void,
+    browserOptions?: BrowserOptions
   ): Promise<ReviewInfo[]> {
+    // 기본 옵션 설정
+    const { headless = true, enableScrollForImages = true } = browserOptions || {};
     let startTime = Date.now();
     startTime = this.logTiming('리뷰 크롤링 시작', startTime);
 
@@ -651,7 +656,7 @@ class NaverCrawlerService {
 
     try {
       // 리뷰 크롤링은 타임아웃을 길게 설정 (10분)
-      browser = await this.launchBrowser(600000);
+      browser = await this.launchBrowser(600000, headless);
       startTime = this.logTiming('브라우저 시작', startTime);
 
       page = await browser.newPage();
@@ -854,6 +859,37 @@ class NaverCrawlerService {
         onCrawlProgress(loadedReviewCount, totalReviewCount || loadedReviewCount);
       }
 
+      // 🔥 스크롤 기반 이미지 로딩 (옵션 활성화 시)
+      if (enableScrollForImages) {
+        console.log('📸 스크롤 기반 이미지 로딩 시작...');
+        await page.evaluate(() => {
+          return new Promise<void>((resolve) => {
+            const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
+            let currentIndex = 0;
+
+            const scrollToNext = () => {
+              if (currentIndex >= reviewElements.length) {
+                console.log('✅ 모든 리뷰 스크롤 완료');
+                resolve();
+                return;
+              }
+
+              const element = reviewElements[currentIndex];
+              // 요소를 뷰포트 중앙으로 스크롤
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+              currentIndex++;
+
+              // 다음 스크롤까지 200ms 대기 (이미지 Lazy Loading 트리거 시간 확보)
+              setTimeout(scrollToNext, 200);
+            };
+
+            scrollToNext();
+          });
+        });
+        console.log('✅ 스크롤 기반 이미지 로딩 완료');
+      }
+
       // 감정 키워드 더보기 버튼 클릭
       console.log('감정 키워드 더보기 버튼 클릭 중...');
       try {
@@ -928,14 +964,20 @@ class NaverCrawlerService {
             for (const selector of imageSelectors) {
               const imageElements = element.querySelectorAll(selector);
               imageElements.forEach(img => {
-                const src = img.getAttribute('src') || img.getAttribute('data-src');
-                if (src &&
-                    !src.includes('blank.gif') &&
-                    !src.includes('placeholder') &&
-                    !src.includes('data:image') &&
-                    !seenUrls.has(src)) {
-                  seenUrls.add(src);
-                  imageUrls.push(src);
+                // data-src 우선 (Lazy Loading), 없으면 src 사용
+                const dataSrc = img.getAttribute('data-src');
+                const src = img.getAttribute('src');
+                const imageUrl = dataSrc || src;
+
+                // 유효한 이미지 URL인지 체크
+                if (imageUrl &&
+                    !imageUrl.includes('blank.gif') &&
+                    !imageUrl.includes('placeholder') &&
+                    !imageUrl.includes('data:image') &&
+                    !imageUrl.startsWith('data:') &&
+                    !seenUrls.has(imageUrl)) {
+                  seenUrls.add(imageUrl);
+                  imageUrls.push(imageUrl);
                 }
               });
 

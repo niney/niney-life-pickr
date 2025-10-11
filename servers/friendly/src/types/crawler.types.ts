@@ -131,3 +131,13 @@ export interface CrawlOptions {
   /** 리뷰 크롤링 여부 (기본: false) */
   crawlReviews?: boolean;
 }
+
+/**
+ * 브라우저 옵션
+ */
+export interface BrowserOptions {
+  /** Headless 모드 여부 (기본: true) */
+  headless?: boolean;
+  /** 스크롤 기반 이미지 로딩 활성화 (기본: true, headless=true일 때 권장) */
+  enableScrollForImages?: boolean;
+}
