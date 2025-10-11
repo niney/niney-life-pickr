@@ -728,8 +728,9 @@ class NaverCrawlerService {
           const countElement = document.querySelector('.place_section_count');
           if (countElement) {
             const text = countElement.textContent?.trim() || '';
-            const match = text.match(/\d+/);
-            return match ? parseInt(match[0], 10) : 0;
+            // 콤마가 포함된 숫자 처리 (예: "1,234" → 1234)
+            const match = text.match(/[\d,]+/);
+            return match ? parseInt(match[0].replace(/,/g, ''), 10) : 0;
           }
           return 0;
         });
