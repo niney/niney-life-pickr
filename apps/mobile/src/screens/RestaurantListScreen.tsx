@@ -63,6 +63,14 @@ const RestaurantListScreen: React.FC = () => {
     [colors.surface, colors.border, theme]
   );
 
+  const searchButtonTextStyle = React.useMemo(
+    () => [
+      styles.searchButtonText,
+      { color: colors.text }
+    ],
+    [colors.text]
+  );
+
   // shared 훅 사용 (플랫폼 독립적)
   const {
     url,
@@ -101,7 +109,7 @@ const RestaurantListScreen: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [fetchCategories, fetchRestaurants]);
 
   // 모바일 전용 크롤링 핸들러 (Socket 콜백 설정 추가)
   const handleCrawl = async () => {
@@ -197,7 +205,7 @@ const RestaurantListScreen: React.FC = () => {
             {loading ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600' }}>추가</Text>
+              <Text style={searchButtonTextStyle}>추가</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -324,6 +332,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  searchButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
