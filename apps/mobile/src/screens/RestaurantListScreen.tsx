@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BlurView } from '@react-native-community/blur';
 import {
   useTheme,
   useSocket,
@@ -223,13 +222,6 @@ const RestaurantListScreen: React.FC = () => {
                     theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
                   ]}
                 >
-                  <BlurView
-                    style={styles.blurContainer}
-                    blurType={theme === 'dark' ? 'dark' : 'light'}
-                    blurAmount={20}
-                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
-                    pointerEvents="none"
-                  />
                   <View style={styles.categoryCardContent}>
                     <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
                     <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
@@ -260,13 +252,6 @@ const RestaurantListScreen: React.FC = () => {
                   onPress={() => handleRestaurantPress(restaurant)}
                   activeOpacity={0.7}
                 >
-                  <BlurView
-                    style={styles.blurContainer}
-                    blurType={theme === 'dark' ? 'dark' : 'light'}
-                    blurAmount={20}
-                    reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
-                    pointerEvents="none"
-                  />
                   <View style={styles.restaurantCardContentWrapper}>
                     <View style={styles.restaurantCardContent}>
                       <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
@@ -376,13 +361,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.18)',
     backgroundColor: 'rgba(26, 26, 26, 0.3)',
   },
-  blurContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
   categoryCardContent: {
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -396,26 +374,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   restaurantsList: {
-    gap: 8,
+    // gap 제거 - borderBottom으로 구분
   },
   restaurantCardContainer: {
     overflow: 'hidden',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
+    borderBottomWidth: 1,
+    paddingVertical: 16,
   },
   restaurantCardLight: {
-    borderColor: 'rgba(0, 0, 0, 0.08)',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'transparent',
   },
   restaurantCardDark: {
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    backgroundColor: 'rgba(26, 26, 26, 0.3)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'transparent',
   },
   restaurantCardContent: {
     flex: 1,
@@ -425,7 +397,7 @@ const styles = StyleSheet.create({
   restaurantCardContentWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 4,
   },
   recrawlButton: {
     width: 36,
