@@ -360,8 +360,22 @@ class ApiService {
   /**
    * Restaurant ID로 리뷰 조회
    */
-  async getReviewsByRestaurantId(restaurantId: number, limit: number = 20, offset: number = 0): Promise<ApiResponse<ReviewListResponse>> {
-    return this.request<ReviewListResponse>(`/api/restaurants/${restaurantId}/reviews?limit=${limit}&offset=${offset}`, {
+  async getReviewsByRestaurantId(
+    restaurantId: number,
+    limit: number = 20,
+    offset: number = 0,
+    sentiments?: ('positive' | 'negative' | 'neutral')[]
+  ): Promise<ApiResponse<ReviewListResponse>> {
+    let url = `/api/restaurants/${restaurantId}/reviews?limit=${limit}&offset=${offset}`;
+
+    // sentiment 필터 추가
+    if (sentiments && sentiments.length > 0) {
+      sentiments.forEach(sentiment => {
+        url += `&sentiment=${sentiment}`;
+      });
+    }
+
+    return this.request<ReviewListResponse>(url, {
       method: 'GET',
     });
   }

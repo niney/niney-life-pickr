@@ -8,7 +8,7 @@ export { useMenus } from './useMenus';
 export type { MenusHookReturn } from './useMenus';
 
 export { useReviews } from './useReviews';
-export type { ReviewsHookReturn } from './useReviews';
+export type { ReviewsHookReturn, SentimentFilter } from './useReviews';
 
 export { useRestaurantList } from './useRestaurantList';
 export type { RestaurantListHookReturn, RestaurantListHookOptions } from './useRestaurantList';

@@ -76,28 +76,64 @@ export class ReviewRepository {
   /**
    * 레스토랑의 리뷰 조회 (요약 데이터 포함 - JOIN 사용)
    */
-  async findByRestaurantIdWithSummary(restaurantId: number, limit: number = 20, offset: number = 0): Promise<any[]> {
-    return await db.all<any>(`
-      SELECT 
+  async findByRestaurantIdWithSummary(
+    restaurantId: number,
+    limit: number = 20,
+    offset: number = 0,
+    sentiments?: string[]
+  ): Promise<any[]> {
+    // Sentiment 필터가 있으면 WHERE 절에 추가
+    let query = `
+      SELECT
         r.*,
         rs.summary_data,
         rs.status as summary_status
       FROM reviews r
       LEFT JOIN review_summaries rs ON r.id = rs.review_id AND rs.status = 'completed'
       WHERE r.restaurant_id = ?
-      ORDER BY r.visit_date DESC, r.id DESC
-      LIMIT ? OFFSET ?
-    `, [restaurantId, limit, offset]);
+    `;
+
+    const params: any[] = [restaurantId];
+
+    // Sentiment 필터 적용 (요약이 있는 리뷰만 필터링)
+    if (sentiments && sentiments.length > 0) {
+      const placeholders = sentiments.map(() => '?').join(', ');
+      query += ` AND json_extract(rs.summary_data, '$.sentiment') IN (${placeholders})`;
+      params.push(...sentiments);
+    }
+
+    query += ` ORDER BY r.visit_date DESC, r.id DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    return await db.all<any>(query, params);
   }
 
   /**
    * 레스토랑의 리뷰 개수
    */
-  async countByRestaurantId(restaurantId: number): Promise<number> {
-    const result = await db.get<{ count: number }>(
-      'SELECT COUNT(*) as count FROM reviews WHERE restaurant_id = ?',
-      [restaurantId]
-    );
+  async countByRestaurantId(restaurantId: number, sentiments?: string[]): Promise<number> {
+    let query = `
+      SELECT COUNT(*) as count
+      FROM reviews r
+    `;
+
+    const params: any[] = [];
+
+    // Sentiment 필터가 있으면 JOIN 및 WHERE 절 추가
+    if (sentiments && sentiments.length > 0) {
+      query += ` LEFT JOIN review_summaries rs ON r.id = rs.review_id AND rs.status = 'completed'`;
+      query += ` WHERE r.restaurant_id = ?`;
+      params.push(restaurantId);
+
+      const placeholders = sentiments.map(() => '?').join(', ');
+      query += ` AND json_extract(rs.summary_data, '$.sentiment') IN (${placeholders})`;
+      params.push(...sentiments);
+    } else {
+      query += ` WHERE r.restaurant_id = ?`;
+      params.push(restaurantId);
+    }
+
+    const result = await db.get<{ count: number }>(query, params);
     return result?.count || 0;
   }
 
