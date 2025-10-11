@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons';
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons';
+import ImageViewing from 'react-native-image-viewing';
 import {
   useTheme,
   useSocket,
@@ -68,6 +69,11 @@ const RestaurantDetailScreen: React.FC = () => {
 
   // Pull to refresh 상태
   const [refreshing, setRefreshing] = useState(false);
+
+  // 이미지 뷰어 상태
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+  const [imageViewerUrls, setImageViewerUrls] = useState<string[]>([]);
 
   // shared 훅 사용 (플랫폼 독립적)
   const {
@@ -209,6 +215,14 @@ const RestaurantDetailScreen: React.FC = () => {
       setRefreshing(false);
     }
   }, [restaurantId]);
+
+  // 이미지 클릭 핸들러
+  const handleImagePress = (images: string[], index: number) => {
+    const fullUrls = images.map(img => `${getApiBaseUrl()}${img}`);
+    setImageViewerUrls(fullUrls);
+    setImageViewerIndex(index);
+    setImageViewerVisible(true);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -477,11 +491,16 @@ const RestaurantDetailScreen: React.FC = () => {
                       {review.images && review.images.length > 0 && (
                         <View style={styles.reviewImagesContainer}>
                           {review.images.length === 1 ? (
-                            <Image
-                              source={{ uri: `${getApiBaseUrl()}${review.images[0]}` }}
-                              style={styles.reviewImageFull}
-                              resizeMode="cover"
-                            />
+                            <TouchableOpacity
+                              onPress={() => handleImagePress(review.images, 0)}
+                              activeOpacity={0.9}
+                            >
+                              <Image
+                                source={{ uri: `${getApiBaseUrl()}${review.images[0]}` }}
+                                style={styles.reviewImageFull}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
                           ) : (
                             <ScrollView
                               horizontal
@@ -490,12 +509,17 @@ const RestaurantDetailScreen: React.FC = () => {
                               contentContainerStyle={styles.reviewImagesScrollContent}
                             >
                               {review.images.map((imageUrl: string, idx: number) => (
-                                <Image
+                                <TouchableOpacity
                                   key={idx}
-                                  source={{ uri: `${getApiBaseUrl()}${imageUrl}` }}
-                                  style={styles.reviewImageScroll}
-                                  resizeMode="cover"
-                                />
+                                  onPress={() => handleImagePress(review.images, idx)}
+                                  activeOpacity={0.9}
+                                >
+                                  <Image
+                                    source={{ uri: `${getApiBaseUrl()}${imageUrl}` }}
+                                    style={styles.reviewImageScroll}
+                                    resizeMode="cover"
+                                  />
+                                </TouchableOpacity>
                               ))}
                             </ScrollView>
                           )}
@@ -634,6 +658,14 @@ const RestaurantDetailScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* 이미지 뷰어 모달 */}
+      <ImageViewing
+        images={imageViewerUrls.map(uri => ({ uri }))}
+        imageIndex={imageViewerIndex}
+        visible={imageViewerVisible}
+        onRequestClose={() => setImageViewerVisible(false)}
+      />
     </View>
   );
 };
