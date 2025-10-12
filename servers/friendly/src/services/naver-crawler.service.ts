@@ -676,7 +676,7 @@ class NaverCrawlerService {
       });
 
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      await page.setViewport({ width: 1920, height: 1080 });
+      await page.setViewport({ width: 1920, height: 4000 }); // 최적화: 높이 확장으로 더 많은 이미지 로딩
 
       console.log('리뷰 페이지 로드 시작:', extractedUrl);
 
@@ -874,11 +874,53 @@ class NaverCrawlerService {
           (window as any).__scrollProgress = 0;
         });
         
-        // 스크롤 작업 시작 (비동기)
+        // 스크롤 작업 시작 (비동기) - Skip + 검증 방식
         const scrollPromise = page.evaluate(() => {
           return new Promise<void>((resolve) => {
             const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
             let currentIndex = 0;
+            const SKIP_COUNT = 5; // 5개씩 건너뛰기 (성능 최적화)
+
+            // 이미지 로딩 대기 함수 (검증)
+            const waitForImagesLoaded = (element: Element): Promise<void> => {
+              return new Promise((resolveWait) => {
+                const images = element.querySelectorAll('img[data-src]');
+                if (images.length === 0) {
+                  resolveWait();
+                  return;
+                }
+
+                const maxWait = 500; // 최대 500ms 대기
+                const startTime = Date.now();
+                const checkInterval = 50; // 50ms마다 체크
+
+                const checkLoaded = () => {
+                  if (Date.now() - startTime >= maxWait) {
+                    // 타임아웃 - 더 이상 기다리지 않음
+                    resolveWait();
+                    return;
+                  }
+
+                  let allLoaded = true;
+                  images.forEach(img => {
+                    const dataSrc = img.getAttribute('data-src');
+                    const src = img.getAttribute('src');
+                    // data-src가 있지만 src가 없으면 아직 로딩 안 됨
+                    if (dataSrc && (!src || src.includes('blank.gif'))) {
+                      allLoaded = false;
+                    }
+                  });
+
+                  if (allLoaded) {
+                    resolveWait();
+                  } else {
+                    setTimeout(checkLoaded, checkInterval);
+                  }
+                };
+
+                checkLoaded();
+              });
+            };
 
             const scrollToNext = () => {
               if (currentIndex >= reviewElements.length) {
@@ -889,15 +931,18 @@ class NaverCrawlerService {
               }
 
               const element = reviewElements[currentIndex];
-              // 요소를 뷰포트 중앙으로 스크롤
-              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // 요소를 뷰포트 중앙으로 즉시 스크롤
+              element.scrollIntoView({ behavior: 'instant', block: 'center' });
 
-              currentIndex++;
-              // 진행 상태 업데이트
-              (window as any).__scrollProgress = currentIndex;
+              // 이미지 로딩 검증 후 다음 스크롤
+              waitForImagesLoaded(element).then(() => {
+                currentIndex += SKIP_COUNT; // 건너뛰기
+                // 진행 상태 업데이트 (전체 개수 기준)
+                (window as any).__scrollProgress = Math.min(currentIndex, reviewElements.length);
 
-              // 다음 스크롤까지 200ms 대기 (이미지 Lazy Loading 트리거 시간 확보)
-              setTimeout(scrollToNext, 200);
+                // 다음 스크롤 (이미지 로딩이 끝났으므로 즉시 진행)
+                setTimeout(scrollToNext, 50);
+              });
             };
 
             scrollToNext();
