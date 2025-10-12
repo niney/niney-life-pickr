@@ -73,6 +73,9 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
         const updatedRestaurants = await fetchRestaurants()
         await fetchCategories()
 
+        // 성공 시 URL 초기화
+        setUrl('')
+
         if (placeId) {
           // placeId로 레스토랑 찾기
           const newRestaurant = updatedRestaurants.find(r => r.place_id === placeId) || null
