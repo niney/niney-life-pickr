@@ -34,6 +34,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     reviewCrawlStatus,
     crawlProgress,
     dbProgress,
+    imageProgress,
     reviewSummaryStatus,
     summaryProgress
   } = useSocket()
@@ -251,6 +252,28 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                     {
                       backgroundColor: colors.primary,
                       width: `${crawlProgress.percentage}%`
+                    }
+                  ]}
+                />
+              </View>
+            </View>
+          )}
+
+          {imageProgress && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressInfo}>
+                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>이미지 처리</Text>
+                <Text style={[styles.progressText, { color: colors.text }]}>
+                  {imageProgress.current} / {imageProgress.total} ({imageProgress.percentage}%)
+                </Text>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      backgroundColor: '#ff9800',
+                      width: `${imageProgress.percentage}%`
                     }
                   ]}
                 />

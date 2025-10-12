@@ -15,6 +15,7 @@ interface SocketContextValue {
   reviewCrawlStatus: ClientReviewCrawlStatus
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
+  imageProgress: ProgressData | null
   reviewSummaryStatus: ReviewSummaryStatus
   summaryProgress: SummaryProgress | null
   joinRestaurantRoom: (restaurantId: string) => void
@@ -80,6 +81,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   })
   const [crawlProgress, setCrawlProgress] = useState<ProgressData | null>(null)
   const [dbProgress, setDbProgress] = useState<ProgressData | null>(null)
+  const [imageProgress, setImageProgress] = useState<ProgressData | null>(null)
   const [reviewSummaryStatus, setReviewSummaryStatus] = useState<ReviewSummaryStatus>({
     status: 'idle'
   })
@@ -90,6 +92,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
   }>({})
   const currentRestaurantIdRef = useRef<string | null>(null)
+  
+  // ✅ Sequence 번호 추적 (순서 보장)
+  const lastCrawlSequenceRef = useRef<number>(0)
+  const lastSummarySequenceRef = useRef<number>(0)
 
   // Socket.io 연결 초기화 (앱 전체에서 단 한 번)
   useEffect(() => {
@@ -121,11 +127,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     const socket = socketRef.current
     if (!socket) return
 
-    // 크롤링 진행 상황 (subscribe 시점 + 실시간 업데이트)
+    // 크롤링 진행 상황 (웹 크롤링 단계, subscribe 시점 + 실시간 업데이트)
     socket.on('review:crawl_progress', (data: any) => {
       console.log('[Socket.io] Crawl Progress:', data)
       
-      // 통합 데이터 구조: { jobId, type, restaurantId, status, current, total, percentage, sequence, timestamp, ... }
+      // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
+      const sequence = data.sequence || data.current || 0
+      if (sequence < lastCrawlSequenceRef.current) {
+        console.warn(`[Socket.io] Outdated crawl progress ignored: ${sequence} < ${lastCrawlSequenceRef.current}`)
+        return
+      }
+      lastCrawlSequenceRef.current = sequence
+      
+      // 크롤링 진행률만 업데이트 (웹 페이지에서 리뷰 수집 중)
       setCrawlProgress({
         current: data.current || 0,
         total: data.total || 0,
@@ -138,23 +152,42 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       }
     })
 
+    // DB 저장 진행 상황 (실제 DB 저장 단계)
+    socket.on('review:db_progress', (data: any) => {
+      console.log('[Socket.io] DB Progress:', data)
+      
+      // DB 저장 진행률 업데이트
+      setDbProgress({
+        current: data.current || 0,
+        total: data.total || 0,
+        percentage: data.percentage || 0
+      })
+      
+      setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
+    })
+
+    // 이미지 처리 진행 상황 (이미지 다운로드 단계)
+    socket.on('review:image_progress', (data: any) => {
+      console.log('[Socket.io] Image Progress:', data)
+      
+      // 이미지 처리 진행률 업데이트
+      setImageProgress({
+        current: data.current || 0,
+        total: data.total || 0,
+        percentage: data.percentage || 0
+      })
+      
+      setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
+    })
+
     // 크롤링 진행 없음 (subscribe 시점에 활성 Job이 없을 때)
     socket.on('review:no_active_job', (data: any) => {
       console.log('[Socket.io] No Active Crawl Job:', data)
       setReviewCrawlStatus({ status: 'idle' })
       setCrawlProgress(null)
       setDbProgress(null)
-    })
-
-    // DB 저장 진행 상황
-    socket.on('review:db_progress', (data: any) => {
-      console.log('[Socket.io] DB Progress:', data)
-      setDbProgress({
-        current: data.current || 0,
-        total: data.total || 0,
-        percentage: data.percentage || 0
-      })
-      setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
+      setImageProgress(null)
+      lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
     })
 
     // 크롤링 완료
@@ -163,6 +196,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setReviewCrawlStatus({ status: 'completed' })
       setCrawlProgress(null)
       setDbProgress(null)
+      setImageProgress(null)
+      lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
 
       // 콜백 호출
       if (callbacksRef.current.onReviewCrawlCompleted) {
@@ -180,6 +215,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setReviewCrawlStatus({ status: 'failed', error: errorMessage })
       setCrawlProgress(null)
       setDbProgress(null)
+      setImageProgress(null)
+      lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
       Alert.error('크롤링 실패', errorMessage)
 
       // 콜백 호출
@@ -208,6 +245,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     socket.on('review_summary:progress', (data: any) => {
       console.log('[Socket.io] Summary Progress:', data)
       
+      // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
+      const sequence = data.sequence || data.current || 0
+      if (sequence < lastSummarySequenceRef.current) {
+        console.warn(`[Socket.io] Outdated summary progress ignored: ${sequence} < ${lastSummarySequenceRef.current}`)
+        return
+      }
+      lastSummarySequenceRef.current = sequence
+      
       // 통합 데이터 구조 지원
       setSummaryProgress({
         current: data.current || 0,
@@ -228,6 +273,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] No Active Summary Job:', data)
       setReviewSummaryStatus({ status: 'idle' })
       setSummaryProgress(null)
+      lastSummarySequenceRef.current = 0 // ✅ Sequence 초기화
     })
 
     // 리뷰 요약 완료
@@ -235,6 +281,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] Summary Completed:', data)
       setReviewSummaryStatus({ status: 'completed' })
       setSummaryProgress(null) // ✅ 완료 시 진행 상태 초기화
+      lastSummarySequenceRef.current = 0 // ✅ Sequence 초기화
 
       // 콜백 호출
       if (callbacksRef.current.onReviewSummaryCompleted) {
@@ -250,13 +297,15 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const errorMessage = data.error || '요약 중 오류가 발생했습니다'
       setReviewSummaryStatus({ status: 'failed', error: errorMessage })
       setSummaryProgress(null)
+      lastSummarySequenceRef.current = 0 // ✅ Sequence 초기화
       Alert.error('요약 실패', errorMessage)
     })
 
     return () => {
       socket.off('review:crawl_progress')
-      socket.off('review:no_active_job')
       socket.off('review:db_progress')
+      socket.off('review:image_progress')
+      socket.off('review:no_active_job')
       socket.off('review:completed')
       socket.off('review:error')
       socket.off('review_summary:started')
@@ -316,6 +365,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setReviewCrawlStatus({ status: 'idle' })
     setCrawlProgress(null)
     setDbProgress(null)
+    setImageProgress(null)
   }
 
   // 요약 상태 초기화
@@ -330,6 +380,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     reviewCrawlStatus,
     crawlProgress,
     dbProgress,
+    imageProgress,
     reviewSummaryStatus,
     summaryProgress,
     joinRestaurantRoom,

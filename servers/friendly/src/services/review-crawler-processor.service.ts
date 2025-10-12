@@ -3,6 +3,7 @@ import reviewRepository from '../db/repositories/review.repository';
 import jobService from './job-socket.service';
 import { generateReviewHash } from '../utils/hash.utils';
 import reviewSummaryProcessor from './review-summary-processor.service';
+import { SOCKET_EVENTS } from '../socket/events';
 import type { ReviewInfo } from '../types/crawler.types';
 
 /**
@@ -112,26 +113,45 @@ export class ReviewCrawlerProcessor {
         console.error(`[Job ${jobId}] 리뷰 DB 저장 실패 (${current}):`, dbError);
       }
 
-      // Socket 이벤트: DB 저장 진행 상황 (10개마다 또는 마지막)
+      // ✅ DB 저장 진행률: Socket 이벤트만 전송 (매번, DB 저장 없음)
+      jobService.emitProgressSocketEvent(
+        jobId,
+        restaurantId,
+        SOCKET_EVENTS.REVIEW_DB_PROGRESS,
+        { current, total, metadata: { placeId } }
+      );
+      
       if (current % 10 === 0 || current === total) {
-        jobService.emitCrawlProgress(jobId, restaurantId, 'db_save', {
-          current,
-          total,
-          placeId
-        });
-        console.log(`[Job ${jobId}] DB 저장 진행: ${current}/${total}`);
+        console.log(`[Job ${jobId}] DB 저장: ${current}/${total}`);
       }
     },
-      // 크롤링 진행 상황 콜백
+      // 크롤링 진행 상황 콜백 (Socket 이벤트만, DB 저장 없음)
       (current, total) => {
-        // Socket 이벤트: 크롤링 진행 상황
-        jobService.emitCrawlProgress(jobId, restaurantId, 'crawl', {
-          current,
-          total,
-          placeId
-        });
+        // ✅ 크롤링 진행률: Socket 이벤트만 전송 (매번)
+        jobService.emitProgressSocketEvent(
+          jobId,
+          restaurantId,
+          SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS,
+          { current, total, metadata: { placeId } }
+        );
         
-        console.log(`[Job ${jobId}] 크롤링 진행: ${current}/${total}`);
+        if (current % 10 === 0 || current === total) {
+          console.log(`[Job ${jobId}] 크롤링: ${current}/${total}`);
+        }
+      },
+      // 이미지 처리 진행 상황 콜백 (Socket 이벤트만, DB 저장 없음)
+      (current, total) => {
+        // ✅ 이미지 처리 진행률: Socket 이벤트만 전송 (매번)
+        jobService.emitProgressSocketEvent(
+          jobId,
+          restaurantId,
+          SOCKET_EVENTS.REVIEW_IMAGE_PROGRESS,
+          { current, total, metadata: { placeId } }
+        );
+        
+        if (current % 10 === 0 || current === total) {
+          console.log(`[Job ${jobId}] 이미지 처리: ${current}/${total}`);
+        }
       }
     );
 

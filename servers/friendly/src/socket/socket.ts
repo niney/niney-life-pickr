@@ -48,11 +48,11 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
     socket.on('subscribe:restaurant', async (restaurantId: string) => {
       await socket.join(`restaurant:${restaurantId}`);
       console.log(`[Socket.io] Client ${socket.id} subscribed to restaurant:${restaurantId}`);
-      
+
       // 현재 활성 Job 조회 및 상태 전송
       try {
         const activeJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId));
-        
+
         // 타입별로 최신 Job만 선택 (중복 방지)
         const jobsByType = activeJobs.reduce((acc, job) => {
           if (!acc[job.type] || new Date(job.created_at) > new Date(acc[job.type].created_at)) {
@@ -60,58 +60,29 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
           }
           return acc;
         }, {} as Record<string, typeof activeJobs[0]>);
-        
+
         // 활성 Job 타입 추적
         const activeJobTypes = new Set(Object.keys(jobsByType));
-        
-        // 각 Job 타입별로 progress 이벤트 형식으로 전송
-        Object.values(jobsByType).forEach((job) => {
-          const eventData = {
-            jobId: job.id,
-            type: job.type,
-            restaurantId: parseInt(restaurantId),
-            status: 'progress' as const,
-            current: job.progress_current,
-            total: job.progress_total,
-            percentage: job.progress_percentage,
-            sequence: job.progress_current,
-            timestamp: new Date(job.started_at || job.created_at).getTime(),
-            ...(job.metadata ? JSON.parse(job.metadata) : {})
-          };
-          
-          // 타입별 적절한 이벤트명으로 전송
-          let eventName = 'restaurant:state'; // 기본 이벤트
-          
-          if (job.type === 'review_crawl') {
-            eventName = 'review:crawl_progress';
-          } else if (job.type === 'review_summary') {
-            eventName = 'review_summary:progress';
-          }
-          
-          socket.emit(eventName, eventData);
-          
-          console.log(`[Socket.io] Sent ${eventName} to ${socket.id} - Job: ${job.id}, Progress: ${job.progress_current}/${job.progress_total}`);
-        });
-        
+
         // 활성 Job이 없는 타입에 대해 "진행 없음" 상태 전송
         const allJobTypes = ['review_crawl', 'review_summary'];
         allJobTypes.forEach((jobType) => {
           if (!activeJobTypes.has(jobType)) {
-            const eventName = jobType === 'review_crawl' 
-              ? 'review:no_active_job' 
+            const eventName = jobType === 'review_crawl'
+              ? 'review:no_active_job'
               : 'review_summary:no_active_job';
-            
+
             socket.emit(eventName, {
               restaurantId: parseInt(restaurantId),
               type: jobType,
               status: 'idle',
               timestamp: Date.now()
             });
-            
+
             console.log(`[Socket.io] Sent ${eventName} to ${socket.id} - No active job`);
           }
         });
-        
+
         console.log(`[Socket.io] Sent state to ${socket.id} - Active jobs: ${activeJobs.length}`);
       } catch (error) {
         console.error(`[Socket.io] Error fetching active jobs for restaurant ${restaurantId}:`, error);

@@ -9,7 +9,7 @@
 import jobManager from './job-manager.service';
 import jobRepository from '../db/repositories/job.repository';
 import { getSocketIO } from '../socket/socket';
-import { getSocketEvent, JobEventType, JobEventData, SOCKET_EVENTS } from '../socket/events';
+import { getSocketEvent, JobEventType, JobEventData } from '../socket/events';
 import { v4 as uuidv4 } from 'uuid';
 import { JobProgress, JobType } from '../types/db.types';
 
@@ -25,7 +25,7 @@ export class JobService {
   ): void {
     const eventName = getSocketEvent(type, status);
     if (!eventName) return; // 이벤트가 없으면 발행하지 않음
-    
+
     const io = getSocketIO();
     io.to(`restaurant:${restaurantId}`).emit(eventName, data);
   }
@@ -44,7 +44,7 @@ export class JobService {
   }): Promise<string> {
     // 1. Job ID 생성 (미제공 시 UUID 자동 생성)
     const jobId = params.jobId || uuidv4();
-    
+
     // 2. 메모리 Job 생성 (모든 타입 동일하게 처리)
     jobManager.createJob(jobId, {
       type: params.type,
@@ -71,7 +71,7 @@ export class JobService {
       timestamp: Date.now(),
       ...params.metadata
     };
-    
+
     this.emitSocketEvent(params.type, params.restaurantId, 'started', eventData);
 
     return jobId;
@@ -278,20 +278,18 @@ export class JobService {
   }
 
   /**
-   * 크롤링 진행률 Socket 이벤트 발행 (review_crawl 전용)
-   * - REVIEW_CRAWL_PROGRESS: 웹 크롤링 진행률
-   * - REVIEW_DB_PROGRESS: DB 저장 진행률
-   * 
-   * @deprecated 대신 progress() 메서드 사용 권장
+   * Socket 진행률 이벤트만 발행 (DB 저장 없음)
+   * - 크롤링 진행률처럼 실시간 업데이트만 필요한 경우 사용
+   * - DB 업데이트 없이 Socket 이벤트만 전송
    */
-  emitCrawlProgress(
+  emitProgressSocketEvent(
     jobId: string,
     restaurantId: number,
-    type: 'crawl' | 'db_save',
+    eventName: string,
     progress: {
       current: number;
       total: number;
-      placeId: string;
+      metadata?: Record<string, any>;
     }
   ): void {
     const io = getSocketIO();
@@ -299,22 +297,18 @@ export class JobService {
 
     const eventData: JobEventData = {
       jobId,
-      type: 'review_crawl',
+      type: 'review_crawl', // 타입은 필요에 따라 조정 가능
       restaurantId,
       status: 'progress',
       current: progress.current,
       total: progress.total,
       percentage,
       sequence: progress.current,
-      placeId: progress.placeId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      ...progress.metadata
     };
 
-    const eventType = type === 'crawl' 
-      ? SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS 
-      : SOCKET_EVENTS.REVIEW_DB_PROGRESS;
-
-    io.to(`restaurant:${restaurantId}`).emit(eventType, eventData);
+    io.to(`restaurant:${restaurantId}`).emit(eventName, eventData);
   }
 }
 
