@@ -96,12 +96,12 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     
     // 크롤링 완료/에러 시 콜백 설정
     setRestaurantCallbacks({
-      onCompleted: async () => {
+      onReviewCrawlCompleted: async () => {
         // 크롤링 완료 시 데이터 갱신
         await fetchRestaurants()
         await fetchCategories()
       },
-      onError: async () => {
+      onReviewCrawlError: async () => {
         // 에러 발생 시에도 데이터 갱신
         await fetchRestaurants()
         await fetchCategories()

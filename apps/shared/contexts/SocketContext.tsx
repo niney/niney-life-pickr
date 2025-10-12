@@ -20,8 +20,9 @@ interface SocketContextValue {
   joinRestaurantRoom: (restaurantId: string) => void
   leaveRestaurantRoom: (restaurantId: string) => void
   setRestaurantCallbacks: (callbacks: {
-    onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
-    onError?: (data: { restaurantId: string; error: string }) => void
+    onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
+    onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
+    onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
   }) => void
   resetCrawlStatus: () => void
   resetSummaryStatus: () => void
@@ -84,8 +85,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   })
   const [summaryProgress, setSummaryProgress] = useState<SummaryProgress | null>(null)
   const callbacksRef = useRef<{
-    onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
-    onError?: (data: { restaurantId: string; error: string }) => void
+    onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
+    onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
+    onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
   }>({})
   const currentRestaurantIdRef = useRef<string | null>(null)
 
@@ -163,8 +165,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setDbProgress(null)
 
       // 콜백 호출
-      if (callbacksRef.current.onCompleted) {
-        callbacksRef.current.onCompleted({
+      if (callbacksRef.current.onReviewCrawlCompleted) {
+        callbacksRef.current.onReviewCrawlCompleted({
           restaurantId: data.restaurantId?.toString() || '',
           totalReviews: data.totalReviews || 0
         })
@@ -181,8 +183,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       Alert.error('크롤링 실패', errorMessage)
 
       // 콜백 호출
-      if (callbacksRef.current.onError) {
-        callbacksRef.current.onError({
+      if (callbacksRef.current.onReviewCrawlError) {
+        callbacksRef.current.onReviewCrawlError({
           restaurantId: data.restaurantId?.toString() || '',
           error: errorMessage
         })
@@ -233,6 +235,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] Summary Completed:', data)
       setReviewSummaryStatus({ status: 'completed' })
       setSummaryProgress(null) // ✅ 완료 시 진행 상태 초기화
+
+      // 콜백 호출
+      if (callbacksRef.current.onReviewSummaryCompleted) {
+        callbacksRef.current.onReviewSummaryCompleted({
+          restaurantId: data.restaurantId?.toString() || ''
+        })
+      }
     })
 
     // 리뷰 요약 에러
@@ -295,8 +304,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
   // 콜백 설정 (크롤링 시작 시 호출)
   const setRestaurantCallbacks = (callbacks: {
-    onCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
-    onError?: (data: { restaurantId: string; error: string }) => void
+    onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
+    onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
+    onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
   }) => {
     callbacksRef.current = callbacks
   }

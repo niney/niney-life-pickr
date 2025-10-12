@@ -6,7 +6,6 @@ import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import type { ReviewData } from '@shared/services'
-import type { SentimentFilter } from '@shared/hooks'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
 
 // API 기본 URL (동적 호스트 감지)
@@ -28,11 +27,12 @@ type TabType = 'menu' | 'review'
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
-  const { 
-    joinRestaurantRoom, 
-    leaveRestaurantRoom, 
-    reviewCrawlStatus, 
-    crawlProgress, 
+  const {
+    joinRestaurantRoom,
+    leaveRestaurantRoom,
+    setRestaurantCallbacks,
+    reviewCrawlStatus,
+    crawlProgress,
     dbProgress,
     reviewSummaryStatus,
     summaryProgress
@@ -40,7 +40,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  
+
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu')
 
@@ -57,6 +57,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     reviewsTotal,
     hasMoreReviews,
     loadMoreReviews,
+    fetchReviews,
     sentimentFilter,
     changeSentimentFilter,
     menus,
@@ -68,6 +69,22 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   useEffect(() => {
     if (id) {
       joinRestaurantRoom(id)
+
+      // 리뷰 크롤링/요약 완료 시 리뷰 재조회
+      setRestaurantCallbacks({
+        onReviewCrawlCompleted: async () => {
+          const restaurantId = parseInt(id, 10)
+          if (!isNaN(restaurantId)) {
+            await fetchReviews(restaurantId)
+          }
+        },
+        onReviewSummaryCompleted: async () => {
+          const restaurantId = parseInt(id, 10)
+          if (!isNaN(restaurantId)) {
+            await fetchReviews(restaurantId)
+          }
+        }
+      })
 
       return () => {
         leaveRestaurantRoom(id)
@@ -195,7 +212,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   }
 
   return (
-    <div 
+    <div
       ref={scrollContainerRef}
       className={isMobile ? '' : 'restaurant-scroll-area'}
       style={{ backgroundColor: colors.background }}
@@ -218,7 +235,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
             🔄 리뷰 크롤링 중...
           </Text>
-          
+
           {crawlProgress && (
             <View style={styles.progressSection}>
               <View style={styles.progressInfo}>
@@ -228,14 +245,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                 </Text>
               </View>
               <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View 
+                <View
                   style={[
-                    styles.progressBarFill, 
-                    { 
+                    styles.progressBarFill,
+                    {
                       backgroundColor: colors.primary,
-                      width: `${crawlProgress.percentage}%` 
+                      width: `${crawlProgress.percentage}%`
                     }
-                  ]} 
+                  ]}
                 />
               </View>
             </View>
@@ -250,14 +267,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                 </Text>
               </View>
               <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View 
+                <View
                   style={[
-                    styles.progressBarFill, 
-                    { 
+                    styles.progressBarFill,
+                    {
                       backgroundColor: '#4caf50',
-                      width: `${dbProgress.percentage}%` 
+                      width: `${dbProgress.percentage}%`
                     }
-                  ]} 
+                  ]}
                 />
               </View>
             </View>
@@ -271,7 +288,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
             🤖 AI 리뷰 요약 중...
           </Text>
-          
+
           {summaryProgress && (
             <View style={styles.progressSection}>
               <View style={styles.progressInfo}>
@@ -281,14 +298,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                 </Text>
               </View>
               <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View 
+                <View
                   style={[
-                    styles.progressBarFill, 
-                    { 
+                    styles.progressBarFill,
+                    {
                       backgroundColor: '#9c27b0',
-                      width: `${summaryProgress.percentage}%` 
+                      width: `${summaryProgress.percentage}%`
                     }
-                  ]} 
+                  ]}
                 />
               </View>
               <View style={styles.progressStats}>
@@ -551,23 +568,23 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                       <View style={styles.summaryHeader}>
                         <Text style={[styles.summaryTitle, { color: '#9c27b0' }]}>🤖 AI 요약</Text>
                         <View style={styles.sentimentBadge}>
-                          <Text style={[styles.sentimentText, { 
-                            color: review.summary.sentiment === 'positive' ? '#4caf50' : 
-                                   review.summary.sentiment === 'negative' ? '#f44336' : '#ff9800' 
+                          <Text style={[styles.sentimentText, {
+                            color: review.summary.sentiment === 'positive' ? '#4caf50' :
+                                   review.summary.sentiment === 'negative' ? '#f44336' : '#ff9800'
                           }]}>
-                            {review.summary.sentiment === 'positive' ? '😊 긍정' : 
+                            {review.summary.sentiment === 'positive' ? '😊 긍정' :
                              review.summary.sentiment === 'negative' ? '😞 부정' : '😐 중립'}
                           </Text>
                         </View>
                       </View>
-                      
+
                       <Text style={[styles.summaryText, { color: colors.text }]}>
                         {review.summary.summary}
                       </Text>
 
                       {review.summary.keyKeywords.length > 0 && (
                         <View style={styles.summaryKeywords}>
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.keywordsToggleButton}
                             onPress={() => toggleKeywords(review.id)}
                           >
@@ -575,7 +592,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                               핵심 키워드 {expandedKeywords.has(review.id) ? '▼' : '▶'}
                             </Text>
                           </TouchableOpacity>
-                          
+
                           {expandedKeywords.has(review.id) && (
                             <View style={styles.keywordsContainer}>
                               {review.summary.keyKeywords.map((keyword: string, idx: number) => (
