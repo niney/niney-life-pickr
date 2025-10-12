@@ -8,6 +8,7 @@ import reviewRepository from '../db/repositories/review.repository';
 import reviewSummaryRepository from '../db/repositories/review-summary.repository';
 import { createReviewSummaryService } from './review-summary.service';
 import type { ReviewDB } from '../types/db.types';
+import type { BaseOllamaConfig } from './ollama/ollama.types';
 
 export class ReviewSummaryProcessor {
   
@@ -294,23 +295,30 @@ export class ReviewSummaryProcessor {
 
   /**
    * 특정 리뷰만 요약 (단일)
+   * @param reviewId - 리뷰 ID
+   * @param useCloud - Cloud 사용 여부 (기본: false)
+   * @param config - 커스텀 설정 (선택) - model, timeout 등
    */
   async processSingleReview(
     reviewId: number,
-    useCloud: boolean = false
+    useCloud: boolean = false,
+    config?: Partial<BaseOllamaConfig>
   ): Promise<void> {
     const review = await reviewRepository.findById(reviewId);
     if (!review) {
       throw new Error('리뷰를 찾을 수 없습니다');
     }
 
-    const summaryService = createReviewSummaryService(useCloud);
+    const summaryService = createReviewSummaryService(useCloud, config);
     await summaryService.ensureReady();
 
     try {
       const [summaryData] = await summaryService.summarizeReviews([review]);
       await reviewSummaryRepository.updateSummary(reviewId, summaryData);
-      console.log(`✅ 리뷰 ${reviewId} 요약 완료`);
+      
+      const serviceType = useCloud ? 'Cloud' : 'Local';
+      const modelInfo = config?.model || 'default';
+      console.log(`✅ 리뷰 ${reviewId} 요약 완료 (${serviceType}, 모델: ${modelInfo})`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await reviewSummaryRepository.markAsFailed(reviewId, errorMessage);

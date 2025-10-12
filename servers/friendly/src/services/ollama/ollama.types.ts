@@ -14,21 +14,25 @@ export interface GenerateOptions {
 }
 
 /**
- * Local Ollama 설정
+ * 기본 Ollama 설정 (공통 부분)
  */
-export interface LocalOllamaConfig {
-  url: string;
+export interface BaseOllamaConfig {
   model: string;
   timeout?: number;
 }
 
 /**
+ * Local Ollama 설정
+ */
+export interface LocalOllamaConfig extends BaseOllamaConfig {
+  url: string;
+}
+
+/**
  * Cloud Ollama 설정
  */
-export interface CloudOllamaConfig {
+export interface CloudOllamaConfig extends BaseOllamaConfig {
   host: string;
-  model: string;
-  timeout?: number;
   parallelSize?: number;
   apiKey?: string;
 }

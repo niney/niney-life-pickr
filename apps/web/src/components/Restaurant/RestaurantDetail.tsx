@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react'
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text, Modal } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowLeft, faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft, faStar, faStarHalfStroke, faRedo } from '@fortawesome/free-solid-svg-icons'
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
@@ -47,6 +47,19 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set())
+
+  // 재요약 모달 상태
+  const [resummaryModalVisible, setResummaryModalVisible] = useState(false)
+  const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-oss:20b-cloud')
+  const [resummaryLoading, setResummaryLoading] = useState(false)
+
+  // 사용 가능한 AI 모델 목록
+  const availableModels = [
+    { value: 'gpt-oss:20b-cloud', label: 'GPT OSS 20B (Cloud)' },
+    { value: 'gpt-oss:120b-cloud', label: 'GPT OSS 120B (Cloud)' },
+    { value: 'deepseek-v3.1:671b-cloud', label: 'DeepSeek v3.1 671B (Cloud)' },
+  ]
 
   // 독립적으로 데이터 로드
   const {
@@ -171,6 +184,64 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       }
       return newSet
     })
+  }
+
+  // 재요약 모달 열기
+  const openResummaryModal = (reviewId: number) => {
+    setSelectedReviewId(reviewId)
+    setResummaryModalVisible(true)
+  }
+
+  // 재요약 모달 닫기
+  const closeResummaryModal = () => {
+    setResummaryModalVisible(false)
+    setSelectedReviewId(null)
+    setSelectedModel('gpt-oss:20b-cloud')
+  }
+
+  // 재요약 실행
+  const handleResummarize = async () => {
+    if (!selectedReviewId) return
+
+    setResummaryLoading(true)
+    try {
+      const apiBaseUrl = getApiBaseUrl()
+      const response = await fetch(`${apiBaseUrl}/api/reviews/summarize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reviewId: selectedReviewId,
+          useCloud: true,
+          config: {
+            model: selectedModel
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('재요약 요청 실패')
+      }
+
+      const result = await response.json()
+      console.log('✅ 재요약 완료:', result)
+
+      // 리뷰 목록 갱신
+      if (id) {
+        const restaurantId = parseInt(id, 10)
+        if (!isNaN(restaurantId)) {
+          await fetchReviews(restaurantId)
+        }
+      }
+
+      closeResummaryModal()
+    } catch (error) {
+      console.error('❌ 재요약 실패:', error)
+      alert('재요약에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      setResummaryLoading(false)
+    }
   }
 
   // 별점 렌더링 함수 (0~100 점수를 1~5 별점으로 변환, 반별 포함)
@@ -537,12 +608,22 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   style={[styles.reviewCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}
                 >
                   <View style={styles.reviewCardHeader}>
-                    <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
-                    {review.visitInfo.visitDate && (
-                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                        {review.visitInfo.visitDate}
-                      </Text>
-                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
+                      {review.visitInfo.visitDate && (
+                        <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                          {review.visitInfo.visitDate}
+                        </Text>
+                      )}
+                    </View>
+                    {/* 재요약 버튼 - 항상 표시 */}
+                    <TouchableOpacity
+                      style={styles.resummaryButton}
+                      onPress={() => openResummaryModal(review.id)}
+                    >
+                      <FontAwesomeIcon icon={faRedo} style={{ fontSize: 14, color: '#9c27b0' }} />
+                      <Text style={[styles.resummaryButtonText, { color: '#9c27b0' }]}>재요약</Text>
+                    </TouchableOpacity>
                   </View>
 
                   {review.visitKeywords.length > 0 && (
@@ -728,6 +809,69 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           </>
         )}
       </div>
+
+      {/* 재요약 모달 */}
+      <Modal
+        visible={resummaryModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeResummaryModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>AI 모델 선택</Text>
+            <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+              리뷰를 재요약할 AI 모델을 선택하세요
+            </Text>
+
+            <View style={styles.modelList}>
+              {availableModels.map((model) => (
+                <TouchableOpacity
+                  key={model.value}
+                  style={[
+                    styles.modelOption,
+                    {
+                      backgroundColor: selectedModel === model.value ? colors.primary : (theme === 'light' ? '#f5f5f5' : colors.background),
+                      borderColor: selectedModel === model.value ? colors.primary : colors.border
+                    }
+                  ]}
+                  onPress={() => setSelectedModel(model.value)}
+                >
+                  <View style={styles.radioButton}>
+                    {selectedModel === model.value && (
+                      <View style={[styles.radioButtonInner, { backgroundColor: '#fff' }]} />
+                    )}
+                  </View>
+                  <Text style={[styles.modelLabel, { color: selectedModel === model.value ? '#fff' : colors.text }]}>
+                    {model.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                onPress={closeResummaryModal}
+                disabled={resummaryLoading}
+              >
+                <Text style={[styles.cancelButtonText, { color: colors.text }]}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton, { backgroundColor: colors.primary }]}
+                onPress={handleResummarize}
+                disabled={resummaryLoading}
+              >
+                {resummaryLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>재요약 시작</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </div>
   )
 }
@@ -977,6 +1121,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  resummaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+    cursor: 'pointer',
+  },
+  resummaryButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   sentimentBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1081,6 +1239,93 @@ const styles = StyleSheet.create({
   filterButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  // 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 500,
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  modalDescription: {
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modelList: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  modelOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    cursor: 'pointer',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#fff',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  modelLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  confirmButton: {
+    minHeight: 48,
+  },
+  confirmButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
 })
 

@@ -4,11 +4,17 @@ import reviewSummaryRepository from '../db/repositories/review-summary.repositor
 import reviewSummaryProcessor from '../services/review-summary-processor.service';
 import { ResponseHelper } from '../utils/response.utils';
 
+/**
+ * 레스토랑의 리뷰 요약 관련 라우트
+ * prefix: /api/restaurants
+ * 
+ * 레스토랑 중심의 리뷰 요약 작업 처리
+ */
 const reviewSummaryRoutes: FastifyPluginAsync = async (fastify) => {
   
   /**
    * POST /api/restaurants/:id/reviews/summarize
-   * 미완료 요약 처리 (재시도)
+   * 특정 레스토랑의 미완료 리뷰 요약 처리 (배치 작업)
    */
   fastify.post('/:id/reviews/summarize', {
     schema: {
@@ -25,8 +31,13 @@ const reviewSummaryRoutes: FastifyPluginAsync = async (fastify) => {
       }),
       response: {
         200: Type.Object({
-          success: Type.Boolean(),
-          message: Type.String()
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Optional(Type.Object({
+            jobId: Type.Number(),
+            restaurantId: Type.Number()
+          })),
+          timestamp: Type.String()
         })
       }
     }
@@ -68,14 +79,15 @@ const reviewSummaryRoutes: FastifyPluginAsync = async (fastify) => {
       }),
       response: {
         200: Type.Object({
-          success: Type.Boolean(),
+          result: Type.Boolean(),
+          message: Type.String(),
           data: Type.Object({
             total: Type.Number(),
             completed: Type.Number(),
             incomplete: Type.Number(),
             percentage: Type.Number()
           }),
-          message: Type.String()
+          timestamp: Type.String()
         })
       }
     }

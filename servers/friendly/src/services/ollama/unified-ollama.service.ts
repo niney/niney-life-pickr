@@ -7,7 +7,7 @@
 import { BaseLocalOllamaService } from './local-ollama.service';
 import { BaseCloudOllamaService } from './cloud-ollama.service';
 import { createLocalConfig, createCloudConfig } from './ollama.config';
-import type { GenerateOptions, LocalOllamaConfig, CloudOllamaConfig } from './ollama.types';
+import type { GenerateOptions, LocalOllamaConfig, CloudOllamaConfig, BaseOllamaConfig } from './ollama.types';
 
 /**
  * 기본 Local Ollama 구현체 (상속만)
@@ -35,12 +35,15 @@ export class UnifiedOllamaService {
   private localService: BaseLocalOllamaService | null = null;
   private useCloud: boolean;
   private isCloudAvailable: boolean = false;
+  protected customConfig?: Partial<BaseOllamaConfig>;  // ← 커스텀 설정 저장
 
   /**
    * @param useCloud - Cloud 사용 시도 여부 (기본: false)
+   * @param config - 커스텀 설정 (선택) - model, timeout 등을 덮어쓸 수 있음
    */
-  constructor(useCloud: boolean = false) {
+  constructor(useCloud: boolean = false, config?: Partial<BaseOllamaConfig>) {
     this.useCloud = useCloud;
+    this.customConfig = config;
     this.initialize();
   }
 
@@ -51,8 +54,15 @@ export class UnifiedOllamaService {
     if (this.useCloud) {
       const cloudConfig = createCloudConfig();
       if (cloudConfig) {
-        this.cloudService = this.createCloudService(cloudConfig);
-        console.log('🌥️  Cloud Ollama 서비스 초기화 시도');
+        // ✅ 커스텀 설정 병합 (덮어쓰기)
+        const mergedConfig: CloudOllamaConfig = {
+          ...cloudConfig,
+          ...this.customConfig  // model, timeout 등 덮어쓰기
+        };
+        
+        this.cloudService = this.createCloudService(mergedConfig);
+        this.isCloudAvailable = true;
+        console.log(`🌥️  Cloud Ollama 초기화: ${mergedConfig.model}`);
       } else {
         console.warn('⚠️  Cloud 설정 없음, Local로 대체');
       }
@@ -60,7 +70,18 @@ export class UnifiedOllamaService {
 
     // Local은 항상 fallback으로 준비
     const localConfig = createLocalConfig();
-    this.localService = this.createLocalService(localConfig);
+    
+    // ✅ 커스텀 설정 병합 (useCloud=false이거나 Cloud 실패 시 사용)
+    const mergedConfig: LocalOllamaConfig = {
+      ...localConfig,
+      ...this.customConfig  // model, timeout 등 덮어쓰기
+    };
+    
+    this.localService = this.createLocalService(mergedConfig);
+    
+    if (!this.useCloud) {
+      console.log(`💻 Local Ollama 초기화: ${mergedConfig.model}`);
+    }
   }
 
   /**

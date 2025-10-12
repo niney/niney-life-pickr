@@ -6,8 +6,12 @@
 import { UnifiedOllamaService } from './ollama/unified-ollama.service';
 import type { ReviewDB } from '../types/db.types';
 import type { ReviewSummaryData } from '../types/db.types';
+import type { BaseOllamaConfig } from './ollama/ollama.types';
 
 class ReviewSummaryService extends UnifiedOllamaService {
+  constructor(useCloud: boolean = false, config?: Partial<BaseOllamaConfig>) {
+    super(useCloud, config);
+  }
 
   /**
    * 여러 리뷰를 개별적으로 요약 (병렬/순차)
@@ -173,8 +177,11 @@ JSON 형식:
   }
 }
 
-export function createReviewSummaryService(useCloud: boolean = false) {
-  return new ReviewSummaryService(useCloud);
+export function createReviewSummaryService(
+  useCloud: boolean = false,
+  config?: Partial<BaseOllamaConfig>
+) {
+  return new ReviewSummaryService(useCloud, config);
 }
 
 export default { createReviewSummaryService };

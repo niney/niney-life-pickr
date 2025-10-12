@@ -22,6 +22,7 @@ import crawlerRoutes from './routes/crawler.routes';
 import restaurantRoutes from './routes/restaurant.routes';
 import jobRoutes from './routes/job.routes';
 import reviewSummaryRoutes from './routes/review-summary.routes';
+import reviewRoutes from './routes/review.routes';
 
 // Create Fastify app with TypeBox provider
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -98,8 +99,9 @@ export const buildApp = async (): Promise<FastifyInstance> => {
         { name: 'users', description: 'User management endpoints' },
         { name: 'crawler', description: 'Naver Map restaurant crawler endpoints' },
         { name: 'restaurants', description: 'Restaurant data management endpoints' },
+        { name: 'reviews', description: 'Individual review operations' },
         { name: 'jobs', description: 'Background job management endpoints' },
-        { name: 'review-summary', description: 'AI review summary endpoints' }
+        { name: 'review-summary', description: 'Restaurant review summary batch operations' }
       ],
       components: {
         securitySchemes: {
@@ -199,7 +201,10 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(crawlerRoutes, { prefix: '/api/crawler' });
   await app.register(restaurantRoutes, { prefix: '/api/restaurants' });
   await app.register(jobRoutes, { prefix: '/api/jobs' });
-  await app.register(reviewSummaryRoutes, { prefix: '/api/restaurants' });
+  
+  // Review 관련 라우트
+  await app.register(reviewRoutes, { prefix: '/api/reviews' }); // 개별 리뷰 작업 (재요약 등)
+  await app.register(reviewSummaryRoutes, { prefix: '/api/restaurants' }); // 레스토랑의 리뷰 요약 작업
 
   return app;
 };
