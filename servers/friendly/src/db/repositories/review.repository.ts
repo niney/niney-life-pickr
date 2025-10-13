@@ -38,7 +38,7 @@ export class ReviewRepository {
         emotion_keywords = excluded.emotion_keywords,
         images = excluded.images,
         crawled_at = excluded.crawled_at,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = datetime('now', 'localtime')
     `, [
       input.restaurant_id,
       input.user_name,

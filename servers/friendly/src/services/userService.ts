@@ -124,7 +124,7 @@ export class UserService {
     
     // Update last login
     await db.run(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
+      "UPDATE users SET last_login = datetime('now', 'localtime') WHERE id = ?",
       [user.id]
     );
     

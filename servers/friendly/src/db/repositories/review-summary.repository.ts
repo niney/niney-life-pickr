@@ -39,7 +39,7 @@ export class ReviewSummaryRepository {
       UPDATE review_summaries 
       SET status = ?, 
           error_message = ?,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = datetime('now', 'localtime')
       WHERE review_id = ?
     `, [status, errorMessage || null, reviewId]);
   }
@@ -56,7 +56,7 @@ export class ReviewSummaryRepository {
       SET summary_data = ?,
           status = 'completed',
           error_message = NULL,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = datetime('now', 'localtime')
       WHERE review_id = ?
     `, [JSON.stringify(summaryData), reviewId]);
   }
@@ -81,7 +81,7 @@ export class ReviewSummaryRepository {
             SET summary_data = ?,
                 status = 'completed',
                 error_message = NULL,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = datetime('now', 'localtime')
             WHERE review_id = ?
           `, [JSON.stringify(update.summaryData), update.reviewId]);
         } else {
@@ -91,7 +91,7 @@ export class ReviewSummaryRepository {
             SET status = 'failed',
                 error_message = ?,
                 retry_count = retry_count + 1,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = datetime('now', 'localtime')
             WHERE review_id = ?
           `, [update.errorMessage || 'AI 요약 생성 실패', update.reviewId]);
         }
@@ -116,7 +116,7 @@ export class ReviewSummaryRepository {
       SET status = 'failed',
           error_message = ?,
           retry_count = retry_count + 1,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = datetime('now', 'localtime')
       WHERE review_id = ?
     `, [errorMessage, reviewId]);
   }

@@ -187,6 +187,7 @@ The friendly server provides comprehensive API documentation in multiple formats
 - **Database**: SQLite3 with file-based storage (`servers/friendly/data/niney.db`)
 - **Migrations**: Automated database migrations on server startup
 - **Location**: Migration files in `servers/friendly/src/db/migrations/`
+- **Timestamp Handling**: All `updated_at` and `last_login` use `datetime('now', 'localtime')` instead of `CURRENT_TIMESTAMP` (UTC) to ensure consistent local time storage across all operations
 
 ### Current Schema
 ```sql
@@ -274,6 +275,16 @@ FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
 - Version tracking in migrations table
 - Reset: `npm run db:reset`
 - File-based SQL migrations with sequential naming
+
+### Timestamp Management
+**Important**: All dynamic timestamp updates use `datetime('now', 'localtime')` to store server local time:
+- **Modified Files**:
+  - `review-summary.repository.ts`: 5 instances in updateStatus(), updateSummary(), updateSummaryBatch() (2x), markAsFailed()
+  - `restaurant.repository.ts`: 1 instance in upsert()
+  - `review.repository.ts`: 1 instance in upsert()
+  - `userService.ts`: 1 instance in validateCredentials() for last_login update
+- **Reason**: SQLite's `CURRENT_TIMESTAMP` returns UTC, causing discrepancies with local `created_at` timestamps
+- **Schema**: `created_at` columns keep `DEFAULT CURRENT_TIMESTAMP` for consistency with existing migrations
 
 ## Authentication System
 

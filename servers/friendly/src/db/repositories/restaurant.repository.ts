@@ -48,7 +48,7 @@ export class RestaurantRepository {
           lng = ?,
           url = ?,
           crawled_at = ?,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = datetime('now', 'localtime')
         WHERE place_id = ?`,
         [
           input.name,
