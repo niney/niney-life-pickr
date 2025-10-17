@@ -149,6 +149,14 @@ export interface ReviewInfo {
   visitInfo: VisitInfo;
 }
 
+export type MenuItemSentiment = 'positive' | 'negative' | 'neutral';
+
+export interface MenuItemWithSentiment {
+  name: string;
+  sentiment: MenuItemSentiment;
+  reason?: string;
+}
+
 export interface ReviewSummary {
   summary: string;
   keyKeywords: string[];
@@ -156,6 +164,7 @@ export interface ReviewSummary {
   sentimentReason: string;
   satisfactionScore: number | null;
   tips: string[];
+  menuItems?: MenuItemWithSentiment[];  // 리뷰에서 추출된 메뉴명/음식명 + 감정
 }
 
 export interface ReviewData {

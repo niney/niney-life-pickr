@@ -721,6 +721,60 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                         </View>
                       )}
 
+                      {review.summary.menuItems && review.summary.menuItems.length > 0 && (
+                        <View style={styles.menuItemsSection}>
+                          <Text style={[styles.menuItemsTitle, { color: colors.textSecondary }]}>🍽️ 언급된 메뉴:</Text>
+                          <View style={styles.keywordsContainer}>
+                            {review.summary.menuItems.map((menuItem, idx: number) => {
+                              // 감정별 색상 및 이모지 설정
+                              const sentimentConfig = {
+                                positive: {
+                                  emoji: '😊',
+                                  bgLight: '#c8e6c9',
+                                  bgDark: '#2e5d2e',
+                                  textLight: '#1b5e20',
+                                  textDark: '#a5d6a7',
+                                  borderLight: '#66bb6a',
+                                  borderDark: '#4caf50'
+                                },
+                                negative: {
+                                  emoji: '😞',
+                                  bgLight: '#ffcdd2',
+                                  bgDark: '#5d2e2e',
+                                  textLight: '#b71c1c',
+                                  textDark: '#ef9a9a',
+                                  borderLight: '#ef5350',
+                                  borderDark: '#e57373'
+                                },
+                                neutral: {
+                                  emoji: '😐',
+                                  bgLight: '#ffe0b2',
+                                  bgDark: '#5d4a2e',
+                                  textLight: '#e65100',
+                                  textDark: '#ffcc80',
+                                  borderLight: '#ff9800',
+                                  borderDark: '#ffb74d'
+                                }
+                              };
+
+                              const config = sentimentConfig[menuItem.sentiment];
+                              const bgColor = theme === 'light' ? config.bgLight : config.bgDark;
+                              const textColor = theme === 'light' ? config.textLight : config.textDark;
+                              const borderColor = theme === 'light' ? config.borderLight : config.borderDark;
+
+                              return (
+                                <View key={idx} style={[styles.menuItemBadge, { backgroundColor: bgColor, borderColor }]}>
+                                  <Text style={[styles.menuItemText, { color: textColor }]}>
+                                    <Text style={{ fontSize: 14 }}>{config.emoji}</Text> {menuItem.name}
+                                    {menuItem.reason && ` (${menuItem.reason})`}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      )}
+
                       {review.summary.tips.length > 0 && (
                         <View style={styles.tipsSection}>
                           <Text style={[styles.tipsTitle, { color: colors.textSecondary }]}>💡 팁:</Text>
@@ -1201,6 +1255,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 4,
+  },
+  menuItemsSection: {
+    marginBottom: 12,
+  },
+  menuItemsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  menuItemBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  menuItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   sentimentReason: {
     marginTop: 4,

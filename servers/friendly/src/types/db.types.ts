@@ -244,6 +244,20 @@ export interface CrawlJobInput {
 export type ReviewSummaryStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 /**
+ * 메뉴별 감정 타입
+ */
+export type MenuItemSentiment = 'positive' | 'negative' | 'neutral';
+
+/**
+ * 메뉴 아이템 (감정 포함)
+ */
+export interface MenuItemWithSentiment {
+  name: string;                      // 메뉴명
+  sentiment: MenuItemSentiment;      // 해당 메뉴에 대한 감정
+  reason?: string;                   // 감정 이유 (10자 이내)
+}
+
+/**
  * AI 요약 데이터 (JSON)
  */
 export interface ReviewSummaryData {
@@ -253,6 +267,7 @@ export interface ReviewSummaryData {
   sentimentReason: string;
   satisfactionScore?: number;
   tips?: string[];
+  menuItems?: MenuItemWithSentiment[];  // 리뷰에서 추출된 메뉴명/음식명 + 감정
 }
 
 /**

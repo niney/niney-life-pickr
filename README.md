@@ -315,6 +315,7 @@ npm run type-check # TypeScript 타입 체킹
 
 - [CLAUDE.md](./CLAUDE.md) - 전체 프로젝트 아키텍처 및 개발 가이드
 - [API 문서](http://localhost:4000/docs) - Friendly 서버 API 문서 (서버 실행 필요)
+- [CHECKLIST_NEW_FIELD_ADDITION.md](./CHECKLIST_NEW_FIELD_ADDITION.md) - 새 필드 추가 시 체크리스트 & 메뉴별 감정 분석 계획
 
 ## 커밋 메시지 규칙
 

@@ -21,6 +21,13 @@ const VisitInfoSchema = Type.Object({
   verificationMethod: Type.Union([Type.String(), Type.Null()], { description: '인증 방법 (예: 영수증 인증)' })
 });
 
+// 메뉴 아이템 (감정 포함) 스키마
+const MenuItemWithSentimentSchema = Type.Object({
+  name: Type.String({ description: '메뉴명' }),
+  sentiment: Type.String({ description: '감정 (positive/negative/neutral)' }),
+  reason: Type.Optional(Type.String({ description: '감정 이유 (10자 이내)' }))
+});
+
 // 리뷰 요약 스키마
 const ReviewSummarySchema = Type.Object({
   summary: Type.String({ description: '핵심 요약' }),
@@ -28,7 +35,8 @@ const ReviewSummarySchema = Type.Object({
   sentiment: Type.String({ description: '감정 (positive/negative/neutral)' }),
   sentimentReason: Type.String({ description: '감정 이유' }),
   satisfactionScore: Type.Union([Type.Number(), Type.Null()], { description: '만족도 점수 (1-100)' }),
-  tips: Type.Array(Type.String(), { description: '팁' })
+  tips: Type.Array(Type.String(), { description: '팁' }),
+  menuItems: Type.Optional(Type.Array(MenuItemWithSentimentSchema, { description: '언급된 메뉴/음식명 + 감정' }))
 });
 
 // 리뷰 스키마
@@ -257,13 +265,31 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
         if (row.summary_data) {
           try {
             const parsed = JSON.parse(row.summary_data);
+            
+            // ✨ 하위 호환성: 기존 string[] → MenuItemWithSentiment[] 변환
+            let menuItems = [];
+            if (parsed.menuItems && Array.isArray(parsed.menuItems)) {
+              if (parsed.menuItems.length > 0 && typeof parsed.menuItems[0] === 'string') {
+                // 기존 형식 (string[])
+                menuItems = parsed.menuItems.map((name: string) => ({
+                  name,
+                  sentiment: 'neutral' as const,
+                  reason: undefined
+                }));
+              } else {
+                // 새 형식 (MenuItemWithSentiment[])
+                menuItems = parsed.menuItems;
+              }
+            }
+            
             summaryData = {
               summary: parsed.summary || '',
               keyKeywords: parsed.keyKeywords || [],
               sentiment: parsed.sentiment || 'neutral',
               sentimentReason: parsed.sentimentReason || '',
               satisfactionScore: parsed.satisfactionScore,
-              tips: parsed.tips || []
+              tips: parsed.tips || [],
+              menuItems
             };
           } catch (error) {
             console.error(`Failed to parse summary_data for review ${row.id}:`, error);

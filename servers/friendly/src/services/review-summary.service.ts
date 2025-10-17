@@ -91,6 +91,14 @@ ${reviewText}
    - neutral 예시: "평범한 맛", "특별한 점 없음"
 5. 만족도 점수: 1-100 사이 숫자로 평가
 6. 팁: 이 리뷰에서 얻을 수 있는 유용한 팁 1-3개 (없으면 빈 배열)
+7. ✨ 메뉴별 감정 분석:
+   - 리뷰에서 언급된 구체적인 메뉴나 음식 이름 추출
+   - 각 메뉴에 대한 감정 분석 (positive/negative/neutral)
+   - 감정 이유를 10자 이내로 간단히 작성
+   - 구체적인 메뉴명만 추출 (예: "꼼장어", "된장찌개", "삼겹살", "냉면", "김치찌개")
+   - 일반적인 단어는 제외 (예: "음식", "메뉴", "요리", "반찬", "국")
+   - 중복 제거하여 최대 5개까지 추출
+   - 없으면 빈 배열 반환
 
 JSON 형식:
 {
@@ -99,7 +107,11 @@ JSON 형식:
   "sentiment": "positive|negative|neutral",
   "sentimentReason": "만족도 이유",
   "satisfactionScore": 85,
-  "tips": ["팁1", "팁2"]
+  "tips": ["팁1", "팁2"],
+  "menuItems": [
+    {"name": "메뉴1", "sentiment": "positive", "reason": "맛있음"},
+    {"name": "메뉴2", "sentiment": "negative", "reason": "너무 짬"}
+  ]
 }
 
 예시 1 (긍정):
@@ -109,7 +121,10 @@ JSON 형식:
   "sentiment": "positive",
   "sentimentReason": "꼼장어의 맛과 양",
   "satisfactionScore": 90,
-  "tips": ["꼼장어 추천", "2인 이상 방문 추천"]
+  "tips": ["꼼장어 추천", "2인 이상 방문 추천"],
+  "menuItems": [
+    {"name": "꼼장어", "sentiment": "positive", "reason": "맛있고 양 많음"}
+  ]
 }
 
 예시 2 (부정):
@@ -119,7 +134,8 @@ JSON 형식:
   "sentiment": "negative",
   "sentimentReason": "음식이 짜고 불친절한 서비스",
   "satisfactionScore": 30,
-  "tips": []
+  "tips": [],
+  "menuItems": []
 }
 
 예시 3 (중립):
@@ -129,7 +145,8 @@ JSON 형식:
   "sentiment": "neutral",
   "sentimentReason": "평범한 맛",
   "satisfactionScore": 50,
-  "tips": []
+  "tips": [],
+  "menuItems": []
 }
 
 예시 4 (리뷰 내용 없음/분석 불가):
@@ -139,7 +156,23 @@ JSON 형식:
   "sentiment": "neutral",
   "sentimentReason": "",
   "satisfactionScore": 0,
-  "tips": []
+  "tips": [],
+  "menuItems": []
+}
+
+예시 5 (여러 메뉴 언급 - 긍정/부정 혼합):
+{
+  "summary": "된장찌개와 삼겹살이 맛있었지만, 냉면은 너무 달았습니다.",
+  "keyKeywords": ["맛있어요", "달아요", "푸짐해요"],
+  "sentiment": "positive",
+  "sentimentReason": "대부분 메뉴의 훌륭한 맛",
+  "satisfactionScore": 75,
+  "tips": ["된장찌개 추천", "냉면은 호불호"],
+  "menuItems": [
+    {"name": "된장찌개", "sentiment": "positive", "reason": "맛있음"},
+    {"name": "삼겹살", "sentiment": "positive", "reason": "맛있음"},
+    {"name": "냉면", "sentiment": "negative", "reason": "너무 달음"}
+  ]
 }
 
 반드시 위 형식의 JSON만 출력하세요. 다른 텍스트는 포함하지 마세요.`;
@@ -157,7 +190,8 @@ JSON 형식:
       sentiment: 'neutral',
       sentimentReason: '정보 부족',
       satisfactionScore: undefined,
-      tips: []
+      tips: [],
+      menuItems: []
     };
   }
 
