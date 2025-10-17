@@ -167,6 +167,46 @@ export interface ReviewSummary {
   menuItems?: MenuItemWithSentiment[];  // 리뷰에서 추출된 메뉴명/음식명 + 감정
 }
 
+/**
+ * 메뉴별 감정 통계
+ */
+export interface MenuSentimentStats {
+  menuName: string;
+  totalMentions: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  positiveRate: number;
+  sentiment: MenuItemSentiment;
+  topReasons: {
+    positive: string[];
+    negative: string[];
+    neutral: string[];
+  };
+}
+
+/**
+ * Top 메뉴 (긍정/부정)
+ */
+export interface TopMenu {
+  menuName: string;
+  positiveRate?: number;
+  negativeRate?: number;
+  mentions: number;
+}
+
+/**
+ * 레스토랑 메뉴 통계
+ */
+export interface RestaurantMenuStatistics {
+  restaurantId: number;
+  totalReviews: number;
+  analyzedReviews: number;
+  menuStatistics: MenuSentimentStats[];
+  topPositiveMenus: TopMenu[];
+  topNegativeMenus: TopMenu[];
+}
+
 export interface ReviewData {
   id: number;
   userName: string | null;

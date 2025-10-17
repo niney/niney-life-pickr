@@ -292,6 +292,41 @@ export class ReviewSummaryRepository {
       DELETE FROM review_summaries WHERE restaurant_id = ?
     `, [restaurantId]);
   }
+
+  /**
+   * 레스토랑의 완료된 요약에서 메뉴 아이템 추출
+   */
+  async findMenuItemsByRestaurant(restaurantId: number): Promise<Array<{ reviewId: number; menuItem: any }>> {
+    const summaries = await db.all<ReviewSummaryDB>(`
+      SELECT id, review_id, summary_data 
+      FROM review_summaries 
+      WHERE restaurant_id = ? 
+        AND status = 'completed' 
+        AND summary_data IS NOT NULL
+    `, [restaurantId]);
+
+    const menuItems: Array<{ reviewId: number; menuItem: any }> = [];
+    
+    for (const summary of summaries) {
+      if (summary.summary_data) {
+        try {
+          const parsed: ReviewSummaryData = JSON.parse(summary.summary_data);
+          if (parsed.menuItems && Array.isArray(parsed.menuItems)) {
+            for (const item of parsed.menuItems) {
+              menuItems.push({
+                reviewId: summary.review_id,
+                menuItem: item
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to parse summary_data for review ${summary.review_id}:`, error);
+        }
+      }
+    }
+    
+    return menuItems;
+  }
 }
 
 export const reviewSummaryRepository = new ReviewSummaryRepository();

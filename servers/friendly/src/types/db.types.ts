@@ -294,3 +294,42 @@ export interface ReviewSummaryInput {
   status?: ReviewSummaryStatus;
   summary_data?: ReviewSummaryData | null;
 }
+
+/**
+ * 메뉴별 감정 통계
+ */
+export interface MenuSentimentStats {
+  menuName: string;
+  totalMentions: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  positiveRate: number;
+  sentiment: MenuItemSentiment;
+  topReasons: {
+    positive: string[];
+    negative: string[];
+    neutral: string[];
+  };
+}
+
+/**
+ * 레스토랑 메뉴 통계
+ */
+export interface RestaurantMenuStatistics {
+  restaurantId: number;
+  totalReviews: number;
+  analyzedReviews: number;
+  menuStatistics: MenuSentimentStats[];
+  topPositiveMenus: Array<{
+    menuName: string;
+    positiveRate: number;
+    mentions: number;
+  }>;
+  topNegativeMenus: Array<{
+    menuName: string;
+    negativeRate: number;
+    mentions: number;
+  }>;
+}
+
