@@ -12,7 +12,6 @@ export const useReviews = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsLoadingMore, setReviewsLoadingMore] = useState(false)
   const [reviewsTotal, setReviewsTotal] = useState(0)
-  const [reviewsLimit] = useState(20)
   const [reviewsOffset, setReviewsOffset] = useState(0)
   const [hasMoreReviews, setHasMoreReviews] = useState(true)
   const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>('all')
@@ -21,6 +20,9 @@ export const useReviews = () => {
   const fetchingOffsetRef = useRef<number | null>(null)
 
   const fetchReviews = async (restaurantId: number, offset: number = 0, append: boolean = false) => {
+    // 첫 로드(offset=0)는 3개, 그 이후는 10개씩 가져오기
+    const reviewsLimit = offset === 0 ? 3 : 10;
+    
     // 중복 요청 방지: 같은 offset으로 이미 요청 중이면 무시
     if (fetchingOffsetRef.current === offset) {
       console.log(`⚠️ 중복 요청 방지: offset ${offset}은 이미 요청 중입니다`)
@@ -43,18 +45,29 @@ export const useReviews = () => {
         const newReviews = response.data.reviews
 
         if (append) {
-          // 무한 스크롤: 기존 리뷰에 추가
-          setReviews(prev => [...prev, ...newReviews])
+          // 중복 제거: 기존 리뷰 ID와 비교하여 중복 제거
+          setReviews(prev => {
+            const existingIds = new Set(prev.map(r => r.id))
+            const uniqueNewReviews = newReviews.filter(r => !existingIds.has(r.id))
+            
+            if (uniqueNewReviews.length < newReviews.length) {
+              console.log(`⚠️ 중복 리뷰 제거: ${newReviews.length - uniqueNewReviews.length}개`)
+            }
+            
+            return [...prev, ...uniqueNewReviews]
+          })
         } else {
           // 초기 로드: 새로 설정
           setReviews(newReviews)
         }
 
         setReviewsTotal(response.data.total)
-        setReviewsOffset(offset)
+        // offset을 실제로 로드된 리뷰 개수만큼 증가
+        setReviewsOffset(offset + newReviews.length)
 
         // 더 이상 불러올 데이터가 있는지 확인
-        const hasMore = offset + newReviews.length < response.data.total
+        const totalLoaded = append ? reviews.length + newReviews.length : newReviews.length
+        const hasMore = totalLoaded < response.data.total
         setHasMoreReviews(hasMore)
       }
     } catch (err) {
@@ -70,7 +83,8 @@ export const useReviews = () => {
   const loadMoreReviews = async (restaurantId: number) => {
     if (!hasMoreReviews || reviewsLoadingMore || reviewsLoading) return
 
-    const nextOffset = reviewsOffset + reviewsLimit
+    // 현재까지 로드된 리뷰 개수를 기준으로 다음 offset 계산
+    const nextOffset = reviews.length
     await fetchReviews(restaurantId, nextOffset, true)
   }
 
@@ -91,7 +105,8 @@ export const useReviews = () => {
 
     setReviewsLoading(true)
     try {
-      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, 0, sentiments)
+      // 필터 변경 시에도 첫 로드는 1개
+      const response = await apiService.getReviewsByRestaurantId(restaurantId, 1, 0, sentiments)
       if (response.result && response.data) {
         setReviews(response.data.reviews)
         setReviewsTotal(response.data.total)
@@ -112,7 +127,6 @@ export const useReviews = () => {
     reviewsLoading,
     reviewsLoadingMore,
     reviewsTotal,
-    reviewsLimit,
     reviewsOffset,
     hasMoreReviews,
     sentimentFilter,

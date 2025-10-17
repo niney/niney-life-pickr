@@ -63,8 +63,58 @@ const RestaurantDetailScreen: React.FC = () => {
   // 레스토랑 정보 섹션 높이 추적
   const [headerHeight, setHeaderHeight] = useState(0);
 
+  // 현재 스크롤 위치 추적
+  const currentScrollY = useRef(0);
+
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu');
+
+  // ScrollView ref 추가
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // 탭 변경 시 스크롤 목표값 저장
+  const [pendingScrollY, setPendingScrollY] = useState<number | null>(null);
+
+  // 탭 변경 시 스크롤 초기화 함수
+  const handleTabChange = (tab: TabType) => {
+    console.log('🔄 [RestaurantDetailScreen] 탭 변경:', {
+      from: activeTab,
+      to: tab,
+      currentScrollY: currentScrollY.current,
+      headerHeight,
+      isCurrentlySkipped: currentScrollY.current >= headerHeight
+    });
+
+    // 현재 스크롤이 헤더를 건너뛴 상태면 건너뛴 상태 유지, 아니면 최상단으로
+    const targetScrollY = currentScrollY.current >= headerHeight && headerHeight > 0
+      ? headerHeight
+      : 0;
+
+    console.log('🎯 [RestaurantDetailScreen] 탭 변경 후 스크롤 목표:', {
+      targetScrollY,
+      willMaintainSkip: targetScrollY === headerHeight
+    });
+
+    // 스크롤 목표값 저장
+    setPendingScrollY(targetScrollY);
+    setActiveTab(tab);
+  };
+
+  // 탭 변경 후 스크롤 적용 (useEffect 사용)
+  useEffect(() => {
+    if (pendingScrollY !== null) {
+      console.log('⚡ [RestaurantDetailScreen] useEffect로 스크롤 적용:', {
+        targetScrollY: pendingScrollY,
+        currentScrollY: currentScrollY.current
+      });
+
+      // requestAnimationFrame으로 다음 프레임에 스크롤 적용
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: pendingScrollY, animated: false });
+        setPendingScrollY(null);
+      });
+    }
+  }, [activeTab, pendingScrollY]);
 
   // 메뉴 통계 상태
   const [menuStatistics, setMenuStatistics] = useState<any>(null);
@@ -151,10 +201,26 @@ const RestaurantDetailScreen: React.FC = () => {
   // Room 입장/퇴장 및 크롤링 완료 콜백 설정
   useEffect(() => {
     const restaurantIdStr = String(restaurantId);
-    
+
     // 레스토랑 변경 시 통계 데이터 초기화
     setMenuStatistics(null);
-    
+
+    // 레스토랑 변경 시 스크롤 위치 처리
+    // 현재 스크롤이 헤더 높이보다 크면 (건너뛴 상태) 헤더 높이로, 아니면 0으로
+    const targetScrollY = currentScrollY.current >= headerHeight && headerHeight > 0
+      ? headerHeight
+      : 0;
+
+    console.log('🔍 [RestaurantDetailScreen] 레스토랑 변경 감지:', {
+      restaurantId: restaurantIdStr,
+      currentScrollY: currentScrollY.current,
+      headerHeight,
+      targetScrollY,
+      isSkipped: currentScrollY.current >= headerHeight
+    });
+
+    scrollViewRef.current?.scrollTo({ y: targetScrollY, animated: false });
+
     joinRestaurantRoom(restaurantIdStr);
 
     // 크롤링 완료 시 리뷰 갱신 콜백 설정
@@ -165,7 +231,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
         // 메뉴도 함께 갱신
         await fetchMenusRef.current(restaurantId);
-        
+
         // 통계 탭이면 통계도 새로고침
         if (activeTabRef.current === 'statistics') {
           await fetchMenuStatisticsRef.current();
@@ -174,7 +240,7 @@ const RestaurantDetailScreen: React.FC = () => {
       onReviewSummaryCompleted: async () => {
         // 리뷰 요약 완료 시에도 갱신
         await fetchReviewsRef.current(restaurantId, 0, false);
-        
+
         // 통계 탭이면 통계도 새로고침
         if (activeTabRef.current === 'statistics') {
           await fetchMenuStatisticsRef.current();
@@ -230,13 +296,27 @@ const RestaurantDetailScreen: React.FC = () => {
   // 스크롤 이벤트 처리 (무한 스크롤)
   const handleScroll = useCallback((event: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+
+    // 현재 스크롤 위치 저장
+    const previousScrollY = currentScrollY.current;
+    currentScrollY.current = contentOffset.y;
+
+    // 스크롤 위치가 크게 변경될 때만 로그 (매 스크롤마다 로그 방지)
+    if (Math.abs(previousScrollY - contentOffset.y) > 50) {
+      console.log('📜 [RestaurantDetailScreen] 스크롤 위치 업데이트:', {
+        scrollY: contentOffset.y,
+        headerHeight,
+        isSkipped: contentOffset.y >= headerHeight
+      });
+    }
+
     const paddingToBottom = 100; // 하단에서 100px 전에 트리거
     const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
 
     if (isNearBottom && activeTab === 'review' && !reviewsLoadingMore && !reviewsLoading && hasMoreReviews) {
       loadMoreReviews(restaurantId);
     }
-  }, [activeTab, restaurantId, reviewsLoadingMore, reviewsLoading, hasMoreReviews]);
+  }, [activeTab, restaurantId, reviewsLoadingMore, reviewsLoading, hasMoreReviews, headerHeight]);
 
   // 핵심 키워드 토글 함수
   const toggleKeywords = (reviewId: number) => {
@@ -363,6 +443,7 @@ const RestaurantDetailScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
@@ -382,7 +463,17 @@ const RestaurantDetailScreen: React.FC = () => {
         }
       >
         {/* 레스토랑 정보 + 크롤링 상태 헤더 (높이 측정용) */}
-        <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+        <View onLayout={(e) => {
+          const newHeight = e.nativeEvent.layout.height;
+          if (newHeight !== headerHeight) {
+            console.log('📏 [RestaurantDetailScreen] 헤더 높이 변경:', {
+              oldHeight: headerHeight,
+              newHeight,
+              restaurantId
+            });
+            setHeaderHeight(newHeight);
+          }
+        }}>
           {/* 레스토랑 정보 헤더 */}
           <View style={styles.restaurantInfoContainer}>
             <View style={[styles.restaurantInfoCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
@@ -529,7 +620,7 @@ const RestaurantDetailScreen: React.FC = () => {
           <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
             <TouchableOpacity
               style={styles.tabButton}
-              onPress={() => setActiveTab('menu')}
+              onPress={() => handleTabChange('menu')}
             >
               <Text
                 style={[
@@ -546,7 +637,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.tabButton}
-              onPress={() => setActiveTab('review')}
+              onPress={() => handleTabChange('review')}
             >
               <Text
                 style={[
@@ -563,7 +654,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.tabButton}
-              onPress={() => setActiveTab('statistics')}
+              onPress={() => handleTabChange('statistics')}
             >
               <Text
                 style={[
@@ -691,9 +782,34 @@ const RestaurantDetailScreen: React.FC = () => {
         {/* 리뷰 탭 */}
         {activeTab === 'review' && (
           <View style={{ paddingHorizontal: 16 }}>
-            {reviewsLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+            {reviewsLoading && reviews.length === 0 ? (
+              // 스켈레톤 UI - 3개의 빈 박스
+              <View style={styles.reviewsList}>
+                {[1, 2, 3].map((index) => (
+                  <View
+                    key={`skeleton-${index}`}
+                    style={[
+                      styles.reviewCardContainer,
+                      styles.skeletonCard,
+                      theme === 'dark' ? styles.reviewCardDark : styles.reviewCardLight,
+                    ]}
+                  >
+                    <View style={styles.reviewCardContent}>
+                      {/* 헤더 스켈레톤 */}
+                      <View style={styles.reviewCardHeader}>
+                        <View style={{ flex: 1 }}>
+                          <View style={[styles.skeletonLine, styles.skeletonShort, { backgroundColor: colors.border }]} />
+                          <View style={[styles.skeletonLine, styles.skeletonTiny, { backgroundColor: colors.border, marginTop: 4 }]} />
+                        </View>
+                      </View>
+                      
+                      {/* 텍스트 스켈레톤 */}
+                      <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 12 }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 8 }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonMedium, { backgroundColor: colors.border, marginTop: 8 }]} />
+                    </View>
+                  </View>
+                ))}
               </View>
             ) : reviews.length > 0 ? (
               <View style={styles.reviewsList}>
@@ -1047,7 +1163,7 @@ const RestaurantDetailScreen: React.FC = () => {
                         ...menu.topReasons.negative.map((r: string) => `👎 ${r}`),
                         ...menu.topReasons.neutral.map((r: string) => `😐 ${r}`)
                       ];
-                      
+
                       return (
                         <View key={index} style={styles.menuStatItem}>
                           <View style={styles.menuStatHeader}>
@@ -1801,6 +1917,26 @@ const styles = StyleSheet.create({
   menuStatReason: {
     fontSize: 12,
     marginBottom: 2,
+  },
+  // 스켈레톤 UI 스타일
+  skeletonCard: {
+    opacity: 0.6,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonTiny: {
+    width: '30%',
+  },
+  skeletonShort: {
+    width: '40%',
+  },
+  skeletonMedium: {
+    width: '60%',
+  },
+  skeletonFull: {
+    width: '100%',
   },
 });
 

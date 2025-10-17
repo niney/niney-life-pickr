@@ -45,6 +45,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu')
 
+  // 탭 변경 시 스크롤 초기화 함수
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }
+
   // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set())
 
@@ -133,6 +141,11 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     if (id) {
       // 레스토랑 변경 시 통계 데이터 초기화
       setMenuStatistics(null)
+      
+      // 레스토랑 변경 시 스크롤 초기화
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0
+      }
       
       joinRestaurantRoom(id)
 
@@ -476,7 +489,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             styles.tabButton,
             activeTab === 'menu' && styles.tabButtonActive
           ]}
-          onPress={() => setActiveTab('menu')}
+          onPress={() => handleTabChange('menu')}
         >
           <Text
             style={[
@@ -496,7 +509,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             styles.tabButton,
             activeTab === 'review' && styles.tabButtonActive
           ]}
-          onPress={() => setActiveTab('review')}
+          onPress={() => handleTabChange('review')}
         >
           <Text
             style={[
@@ -516,7 +529,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             styles.tabButton,
             activeTab === 'statistics' && styles.tabButtonActive
           ]}
-          onPress={() => setActiveTab('statistics')}
+          onPress={() => handleTabChange('statistics')}
         >
           <Text
             style={[
