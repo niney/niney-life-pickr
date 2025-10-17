@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react'
+import React, { useEffect, useRef, useCallback, useState, useEffectEvent } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text, Modal } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft, faStar, faStarHalfStroke, faRedo } from '@fortawesome/free-solid-svg-icons'
@@ -22,7 +22,7 @@ interface RestaurantDetailProps {
   isMobile?: boolean
 }
 
-type TabType = 'menu' | 'review'
+type TabType = 'menu' | 'review' | 'statistics'
 
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
@@ -48,7 +48,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set())
 
-  // 재요약 모달 상태
+  // 재 요약 모달 상태
   const [resummaryModalVisible, setResummaryModalVisible] = useState(false)
   const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null)
   const [selectedModel, setSelectedModel] = useState<string>('gpt-oss:20b-cloud')
@@ -60,6 +60,10 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     { value: 'gpt-oss:120b-cloud', label: 'GPT OSS 120B (Cloud)' },
     { value: 'deepseek-v3.1:671b-cloud', label: 'DeepSeek v3.1 671B (Cloud)' },
   ]
+
+  // 메뉴 통계 상태
+  const [menuStatistics, setMenuStatistics] = useState<any>(null)
+  const [statisticsLoading, setStatisticsLoading] = useState(false)
 
   // 독립적으로 데이터 로드
   const {
@@ -79,25 +83,63 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     handleBackToList,
   } = useRestaurantDetail()
 
+  // 메뉴 통계 조회 함수
+  const fetchMenuStatistics = useCallback(async (restaurantId: number) => {
+    setStatisticsLoading(true)
+    try {
+      const apiBaseUrl = getApiBaseUrl()
+      const response = await fetch(`${apiBaseUrl}/api/restaurants/${restaurantId}/menu-statistics?minMentions=1`)
+      if (!response.ok) {
+        throw new Error('메뉴 통계 조회 실패')
+      }
+      const result = await response.json()
+      if (result.result && result.data) {
+        setMenuStatistics(result.data)
+      }
+    } catch (error) {
+      console.error('❌ 메뉴 통계 조회 실패:', error)
+      setMenuStatistics(null)
+    } finally {
+      setStatisticsLoading(false)
+    }
+  }, [])
+
+  // Effect Event: 크롤링 완료 시 실행할 로직 (non-reactive)
+  const onReviewCrawlCompleted = useEffectEvent(async () => {
+    const restaurantId = parseInt(id!, 10)
+    if (!isNaN(restaurantId)) {
+      await fetchReviews(restaurantId)
+      // 통계 탭이면 통계도 새로고침
+      if (activeTab === 'statistics') {
+        await fetchMenuStatistics(restaurantId)
+      }
+    }
+  })
+
+  // Effect Event: 요약 완료 시 실행할 로직 (non-reactive)
+  const onReviewSummaryCompleted = useEffectEvent(async () => {
+    const restaurantId = parseInt(id!, 10)
+    if (!isNaN(restaurantId)) {
+      await fetchReviews(restaurantId)
+      // 통계 탭이면 통계도 새로고침
+      if (activeTab === 'statistics') {
+        await fetchMenuStatistics(restaurantId)
+      }
+    }
+  })
+
   // restaurant id로 room 입장, 컴포넌트 언마운트 시 퇴장
   useEffect(() => {
     if (id) {
+      // 레스토랑 변경 시 통계 데이터 초기화
+      setMenuStatistics(null)
+      
       joinRestaurantRoom(id)
 
       // 리뷰 크롤링/요약 완료 시 리뷰 재조회
       setRestaurantCallbacks({
-        onReviewCrawlCompleted: async () => {
-          const restaurantId = parseInt(id, 10)
-          if (!isNaN(restaurantId)) {
-            await fetchReviews(restaurantId)
-          }
-        },
-        onReviewSummaryCompleted: async () => {
-          const restaurantId = parseInt(id, 10)
-          if (!isNaN(restaurantId)) {
-            await fetchReviews(restaurantId)
-          }
-        }
+        onReviewCrawlCompleted,
+        onReviewSummaryCompleted
       })
 
       return () => {
@@ -105,6 +147,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       }
     }
   }, [id])
+
+  // 통계 탭 활성화 시 데이터 로드
+  useEffect(() => {
+    if (activeTab === 'statistics' && id) {
+      const restaurantId = parseInt(id, 10)
+      if (!isNaN(restaurantId)) {
+        fetchMenuStatistics(restaurantId)
+      }
+    }
+  }, [activeTab, id, fetchMenuStatistics])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
@@ -455,6 +507,26 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             리뷰 ({reviewsTotal})
           </Text>
           {activeTab === 'review' && (
+            <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'statistics' && styles.tabButtonActive
+          ]}
+          onPress={() => setActiveTab('statistics')}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              { color: activeTab === 'statistics' ? colors.primary : colors.textSecondary }
+            ]}
+          >
+            📊 통계
+          </Text>
+          {activeTab === 'statistics' && (
             <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
           )}
         </TouchableOpacity>
@@ -860,6 +932,126 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 리뷰가 없습니다</Text>
           </View>
         )}
+          </>
+        )}
+
+        {/* 통계 탭 */}
+        {activeTab === 'statistics' && (
+          <>
+            {statisticsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : menuStatistics ? (
+              <View style={styles.statisticsContainer}>
+                {/* 전체 요약 */}
+                <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>📊 전체 요약</Text>
+                  <View style={styles.statisticsSummary}>
+                    <View style={styles.summaryItem}>
+                      <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>전체 리뷰</Text>
+                      <Text style={[styles.summaryValue, { color: colors.text }]}>{menuStatistics.totalReviews}개</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>분석 완료</Text>
+                      <Text style={[styles.summaryValue, { color: colors.text }]}>{menuStatistics.analyzedReviews}개</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>언급된 메뉴</Text>
+                      <Text style={[styles.summaryValue, { color: colors.text }]}>{menuStatistics.menuStatistics.length}개</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Top 긍정 메뉴 */}
+                {menuStatistics.topPositiveMenus.length > 0 && (
+                  <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+                    <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>😊 추천 메뉴 (긍정률 높음)</Text>
+                    <View style={styles.topMenusList}>
+                      {menuStatistics.topPositiveMenus.map((menu: any, index: number) => (
+                        <View key={index} style={[styles.topMenuItem, { backgroundColor: '#e8f5e9', borderColor: '#4caf50' }]}>
+                          <Text style={[styles.topMenuRank, { color: '#2e7d32' }]}>#{index + 1}</Text>
+                          <View style={styles.topMenuInfo}>
+                            <Text style={[styles.topMenuName, { color: '#1b5e20' }]}>{menu.menuName}</Text>
+                            <Text style={[styles.topMenuStats, { color: '#2e7d32' }]}>
+                              긍정률 {menu.positiveRate}% · {menu.mentions}회 언급
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Top 부정 메뉴 */}
+                {menuStatistics.topNegativeMenus.length > 0 && (
+                  <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+                    <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>😞 주의할 메뉴 (부정률 높음)</Text>
+                    <View style={styles.topMenusList}>
+                      {menuStatistics.topNegativeMenus.map((menu: any, index: number) => (
+                        <View key={index} style={[styles.topMenuItem, { backgroundColor: '#ffebee', borderColor: '#f44336' }]}>
+                          <Text style={[styles.topMenuRank, { color: '#c62828' }]}>#{index + 1}</Text>
+                          <View style={styles.topMenuInfo}>
+                            <Text style={[styles.topMenuName, { color: '#b71c1c' }]}>{menu.menuName}</Text>
+                            <Text style={[styles.topMenuStats, { color: '#c62828' }]}>
+                              부정률 {menu.negativeRate}% · {menu.mentions}회 언급
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* 전체 메뉴 통계 */}
+                <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>📋 전체 메뉴 통계</Text>
+                  <View style={styles.allMenusList}>
+                    {menuStatistics.menuStatistics.map((stat: any, index: number) => {
+                      const sentimentColor = stat.sentiment === 'positive' ? '#4caf50' : stat.sentiment === 'negative' ? '#f44336' : '#ff9800'
+                      const sentimentBg = stat.sentiment === 'positive' ? '#e8f5e9' : stat.sentiment === 'negative' ? '#ffebee' : '#fff3e0'
+                      
+                      return (
+                        <View key={index} style={[styles.menuStatItem, { borderColor: colors.border }]}>
+                          <View style={styles.menuStatHeader}>
+                            <Text style={[styles.menuStatName, { color: colors.text }]}>{stat.menuName}</Text>
+                            <View style={[styles.menuStatBadge, { backgroundColor: sentimentBg }]}>
+                              <Text style={[styles.menuStatBadgeText, { color: sentimentColor }]}>
+                                {stat.sentiment === 'positive' ? '😊' : stat.sentiment === 'negative' ? '😞' : '😐'} {stat.positiveRate}%
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.menuStatCounts}>
+                            <Text style={[styles.menuStatCount, { color: '#4caf50' }]}>긍정 {stat.positive}</Text>
+                            <Text style={[styles.menuStatCount, { color: '#f44336' }]}>부정 {stat.negative}</Text>
+                            <Text style={[styles.menuStatCount, { color: '#ff9800' }]}>중립 {stat.neutral}</Text>
+                            <Text style={[styles.menuStatCount, { color: colors.textSecondary }]}>총 {stat.totalMentions}회</Text>
+                          </View>
+                          {(stat.topReasons.positive.length > 0 || stat.topReasons.negative.length > 0) && (
+                            <View style={styles.menuStatReasons}>
+                              {stat.topReasons.positive.length > 0 && (
+                                <Text style={[styles.menuStatReason, { color: '#4caf50' }]}>
+                                  👍 {stat.topReasons.positive.join(', ')}
+                                </Text>
+                              )}
+                              {stat.topReasons.negative.length > 0 && (
+                                <Text style={[styles.menuStatReason, { color: '#f44336' }]}>
+                                  👎 {stat.topReasons.negative.join(', ')}
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                        </View>
+                      )
+                    })}
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>통계 데이터가 없습니다</Text>
+              </View>
+            )}
           </>
         )}
       </div>
@@ -1399,6 +1591,108 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  // 통계 스타일
+  statisticsContainer: {
+    gap: 20,
+  },
+  statisticsCard: {
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  statisticsCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  statisticsSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 16,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  topMenusList: {
+    gap: 12,
+  },
+  topMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  topMenuRank: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginRight: 16,
+    minWidth: 36,
+  },
+  topMenuInfo: {
+    flex: 1,
+  },
+  topMenuName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  topMenuStats: {
+    fontSize: 14,
+  },
+  allMenusList: {
+    gap: 12,
+  },
+  menuStatItem: {
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  menuStatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  menuStatName: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  menuStatBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  menuStatBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  menuStatCounts: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  menuStatCount: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  menuStatReasons: {
+    gap: 4,
+  },
+  menuStatReason: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 })
 
