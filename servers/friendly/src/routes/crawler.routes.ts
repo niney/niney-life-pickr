@@ -95,6 +95,10 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
         createSummary: Type.Optional(Type.Boolean({
           description: '리뷰 요약 생성 여부 (기본: false)',
           default: false
+        })),
+        resetSummary: Type.Optional(Type.Boolean({
+          description: '기존 요약 삭제 후 재생성 여부 (createSummary: true일 때만 유효, 기본: false)',
+          default: false
         }))
       }),
       response: {
@@ -146,18 +150,20 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    let { 
-      url, 
+    let {
+      url,
       restaurantId,
-      crawlMenus = true, 
+      crawlMenus = true,
       crawlReviews = false,
-      createSummary = false
+      createSummary = false,
+      resetSummary = false
     } = request.body as {
       url?: string;
       restaurantId?: number;
       crawlMenus?: boolean;
       crawlReviews?: boolean;
       createSummary?: boolean;
+      resetSummary?: boolean;
     };
 
     // URL 또는 restaurantId 중 하나는 필수
@@ -207,10 +213,11 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         console.log('[통합 크롤링] 신규 크롤링 시작:', url);
-        const result = await restaurantService.crawlAndSaveRestaurant(url, { 
-          crawlMenus, 
+        const result = await restaurantService.crawlAndSaveRestaurant(url, {
+          crawlMenus,
           crawlReviews,
-          createSummary
+          createSummary,
+          resetSummary
         });
 
         return ResponseHelper.success(reply, {
@@ -274,11 +281,19 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
 
         // 리뷰 요약 생성
         if (createSummary) {
+          // resetSummary 옵션이 true면 기존 요약 먼저 삭제
+          if (resetSummary) {
+            console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 기존 요약 삭제 중...`);
+            const reviewSummaryRepository = await import('../db/repositories/review-summary.repository');
+            await reviewSummaryRepository.default.deleteByRestaurantId(restaurantId);
+            console.log(`[통합 크롤링] 기존 요약 삭제 완료`);
+          }
+
           console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 리뷰 요약 생성 시작`);
-          
+
           const reviewSummaryProcessor = await import('../services/review-summary-processor.service');
           reviewSummaryProcessor.default.processIncompleteReviews(
-            restaurant.id, 
+            restaurant.id,
             true // useCloud
           ).catch(err => {
             console.error(`[레스토랑 ${restaurant.id}] 요약 생성 오류:`, err);

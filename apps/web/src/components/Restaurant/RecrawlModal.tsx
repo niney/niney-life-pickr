@@ -6,7 +6,7 @@ import { THEME_COLORS } from '@shared/constants'
 interface RecrawlModalProps {
   visible: boolean
   onClose: () => void
-  onConfirm: (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }) => Promise<void>
+  onConfirm: (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean; resetSummary?: boolean }) => Promise<void>
   restaurantName: string
 }
 
@@ -22,6 +22,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
   const [crawlMenus, setCrawlMenus] = useState(false)
   const [crawlReviews, setCrawlReviews] = useState(false)
   const [createSummary, setCrawlSummary] = useState(false)
+  const [resetSummary, setResetSummary] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleConfirm = async () => {
@@ -32,12 +33,18 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
 
     setLoading(true)
     try {
-      await onConfirm({ crawlMenus, crawlReviews, createSummary })
+      await onConfirm({
+        crawlMenus,
+        crawlReviews,
+        createSummary,
+        resetSummary: createSummary && resetSummary
+      })
       onClose()
       // 상태 초기화
       setCrawlMenus(false)
       setCrawlReviews(false)
       setCrawlSummary(false)
+      setResetSummary(false)
     } catch (error) {
       console.error('재크롤링 실패:', error)
     } finally {
@@ -106,6 +113,24 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
                 </Text>
               </View>
             </TouchableOpacity>
+
+            {/* resetSummary 옵션 - createSummary가 true일 때만 표시 */}
+            {createSummary && (
+              <TouchableOpacity
+                style={[styles.optionRow, styles.resetSummaryOption]}
+                onPress={() => setResetSummary(!resetSummary)}
+              >
+                <View style={[styles.checkbox, resetSummary && { backgroundColor: colors.primary }]}>
+                  {resetSummary && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <View style={styles.optionText}>
+                  <Text style={[styles.optionTitle, { color: colors.text }]}>기존 요약 지우기</Text>
+                  <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>
+                    모든 요약을 삭제한 후 처음부터 생성합니다
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.buttonContainer}>
@@ -162,8 +187,15 @@ const styles = StyleSheet.create({
   },
   optionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
+  },
+  resetSummaryOption: {
+    paddingLeft: 12,
+    paddingTop: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(0, 0, 0, 0.1)',
+    marginTop: 8,
   },
   checkbox: {
     width: 24,

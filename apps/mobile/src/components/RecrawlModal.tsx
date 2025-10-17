@@ -6,7 +6,7 @@ import { THEME_COLORS } from 'shared/constants'
 interface RecrawlModalProps {
   visible: boolean
   onClose: () => void
-  onConfirm: (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }) => void
+  onConfirm: (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean; resetSummary?: boolean }) => void
   restaurantName: string
 }
 
@@ -16,13 +16,20 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({ visible, onClose, onConfirm
   const [crawlMenus, setCrawlMenus] = useState(false)
   const [crawlReviews, setCrawlReviews] = useState(false)
   const [createSummary, setCreateSummary] = useState(false)
+  const [resetSummary, setResetSummary] = useState(false)
 
   const handleConfirm = () => {
-    onConfirm({ crawlMenus, crawlReviews, createSummary })
+    onConfirm({
+      crawlMenus,
+      crawlReviews,
+      createSummary,
+      resetSummary: createSummary && resetSummary
+    })
     onClose()
     setCrawlMenus(false)
     setCrawlReviews(false)
     setCreateSummary(false)
+    setResetSummary(false)
   }
 
   const handleClose = () => {
@@ -30,6 +37,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({ visible, onClose, onConfirm
     setCrawlMenus(false)
     setCrawlReviews(false)
     setCreateSummary(false)
+    setResetSummary(false)
   }
 
   return (
@@ -60,6 +68,19 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({ visible, onClose, onConfirm
               </View>
               <Text style={[styles.checkboxLabel, { color: colors.text }]}>리뷰 요약 생성</Text>
             </TouchableOpacity>
+
+            {/* resetSummary 옵션 - createSummary가 true일 때만 표시 */}
+            {createSummary && (
+              <TouchableOpacity style={[styles.checkboxRow, styles.resetSummaryRow]} onPress={() => setResetSummary(!resetSummary)}>
+                <View style={[styles.checkbox, { borderColor: colors.border }]}>
+                  {resetSummary && <View style={[styles.checkboxInner, { backgroundColor: colors.primary }]} />}
+                </View>
+                <View style={styles.resetSummaryContent}>
+                  <Text style={[styles.checkboxLabel, { color: colors.text }]}>기존 요약 지우고 다시 생성</Text>
+                  <Text style={[styles.resetSummaryDescription, { color: colors.textSecondary }]}>모든 요약을 삭제한 후 처음부터 생성합니다</Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.buttonContainer}>
@@ -126,6 +147,22 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 16,
+  },
+  resetSummaryRow: {
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(0, 0, 0, 0.1)',
+    marginTop: 8,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  resetSummaryContent: {
+    flex: 1,
+  },
+  resetSummaryDescription: {
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: '400',
   },
   buttonContainer: {
     flexDirection: 'row',

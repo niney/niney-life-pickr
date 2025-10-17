@@ -303,12 +303,14 @@ class ApiService {
     crawlMenus?: boolean;
     crawlReviews?: boolean;
     createSummary?: boolean;
+    resetSummary?: boolean;
   }): Promise<ApiResponse<{
     restaurantId: number;
     isNewCrawl: boolean;
     crawlMenus: boolean;
     crawlReviews: boolean;
     createSummary: boolean;
+    resetSummary?: boolean;
     reviewJobId?: string;
     restaurantInfo?: RestaurantInfo;
   }>> {
@@ -324,12 +326,13 @@ class ApiService {
    */
   async recrawlRestaurant(
     restaurantId: number,
-    options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }
+    options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean; resetSummary?: boolean }
   ): Promise<ApiResponse<{
     restaurantId: number;
     crawlMenus: boolean;
     crawlReviews: boolean;
     createSummary: boolean;
+    resetSummary?: boolean;
     reviewJobId?: string;
   }>> {
     // 내부적으로 통합 API 사용

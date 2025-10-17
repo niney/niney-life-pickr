@@ -51,12 +51,12 @@ export class RestaurantService {
   /**
    * 음식점 크롤링 및 DB 저장
    * @param url 네이버맵 URL
-   * @param options 크롤링 옵션 (crawlMenus, crawlReviews, createSummary 등)
+   * @param options 크롤링 옵션 (crawlMenus, crawlReviews, createSummary, resetSummary 등)
    * @returns 크롤링 결과 및 DB 저장 여부
    */
   async crawlAndSaveRestaurant(
     url: string,
-    options: { crawlMenus?: boolean; crawlReviews?: boolean; createSummary?: boolean } = {}
+    options: { crawlMenus?: boolean; crawlReviews?: boolean; createSummary?: boolean; resetSummary?: boolean } = {}
   ): Promise<{
     restaurantInfo: RestaurantInfo;
     savedToDb: boolean;
@@ -122,10 +122,18 @@ export class RestaurantService {
         // 4. 리뷰 요약 생성 (옵션이 true인 경우)
         if (options.createSummary && restaurantId) {
           try {
+            // resetSummary 옵션이 true면 기존 요약 먼저 삭제
+            if (options.resetSummary) {
+              console.log(`[RestaurantService] 레스토랑 ${restaurantId} 기존 요약 삭제 중...`);
+              const reviewSummaryRepository = await import('../db/repositories/review-summary.repository');
+              await reviewSummaryRepository.default.deleteByRestaurantId(restaurantId);
+              console.log(`[RestaurantService] 기존 요약 삭제 완료`);
+            }
+
             console.log(`[RestaurantService] 레스토랑 ${restaurantId} 리뷰 요약 생성 시작`);
             const reviewSummaryProcessor = await import('./review-summary-processor.service');
             reviewSummaryProcessor.default.processIncompleteReviews(
-              restaurantId, 
+              restaurantId,
               true // useCloud
             ).catch(err => {
               console.error(`[RestaurantService] 레스토랑 ${restaurantId} 요약 생성 오류:`, err);
