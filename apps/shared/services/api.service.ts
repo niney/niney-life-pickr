@@ -15,11 +15,21 @@ import { Platform } from 'react-native';
 const API_PORT = 4000;
 
 export const getDefaultApiUrl = (): string => {
-  // Web: Vite 빌드 시 YAML에서 주입된 값 사용
-  // @ts-ignore - Vite injects this at build time
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
-    // @ts-ignore
-    return import.meta.env.VITE_API_URL;
+  // Web 환경인 경우
+  if (Platform.OS === 'web') {
+    // Vite 빌드 시 YAML에서 주입된 값 사용 (Production)
+    // @ts-ignore - Vite injects this at build time
+    if (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'production' && import.meta.env?.VITE_API_URL) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_URL;
+    }
+
+    // 웹 환경: 현재 브라우저의 호스트 사용 (localhost, IP, 도메인 자동 감지)
+    if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      return `${protocol}//${hostname}:${API_PORT}`;
+    }
   }
 
   // Mobile: 플랫폼별 기본값
