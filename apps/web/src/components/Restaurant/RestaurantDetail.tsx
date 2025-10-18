@@ -98,7 +98,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       const apiBaseUrl = getApiBaseUrl()
       const response = await fetch(`${apiBaseUrl}/api/restaurants/${restaurantId}/menu-statistics?minMentions=1`)
       if (!response.ok) {
-        throw new Error('메뉴 통계 조회 실패')
+        console.error('❌ 메뉴 통계 조회 실패: HTTP', response.status)
+        return
       }
       const result = await response.json()
       if (result.result && result.data) {
@@ -286,7 +287,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       })
 
       if (!response.ok) {
-        throw new Error('재요약 요청 실패')
+        console.error('❌ 재요약 요청 실패: HTTP', response.status)
+        alert('재요약 요청에 실패했습니다.')
+        return
       }
 
       const result = await response.json()

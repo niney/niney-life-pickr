@@ -8,13 +8,12 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
-  Dimensions,
   Modal,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faStar, faStarHalfStroke, faRedo } from '@fortawesome/free-solid-svg-icons';
+import { faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons';
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons';
 import ImageViewing from 'react-native-image-viewing';
 import {
@@ -23,11 +22,10 @@ import {
   THEME_COLORS,
   useReviews,
   useMenus,
-  apiService
+  apiService, Alert
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
 type TabType = 'menu' | 'review' | 'statistics';
@@ -170,7 +168,8 @@ const RestaurantDetailScreen: React.FC = () => {
       const apiBaseUrl = getApiBaseUrl();
       const response = await fetch(`${apiBaseUrl}/api/restaurants/${restaurantId}/menu-statistics?minMentions=1`);
       if (!response.ok) {
-        throw new Error('메뉴 통계 조회 실패');
+        console.error('❌ 메뉴 통계 조회 실패: HTTP', response.status);
+        return;
       }
       const result = await response.json();
       if (result.result && result.data) {
@@ -289,9 +288,6 @@ const RestaurantDetailScreen: React.FC = () => {
     }
   }, [activeTab, fetchMenuStatistics]);
 
-  // 크롤링/요약 상태 체크
-  const isCrawling = reviewCrawlStatus.status === 'active';
-  const isSummarizing = reviewSummaryStatus.status === 'active';
 
   // 스크롤 이벤트 처리 (무한 스크롤)
   const handleScroll = useCallback((event: any) => {
@@ -366,7 +362,9 @@ const RestaurantDetailScreen: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('재요약 요청 실패');
+        console.error('❌ 재요약 요청 실패: HTTP', response.status);
+        Alert.error('재요약 실패', '재요약 요청에 실패했습니다.');
+        return;
       }
 
       const result = await response.json();
@@ -802,7 +800,7 @@ const RestaurantDetailScreen: React.FC = () => {
                           <View style={[styles.skeletonLine, styles.skeletonTiny, { backgroundColor: colors.border, marginTop: 4 }]} />
                         </View>
                       </View>
-                      
+
                       {/* 텍스트 스켈레톤 */}
                       <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 12 }]} />
                       <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 8 }]} />

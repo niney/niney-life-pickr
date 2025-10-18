@@ -1,10 +1,10 @@
-import { defineConfig } from 'vite'
+import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+import {VitePWA} from 'vite-plugin-pwa'
 import yaml from 'js-yaml'
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import {fileURLToPath} from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -13,8 +13,7 @@ function loadConfig() {
   try {
     const configPath = path.resolve(__dirname, '../../config/base.yml')
     const configFile = fs.readFileSync(configPath, 'utf8')
-    const config = yaml.load(configFile) as any
-    return config
+    return yaml.load(configFile) as any
   } catch (error) {
     console.warn('Config file not found, using default values')
     return {
@@ -36,10 +35,10 @@ function loadConfig() {
   }
 }
 
-const config = loadConfig()
-const webConfig = config.server?.web || { host: 'localhost', port: 3000 }
-const appConfig = config.app || { name: 'Niney Life Pickr', description: 'Life decision picker app' }
-const pwaConfig = config.pwa || { enabled: true, registerType: 'autoUpdate' }
+const loadedConfig = loadConfig()
+const webConfig = loadedConfig.server?.web || { host: 'localhost', port: 3000 }
+const appConfig = loadedConfig.app || { name: 'Niney Life Pickr', description: 'Life decision picker app' }
+const pwaConfig = loadedConfig.pwa || { enabled: true, registerType: 'autoUpdate' }
 
 // https://vite.dev/config/
 export default defineConfig({
