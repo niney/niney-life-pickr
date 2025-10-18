@@ -42,79 +42,15 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
-  // 현재 스크롤 위치 추적
-  const currentScrollY = useRef(0)
-
-  // 레스토랑 정보 헤더 높이 추적
-  const [headerHeight, setHeaderHeight] = useState(0)
-  const headerRef = useRef<HTMLDivElement | null>(null)
-
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu')
 
-  // 각 탭별로 "건너뛴 상태" 저장 (true: 헤더 건너뜀, false: 최상단)
-  const tabScrollStates = useRef<Record<TabType, boolean>>({
-    menu: false,
-    review: false,
-    statistics: false,
-  })
-
-  // 통계 탭 데이터 로드 대기 플래그
-  const waitingStatisticsScroll = useRef(false)
-
-  // 스크롤 위치 감시 및 "건너뛴 상태" 저장
-  const updateTabScrollState = useCallback(() => {
-    if (headerHeight === 0) return
-    
-    // 통계 탭 데이터 로딩 대기 중에는 상태 업데이트 안함
-    if (waitingStatisticsScroll.current && activeTab === 'statistics') {
-      return
-    }
-    
-    const isSkipped = currentScrollY.current >= headerHeight
-    const previousState = tabScrollStates.current[activeTab]
-    
-    if (previousState !== isSkipped) {
-      tabScrollStates.current[activeTab] = isSkipped
-    }
-  }, [activeTab, headerHeight])
-
-  // 탭 변경 시 저장된 스크롤 상태로 복원
+  // 탭 변경 시 스크롤 초기화 함수
   const handleTabChange = (tab: TabType) => {
-    // 현재 탭의 스크롤 상태 마지막 저장
-    updateTabScrollState()
-
-    // headerHeight가 아직 측정 안됨
-    if (headerHeight === 0) {
-      setActiveTab(tab)
-      return
-    }
-
-    // 현재 스크롤이 건너뛴 상태인지 확인
-    const currentIsSkipped = currentScrollY.current >= headerHeight
-    
-    // 이동할 탭의 저장된 스크롤 상태 가져오기
-    let shouldSkip = tabScrollStates.current[tab]
-    
-    // 현재 건너뛴 상태인데 이동할 탭이 초기 상태(false)면 현재 상태 상속
-    if (currentIsSkipped && !shouldSkip) {
-      shouldSkip = true
-      tabScrollStates.current[tab] = true
-    }
-    
-    const targetScrollY = shouldSkip ? headerHeight : 0
-
-    // 통계 탭이고 데이터가 없으면 대기 플래그 설정
-    if (tab === 'statistics' && menuStatistics === null) {
-      waitingStatisticsScroll.current = true
-    } else {
-      // 즉시 스크롤 적용
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = targetScrollY
-      }
-    }
-
     setActiveTab(tab)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
   }
 
   // 핵심 키워드 표시 상태 (리뷰 ID별로 관리)
@@ -225,42 +161,15 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     }
   }, [id])
 
-  // 헤더 높이 측정
-  useEffect(() => {
-    if (headerRef.current) {
-      const height = headerRef.current.offsetHeight
-      if (height !== headerHeight) {
-        setHeaderHeight(height)
-      }
-    }
-  }, [restaurant, reviewCrawlStatus.status, reviewSummaryStatus.status, headerHeight])
-
   // 통계 탭 활성화 시 데이터 로드
   useEffect(() => {
-    if (activeTab === 'statistics' && id && menuStatistics === null) {
+    if (activeTab === 'statistics' && id) {
       const restaurantId = parseInt(id, 10)
       if (!isNaN(restaurantId)) {
         fetchMenuStatistics(restaurantId)
       }
     }
-  }, [activeTab, id, menuStatistics, fetchMenuStatistics])
-
-  // 통계 데이터 로드 완료 시 스크롤 복원
-  useEffect(() => {
-    if (waitingStatisticsScroll.current && 
-        menuStatistics !== null && 
-        !statisticsLoading &&
-        headerHeight > 0) {
-      
-      const shouldSkip = tabScrollStates.current.statistics
-      const targetScrollY = shouldSkip ? headerHeight : 0
-
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = targetScrollY
-      }
-      waitingStatisticsScroll.current = false
-    }
-  }, [menuStatistics, statisticsLoading, headerHeight])
+  }, [activeTab, id, fetchMenuStatistics])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
@@ -272,7 +181,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     }
   }, [id, hasMoreReviews, reviewsLoading, loadMoreReviews])
 
-  // 데스크톱 스크롤 이벤트 (스크롤 영역 감지 + 상태 저장)
+  // 데스크톱 스크롤 이벤트 (스크롤 영역 감지)
   useEffect(() => {
     if (isMobile || !scrollContainerRef.current) return
 
@@ -283,12 +192,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       const scrollTop = container.scrollTop
       const scrollHeight = container.scrollHeight
       const clientHeight = container.clientHeight
-
-      // 현재 스크롤 위치 저장
-      currentScrollY.current = scrollTop
-
-      // 현재 탭의 스크롤 상태 업데이트
-      updateTabScrollState()
 
       // 스크롤이 하단 200px 근처에 도달하면 로드
       if (scrollHeight - scrollTop - clientHeight < 200) {
@@ -302,7 +205,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     return () => {
       container.removeEventListener('scroll', handleScroll)
     }
-  }, [isMobile, handleLoadMore, updateTabScrollState])
+  }, [isMobile, handleLoadMore])
 
   // Intersection Observer 설정 (모바일 무한 스크롤)
   useEffect(() => {
@@ -451,20 +354,19 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       className={isMobile ? '' : 'restaurant-scroll-area'}
       style={{ backgroundColor: colors.background }}
     >
-      <div ref={headerRef}>
-        <View style={[styles.reviewHeader, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
-            <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: isMobile ? 22 : 20, color: colors.text }} />
-          </TouchableOpacity>
-          <View style={styles.reviewHeaderInfo}>
-            <Text style={[styles.reviewTitle, { color: colors.text }]}>{restaurant?.name || '레스토랑'}</Text>
-            <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]}>
-              메뉴 {menus.length}개 · 리뷰 {reviewsTotal}개
-            </Text>
-          </View>
+      <View style={[styles.reviewHeader, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
+          <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: isMobile ? 22 : 20, color: colors.text }} />
+        </TouchableOpacity>
+        <View style={styles.reviewHeaderInfo}>
+          <Text style={[styles.reviewTitle, { color: colors.text }]}>{restaurant?.name || '레스토랑'}</Text>
+          <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]}>
+            메뉴 {menus.length}개 · 리뷰 {reviewsTotal}개
+          </Text>
         </View>
+      </View>
 
-        {/* 크롤링 진행 상태 표시 */}
+      {/* 크롤링 진행 상태 표시 */}
       {isCrawling && (
         <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
@@ -579,7 +481,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           )}
         </View>
       )}
-      </div>
 
       {/* 탭 메뉴 */}
       <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>

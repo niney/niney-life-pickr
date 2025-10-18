@@ -4,9 +4,8 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  TextInputProps,
-  ViewStyle,
 } from 'react-native';
+import type { TextInputProps, ViewStyle } from 'react-native';
 
 interface InputFieldProps extends TextInputProps {
   label?: string;

@@ -10,7 +10,6 @@ import {
   Image,
   Dimensions,
   Modal,
-  Animated,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,37 +36,6 @@ type TabType = 'menu' | 'review' | 'statistics';
 const getApiBaseUrl = (): string => {
   // @ts-ignore - apiService.baseUrl는 private이지만 접근 가능
   return (apiService as any).baseUrl || 'http://localhost:4000';
-};
-
-// 스켈레톤 애니메이션 컴포넌트
-const SkeletonBox: React.FC<{ style?: any }> = ({ style }) => {
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [pulseAnim]);
-
-  const opacity = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
-
-  return <Animated.View style={[style, { opacity }]} />;
 };
 
 const RestaurantDetailScreen: React.FC = () => {
@@ -104,70 +72,49 @@ const RestaurantDetailScreen: React.FC = () => {
   // ScrollView ref 추가
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // 각 탭별로 "건너뛴 상태" 저장 (true: 헤더 건너뜀, false: 최상단)
-  const tabScrollStates = useRef<Record<TabType, boolean>>({
-    menu: false,
-    review: false,
-    statistics: false,
-  });
+  // 탭 변경 시 스크롤 목표값 저장
+  const [pendingScrollY, setPendingScrollY] = useState<number | null>(null);
 
-  // 통계 탭 데이터 로드 대기 플래그
-  const waitingStatisticsScroll = useRef(false);
-
-  // 스크롤 위치 감시 및 "건너뛴 상태" 저장
-  const updateTabScrollState = useCallback(() => {
-    if (headerHeight === 0) return;
-    
-    // 통계 탭 데이터 로딩 대기 중에는 상태 업데이트 안함
-    if (waitingStatisticsScroll.current && activeTab === 'statistics') {
-      return;
-    }
-    
-    const isSkipped = currentScrollY.current >= headerHeight;
-    const previousState = tabScrollStates.current[activeTab];
-    
-    if (previousState !== isSkipped) {
-      tabScrollStates.current[activeTab] = isSkipped;
-    }
-  }, [activeTab, headerHeight]);
-
-  // 탭 변경 시 저장된 스크롤 상태로 복원
+  // 탭 변경 시 스크롤 초기화 함수
   const handleTabChange = (tab: TabType) => {
-    // 현재 탭의 스크롤 상태 마지막 저장
-    updateTabScrollState();
+    console.log('🔄 [RestaurantDetailScreen] 탭 변경:', {
+      from: activeTab,
+      to: tab,
+      currentScrollY: currentScrollY.current,
+      headerHeight,
+      isCurrentlySkipped: currentScrollY.current >= headerHeight
+    });
 
-    // headerHeight가 아직 측정 안됨
-    if (headerHeight === 0) {
-      setActiveTab(tab);
-      return;
-    }
+    // 현재 스크롤이 헤더를 건너뛴 상태면 건너뛴 상태 유지, 아니면 최상단으로
+    const targetScrollY = currentScrollY.current >= headerHeight && headerHeight > 0
+      ? headerHeight
+      : 0;
 
-    // 현재 스크롤이 건너뛴 상태인지 확인
-    const currentIsSkipped = currentScrollY.current >= headerHeight;
-    
-    // 이동할 탭의 저장된 스크롤 상태 가져오기
-    let shouldSkip = tabScrollStates.current[tab];
-    
-    // 현재 건너뛴 상태인데 이동할 탭이 초기 상태(false)면 현재 상태 상속
-    if (currentIsSkipped && !shouldSkip) {
-      shouldSkip = true;
-      tabScrollStates.current[tab] = true;
-    }
-    
-    const targetScrollY = shouldSkip ? headerHeight : 0;
+    console.log('🎯 [RestaurantDetailScreen] 탭 변경 후 스크롤 목표:', {
+      targetScrollY,
+      willMaintainSkip: targetScrollY === headerHeight
+    });
 
-    // 통계 탭이고 데이터가 없으면 대기 플래그 설정
-    if (tab === 'statistics' && menuStatistics === null) {
-      waitingStatisticsScroll.current = true;
-    } else {
-      // 즉시 스크롤 적용
-      requestAnimationFrame(() => {
-        scrollViewRef.current?.scrollTo({ y: targetScrollY, animated: false });
-      });
-    }
-
+    // 스크롤 목표값 저장
+    setPendingScrollY(targetScrollY);
     setActiveTab(tab);
   };
+
+  // 탭 변경 후 스크롤 적용 (useEffect 사용)
+  useEffect(() => {
+    if (pendingScrollY !== null) {
+      console.log('⚡ [RestaurantDetailScreen] useEffect로 스크롤 적용:', {
+        targetScrollY: pendingScrollY,
+        currentScrollY: currentScrollY.current
+      });
+
+      // requestAnimationFrame으로 다음 프레임에 스크롤 적용
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: pendingScrollY, animated: false });
+        setPendingScrollY(null);
+      });
+    }
+  }, [activeTab, pendingScrollY]);
 
   // 메뉴 통계 상태
   const [menuStatistics, setMenuStatistics] = useState<any>(null);
@@ -258,8 +205,21 @@ const RestaurantDetailScreen: React.FC = () => {
     // 레스토랑 변경 시 통계 데이터 초기화
     setMenuStatistics(null);
 
-    // 레스토랑 변경 시 스크롤 최상단으로
-    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    // 레스토랑 변경 시 스크롤 위치 처리
+    // 현재 스크롤이 헤더 높이보다 크면 (건너뛴 상태) 헤더 높이로, 아니면 0으로
+    const targetScrollY = currentScrollY.current >= headerHeight && headerHeight > 0
+      ? headerHeight
+      : 0;
+
+    console.log('🔍 [RestaurantDetailScreen] 레스토랑 변경 감지:', {
+      restaurantId: restaurantIdStr,
+      currentScrollY: currentScrollY.current,
+      headerHeight,
+      targetScrollY,
+      isSkipped: currentScrollY.current >= headerHeight
+    });
+
+    scrollViewRef.current?.scrollTo({ y: targetScrollY, animated: false });
 
     joinRestaurantRoom(restaurantIdStr);
 
@@ -324,45 +284,31 @@ const RestaurantDetailScreen: React.FC = () => {
 
   // 통계 탭 활성화 시 데이터 로드
   useEffect(() => {
-    if (activeTab === 'statistics' && menuStatistics === null) {
-      console.log('� [통계 탭] 데이터 로드 시작');
+    if (activeTab === 'statistics') {
       fetchMenuStatistics();
     }
-  }, [activeTab, menuStatistics, fetchMenuStatistics]);
-
-  // 통계 데이터 로드 완료 시 스크롤 복원
-  useEffect(() => {
-    if (waitingStatisticsScroll.current && 
-        menuStatistics !== null && 
-        !statisticsLoading &&
-        headerHeight > 0) {
-      
-      const shouldSkip = tabScrollStates.current.statistics;
-      const targetScrollY = shouldSkip ? headerHeight : 0;
-
-      requestAnimationFrame(() => {
-        scrollViewRef.current?.scrollTo({ 
-          y: targetScrollY, 
-          animated: false 
-        });
-        waitingStatisticsScroll.current = false;
-      });
-    }
-  }, [menuStatistics, statisticsLoading, headerHeight]);
+  }, [activeTab, fetchMenuStatistics]);
 
   // 크롤링/요약 상태 체크
   const isCrawling = reviewCrawlStatus.status === 'active';
   const isSummarizing = reviewSummaryStatus.status === 'active';
 
-  // 스크롤 이벤트 처리 (무한 스크롤 + 상태 저장)
+  // 스크롤 이벤트 처리 (무한 스크롤)
   const handleScroll = useCallback((event: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
 
     // 현재 스크롤 위치 저장
+    const previousScrollY = currentScrollY.current;
     currentScrollY.current = contentOffset.y;
 
-    // 현재 탭의 스크롤 상태 업데이트
-    updateTabScrollState();
+    // 스크롤 위치가 크게 변경될 때만 로그 (매 스크롤마다 로그 방지)
+    if (Math.abs(previousScrollY - contentOffset.y) > 50) {
+      console.log('📜 [RestaurantDetailScreen] 스크롤 위치 업데이트:', {
+        scrollY: contentOffset.y,
+        headerHeight,
+        isSkipped: contentOffset.y >= headerHeight
+      });
+    }
 
     const paddingToBottom = 100; // 하단에서 100px 전에 트리거
     const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
@@ -520,6 +466,11 @@ const RestaurantDetailScreen: React.FC = () => {
         <View onLayout={(e) => {
           const newHeight = e.nativeEvent.layout.height;
           if (newHeight !== headerHeight) {
+            console.log('📏 [RestaurantDetailScreen] 헤더 높이 변경:', {
+              oldHeight: headerHeight,
+              newHeight,
+              restaurantId
+            });
             setHeaderHeight(newHeight);
           }
         }}>
@@ -831,9 +782,34 @@ const RestaurantDetailScreen: React.FC = () => {
         {/* 리뷰 탭 */}
         {activeTab === 'review' && (
           <View style={{ paddingHorizontal: 16 }}>
-            {reviewsLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+            {reviewsLoading && reviews.length === 0 ? (
+              // 스켈레톤 UI - 3개의 빈 박스
+              <View style={styles.reviewsList}>
+                {[1, 2, 3].map((index) => (
+                  <View
+                    key={`skeleton-${index}`}
+                    style={[
+                      styles.reviewCardContainer,
+                      styles.skeletonCard,
+                      theme === 'dark' ? styles.reviewCardDark : styles.reviewCardLight,
+                    ]}
+                  >
+                    <View style={styles.reviewCardContent}>
+                      {/* 헤더 스켈레톤 */}
+                      <View style={styles.reviewCardHeader}>
+                        <View style={{ flex: 1 }}>
+                          <View style={[styles.skeletonLine, styles.skeletonShort, { backgroundColor: colors.border }]} />
+                          <View style={[styles.skeletonLine, styles.skeletonTiny, { backgroundColor: colors.border, marginTop: 4 }]} />
+                        </View>
+                      </View>
+                      
+                      {/* 텍스트 스켈레톤 */}
+                      <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 12 }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 8 }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonMedium, { backgroundColor: colors.border, marginTop: 8 }]} />
+                    </View>
+                  </View>
+                ))}
               </View>
             ) : reviews.length > 0 ? (
               <View style={styles.reviewsList}>
@@ -1108,64 +1084,9 @@ const RestaurantDetailScreen: React.FC = () => {
         {/* 통계 탭 */}
         {activeTab === 'statistics' && (
           <View style={{ paddingHorizontal: 16 }}>
-            {statisticsLoading || menuStatistics === null ? (
-              // 로딩 중 스켈레톤 UI
-              <View style={styles.statisticsContainer}>
-                {/* 전체 요약 스켈레톤 */}
-                <View style={[styles.statisticsCard, styles.skeletonCard]}>
-                  <SkeletonBox style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-                  <View style={styles.statisticsSummary}>
-                    {[1, 2, 3].map((i) => (
-                      <View key={i} style={styles.summaryItem}>
-                        <SkeletonBox style={[styles.skeletonText, styles.skeletonLabel, { backgroundColor: colors.border }]} />
-                        <SkeletonBox style={[styles.skeletonText, styles.skeletonValue, { backgroundColor: colors.border }]} />
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {/* TOP 5 스켈레톤 */}
-                {[1, 2].map((cardIdx) => (
-                  <View key={cardIdx} style={[styles.statisticsCard, styles.skeletonCard]}>
-                    <SkeletonBox style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-                    <View style={styles.topMenusList}>
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <View key={i} style={styles.topMenuItem}>
-                          <View style={[styles.topMenuRank, { backgroundColor: colors.border }]}>
-                            <SkeletonBox style={[styles.skeletonRankCircle, { backgroundColor: colors.background }]} />
-                          </View>
-                          <View style={styles.topMenuInfo}>
-                            <SkeletonBox style={[styles.skeletonText, styles.skeletonMenuName, { backgroundColor: colors.border }]} />
-                            <SkeletonBox style={[styles.skeletonText, styles.skeletonMenuStats, { backgroundColor: colors.border }]} />
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                ))}
-
-                {/* 전체 메뉴 통계 스켈레톤 */}
-                <View style={[styles.statisticsCard, styles.skeletonCard]}>
-                  <SkeletonBox style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-                  <View style={styles.allMenusList}>
-                    {[1, 2, 3].map((i) => (
-                      <View key={i} style={styles.menuStatItem}>
-                        <View style={styles.menuStatHeader}>
-                          <SkeletonBox style={[styles.skeletonText, styles.skeletonMenuName, { backgroundColor: colors.border }]} />
-                          <SkeletonBox style={[styles.skeletonBadge, { backgroundColor: colors.border }]} />
-                        </View>
-                        <View style={styles.menuStatCounts}>
-                          {[1, 2, 3, 4].map((j) => (
-                            <View key={j} style={styles.menuStatCount}>
-                              <SkeletonBox style={[styles.skeletonText, styles.skeletonSmall, { backgroundColor: colors.border }]} />
-                              <SkeletonBox style={[styles.skeletonText, styles.skeletonSmall, { backgroundColor: colors.border }]} />
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </View>
+            {statisticsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : menuStatistics ? (
               <View style={styles.statisticsContainer}>
@@ -1997,51 +1918,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 2,
   },
-  // Skeleton styles
+  // 스켈레톤 UI 스타일
   skeletonCard: {
-    overflow: 'hidden',
+    opacity: 0.6,
   },
-  skeletonTitle: {
-    height: 20,
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonTiny: {
+    width: '30%',
+  },
+  skeletonShort: {
     width: '40%',
-    borderRadius: 4,
-    marginBottom: 12,
   },
-  skeletonText: {
-    borderRadius: 4,
-  },
-  skeletonLabel: {
-    height: 12,
-    width: 50,
-    marginBottom: 4,
-  },
-  skeletonValue: {
-    height: 16,
-    width: 40,
-  },
-  skeletonMenuName: {
-    height: 14,
+  skeletonMedium: {
     width: '60%',
-    marginBottom: 4,
   },
-  skeletonMenuStats: {
-    height: 12,
-    width: '80%',
-  },
-  skeletonRankCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  skeletonBadge: {
-    height: 24,
-    width: 60,
-    borderRadius: 12,
-  },
-  skeletonSmall: {
-    height: 12,
-    width: 30,
-    marginBottom: 2,
+  skeletonFull: {
+    width: '100%',
   },
 });
 
