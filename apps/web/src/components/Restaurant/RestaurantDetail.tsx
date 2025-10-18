@@ -5,18 +5,8 @@ import { faArrowLeft, faStar, faStarHalfStroke, faRedo } from '@fortawesome/free
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
-import type { ReviewData } from '@shared/services'
+import { getDefaultApiUrl, type ReviewData } from '@shared/services'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
-
-// API 기본 URL (동적 호스트 감지)
-const getApiBaseUrl = (): string => {
-  if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol
-    const hostname = window.location.hostname
-    return `${protocol}//${hostname}:4000`
-  }
-  return 'http://localhost:4000'
-}
 
 interface RestaurantDetailProps {
   isMobile?: boolean
@@ -95,7 +85,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const fetchMenuStatistics = useCallback(async (restaurantId: number) => {
     setStatisticsLoading(true)
     try {
-      const apiBaseUrl = getApiBaseUrl()
+      const apiBaseUrl = getDefaultApiUrl()
       const response = await fetch(`${apiBaseUrl}/api/restaurants/${restaurantId}/menu-statistics?minMentions=1`)
       if (!response.ok) {
         console.error('❌ 메뉴 통계 조회 실패: HTTP', response.status)
@@ -271,7 +261,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
     setResummaryLoading(true)
     try {
-      const apiBaseUrl = getApiBaseUrl()
+      const apiBaseUrl = getDefaultApiUrl()
       const response = await fetch(`${apiBaseUrl}/api/reviews/summarize`, {
         method: 'POST',
         headers: {
@@ -732,7 +722,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   {review.images && review.images.length > 0 && (
                     <View style={styles.reviewImagesContainer}>
                       {review.images.map((imageUrl: string, idx: number) => {
-                        const apiBaseUrl = getApiBaseUrl()
+                        const apiBaseUrl = getDefaultApiUrl()
                         const fullImageUrl = `${apiBaseUrl}${imageUrl}`
 
                         return (

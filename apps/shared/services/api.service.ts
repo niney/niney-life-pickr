@@ -14,7 +14,7 @@ import { Platform } from 'react-native';
 // - iOS: 192.168.0.12:4000 (물리 기기, 개발자 IP에 맞게 수정 필요)
 const API_PORT = 4000;
 
-const getDefaultApiUrl = (): string => {
+export const getDefaultApiUrl = (): string => {
   // Web: Vite 빌드 시 YAML에서 주입된 값 사용
   // @ts-ignore - Vite injects this at build time
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {

@@ -22,19 +22,14 @@ import {
   THEME_COLORS,
   useReviews,
   useMenus,
-  apiService, Alert
+  getDefaultApiUrl,
+  Alert
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
 
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
 type TabType = 'menu' | 'review' | 'statistics';
-
-// API Base URL 헬퍼 함수
-const getApiBaseUrl = (): string => {
-  // @ts-ignore - apiService.baseUrl는 private이지만 접근 가능
-  return (apiService as any).baseUrl || 'http://localhost:4000';
-};
 
 const RestaurantDetailScreen: React.FC = () => {
   const route = useRoute<RestaurantDetailRouteProp>();
@@ -165,7 +160,7 @@ const RestaurantDetailScreen: React.FC = () => {
   const fetchMenuStatistics = useCallback(async () => {
     setStatisticsLoading(true);
     try {
-      const apiBaseUrl = getApiBaseUrl();
+      const apiBaseUrl = getDefaultApiUrl();
       const response = await fetch(`${apiBaseUrl}/api/restaurants/${restaurantId}/menu-statistics?minMentions=1`);
       if (!response.ok) {
         console.error('❌ 메뉴 통계 조회 실패: HTTP', response.status);
@@ -346,7 +341,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
     setResummaryLoading(true);
     try {
-      const apiBaseUrl = getApiBaseUrl();
+      const apiBaseUrl = getDefaultApiUrl();
       const response = await fetch(`${apiBaseUrl}/api/reviews/summarize`, {
         method: 'POST',
         headers: {
@@ -432,7 +427,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
   // 이미지 클릭 핸들러
   const handleImagePress = (images: string[], index: number) => {
-    const fullUrls = images.map(img => `${getApiBaseUrl()}${img}`);
+    const fullUrls = images.map(img => `${getDefaultApiUrl()}${img}`);
     setImageViewerUrls(fullUrls);
     setImageViewerIndex(index);
     setImageViewerVisible(true);
@@ -861,7 +856,7 @@ const RestaurantDetailScreen: React.FC = () => {
                               activeOpacity={0.9}
                             >
                               <Image
-                                source={{ uri: `${getApiBaseUrl()}${review.images[0]}` }}
+                                source={{ uri: `${getDefaultApiUrl()}${review.images[0]}` }}
                                 style={styles.reviewImageFull}
                                 resizeMode="cover"
                               />
@@ -880,7 +875,7 @@ const RestaurantDetailScreen: React.FC = () => {
                                   activeOpacity={0.9}
                                 >
                                   <Image
-                                    source={{ uri: `${getApiBaseUrl()}${imageUrl}` }}
+                                    source={{ uri: `${getDefaultApiUrl()}${imageUrl}` }}
                                     style={styles.reviewImageScroll}
                                     resizeMode="cover"
                                   />

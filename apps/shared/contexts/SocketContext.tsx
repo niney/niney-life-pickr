@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { Platform } from 'react-native'
 import {
   Alert,
   type ProgressData,
@@ -8,6 +7,7 @@ import {
   type SummaryProgress,
   type ReviewSummaryStatus
 } from '../utils'
+import { getDefaultApiUrl } from '../services'
 
 interface SocketContextValue {
   socket: Socket | null
@@ -36,46 +36,11 @@ interface SocketProviderProps {
   serverUrl?: string
 }
 
-/**
- * 환경에 따른 서버 URL 결정
- *
- * Web: Vite가 빌드 시점에 config/*.yml에서 읽어서 주입
- * - Development: config/base.yml의 api.url (http://localhost:4000)
- * - Production: config/production.yml의 api.url (https://nlpfriendly.easypcb.co.kr)
- *
- * Mobile: 플랫폼별 하드코딩 (React Native는 빌드 타임 주입 불가)
- * - Android: 10.0.2.2:4000 (에뮬레이터 → 호스트 localhost)
- * - iOS: 192.168.0.12:4000 (물리 기기, 개발자 IP에 맞게 수정 필요)
- */
-const getServerUrl = (customUrl?: string): string => {
-  if (customUrl) return customUrl
-
-  const isWeb = Platform.OS === 'web'
-
-  if (isWeb) {
-    // Web: Vite 빌드 시 YAML에서 주입된 값 사용 (api.service.ts와 동일)
-    // @ts-ignore - Vite injects this at build time
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
-      // @ts-ignore
-      return import.meta.env.VITE_API_URL
-    }
-    return 'http://localhost:4000'
-  }
-
-  // Mobile: 플랫폼별 기본값
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:4000'
-  }
-
-  // iOS 및 기타 (개발자 IP에 맞게 수정 필요)
-  return 'http://192.168.0.12:4000'
-}
-
 export const SocketProvider: React.FC<SocketProviderProps> = ({
   children,
   serverUrl
 }) => {
-  const resolvedServerUrl = getServerUrl(serverUrl)
+  const resolvedServerUrl = serverUrl || getDefaultApiUrl()
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [reviewCrawlStatus, setReviewCrawlStatus] = useState<ClientReviewCrawlStatus>({
@@ -94,7 +59,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
   }>({})
   const currentRestaurantIdRef = useRef<string | null>(null)
-  
+
   // ✅ Sequence 번호 추적 (순서 보장)
   const lastCrawlSequenceRef = useRef<number>(0)
   const lastSummarySequenceRef = useRef<number>(0)
@@ -132,7 +97,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // 크롤링 진행 상황 (웹 크롤링 단계, subscribe 시점 + 실시간 업데이트)
     socket.on('review:crawl_progress', (data: any) => {
       console.log('[Socket.io] Crawl Progress:', data)
-      
+
       // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
       const sequence = data.sequence || data.current || 0
       if (sequence < lastCrawlSequenceRef.current) {
@@ -140,14 +105,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         return
       }
       lastCrawlSequenceRef.current = sequence
-      
+
       // 크롤링 진행률만 업데이트 (웹 페이지에서 리뷰 수집 중)
       setCrawlProgress({
         current: data.current || 0,
         total: data.total || 0,
         percentage: data.percentage || 0
       })
-      
+
       // status가 'progress'면 진행 중
       if (data.status === 'progress') {
         setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
@@ -157,28 +122,28 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // DB 저장 진행 상황 (실제 DB 저장 단계)
     socket.on('review:db_progress', (data: any) => {
       console.log('[Socket.io] DB Progress:', data)
-      
+
       // DB 저장 진행률 업데이트
       setDbProgress({
         current: data.current || 0,
         total: data.total || 0,
         percentage: data.percentage || 0
       })
-      
+
       setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
     })
 
     // 이미지 처리 진행 상황 (이미지 다운로드 단계)
     socket.on('review:image_progress', (data: any) => {
       console.log('[Socket.io] Image Progress:', data)
-      
+
       // 이미지 처리 진행률 업데이트
       setImageProgress({
         current: data.current || 0,
         total: data.total || 0,
         percentage: data.percentage || 0
       })
-      
+
       setReviewCrawlStatus(prev => ({ ...prev, status: 'active' }))
     })
 
@@ -246,7 +211,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // 리뷰 요약 진행 (subscribe 시점 + 실시간 업데이트)
     socket.on('review_summary:progress', (data: any) => {
       console.log('[Socket.io] Summary Progress:', data)
-      
+
       // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
       const sequence = data.sequence || data.current || 0
       if (sequence < lastSummarySequenceRef.current) {
@@ -254,7 +219,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         return
       }
       lastSummarySequenceRef.current = sequence
-      
+
       // 통합 데이터 구조 지원
       setSummaryProgress({
         current: data.current || 0,
@@ -263,7 +228,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         completed: data.completed || 0,
         failed: data.failed || 0
       })
-      
+
       // status가 'progress'면 진행 중으로 상태 업데이트
       if (data.status === 'progress') {
         setReviewSummaryStatus({ status: 'active' })
