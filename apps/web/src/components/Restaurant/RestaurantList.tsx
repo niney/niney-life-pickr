@@ -22,6 +22,8 @@ interface RestaurantListProps {
   restaurants: RestaurantData[]
   restaurantsLoading: boolean
   total: number
+  selectedCategory: string | null
+  setSelectedCategory: (category: string | null) => void
   reviewCrawlStatus: ReviewCrawlStatus
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
@@ -39,6 +41,8 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   restaurants,
   restaurantsLoading,
   total,
+  selectedCategory,
+  setSelectedCategory,
   reviewCrawlStatus,
   crawlProgress,
   dbProgress,
@@ -56,6 +60,15 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   // 재크롤링 모달 상태
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null)
+
+  // 카테고리 클릭 핸들러
+  const handleCategoryClick = (category: string) => {
+    if (selectedCategory === category) {
+      setSelectedCategory(null) // 같은 카테고리 클릭 시 필터 해제
+    } else {
+      setSelectedCategory(category)
+    }
+  }
 
   // 재크롤링 버튼 클릭
   const handleRecrawlClick = (restaurant: RestaurantData, event: React.MouseEvent) => {
@@ -130,20 +143,31 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
               WebkitOverflowScrolling: 'touch',
             }}>
               {categories.map((category: RestaurantCategory) => (
-                <View
+                <TouchableOpacity
                   key={category.category}
-                  style={[
-                    styles.categoryCard, 
-                    { 
-                      backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface, 
-                      borderColor: colors.border,
-                      flexShrink: isMobile ? 0 : 1,
-                    }
-                  ]}
+                  onPress={() => handleCategoryClick(category.category)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
-                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
-                </View>
+                  <View
+                    style={[
+                      styles.categoryCard, 
+                      { 
+                        backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface, 
+                        borderColor: selectedCategory === category.category ? colors.primary : colors.border,
+                        borderWidth: selectedCategory === category.category ? 2 : 1,
+                        flexShrink: isMobile ? 0 : 1,
+                      }
+                    ]}
+                  >
+                    <Text style={[
+                      styles.categoryName, 
+                      { color: selectedCategory === category.category ? colors.primary : colors.text }
+                    ]}>
+                      {category.category}
+                    </Text>
+                    <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
+                  </View>
+                </TouchableOpacity>
               ))}
             </div>
           ) : !categoriesLoading ? (

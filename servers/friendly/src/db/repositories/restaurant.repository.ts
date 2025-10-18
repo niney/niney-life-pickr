@@ -162,22 +162,37 @@ export class RestaurantRepository {
   }
 
   /**
-   * 음식점 목록 조회 (페이지네이션)
+   * 음식점 목록 조회 (페이지네이션 + 카테고리 필터)
    */
-  async findAll(limit: number = 20, offset: number = 0): Promise<RestaurantDB[]> {
-    return await db.all<RestaurantDB>(
-      'SELECT * FROM restaurants ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
-    );
+  async findAll(limit: number = 20, offset: number = 0, category?: string): Promise<RestaurantDB[]> {
+    let query = 'SELECT * FROM restaurants';
+    const params: any[] = [];
+
+    // 카테고리 필터링
+    if (category) {
+      query += ' WHERE category = ?';
+      params.push(category);
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    return await db.all<RestaurantDB>(query, params);
   }
 
   /**
-   * 음식점 총 개수
+   * 음식점 총 개수 (카테고리 필터 지원)
    */
-  async count(): Promise<number> {
-    const result = await db.get<{ count: number }>(
-      'SELECT COUNT(*) as count FROM restaurants'
-    );
+  async count(category?: string): Promise<number> {
+    let query = 'SELECT COUNT(*) as count FROM restaurants';
+    const params: any[] = [];
+
+    if (category) {
+      query += ' WHERE category = ?';
+      params.push(category);
+    }
+
+    const result = await db.get<{ count: number }>(query, params);
     return result?.count || 0;
   }
 

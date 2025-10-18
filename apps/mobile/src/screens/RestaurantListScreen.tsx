@@ -81,6 +81,8 @@ const RestaurantListScreen: React.FC = () => {
     restaurants,
     restaurantsLoading,
     total,
+    selectedCategory,
+    setSelectedCategory,
     handleCrawl: sharedHandleCrawl,
     fetchRestaurants,
     fetchCategories,
@@ -95,6 +97,15 @@ const RestaurantListScreen: React.FC = () => {
       }
     },
   });
+
+  // 카테고리 클릭 핸들러
+  const handleCategoryClick = (category: string) => {
+    if (selectedCategory === category) {
+      setSelectedCategory(null); // 같은 카테고리 클릭 시 필터 해제
+    } else {
+      setSelectedCategory(category);
+    }
+  };
 
   // Pull to refresh 핸들러
   const onRefresh = useCallback(async () => {
@@ -223,18 +234,32 @@ const RestaurantListScreen: React.FC = () => {
               contentContainerStyle={styles.categoriesScrollContent}
             >
               {categories.map((category) => (
-                <View
+                <TouchableOpacity
                   key={category.category}
-                  style={[
-                    styles.categoryCardContainer,
-                    theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
-                  ]}
+                  onPress={() => handleCategoryClick(category.category)}
+                  activeOpacity={0.7}
                 >
-                  <View style={styles.categoryCardContent}>
-                    <Text style={[styles.categoryName, { color: colors.text }]}>{category.category}</Text>
-                    <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
+                  <View
+                    style={[
+                      styles.categoryCardContainer,
+                      theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
+                      selectedCategory === category.category && {
+                        borderColor: colors.primary,
+                        borderWidth: 2,
+                      }
+                    ]}
+                  >
+                    <View style={styles.categoryCardContent}>
+                      <Text style={[
+                        styles.categoryName, 
+                        { color: selectedCategory === category.category ? colors.primary : colors.text }
+                      ]}>
+                        {category.category}
+                      </Text>
+                      <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
+                    </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           ) : !categoriesLoading ? (

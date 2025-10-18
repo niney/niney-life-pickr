@@ -103,13 +103,13 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /api/restaurants
-   * 음식점 목록 조회 (페이지네이션)
+   * 음식점 목록 조회 (페이지네이션 + 카테고리 필터)
    */
   fastify.get('/', {
     schema: {
       tags: ['restaurants'],
       summary: '음식점 목록 조회',
-      description: '저장된 음식점 목록을 페이지네이션으로 조회합니다.',
+      description: '저장된 음식점 목록을 페이지네이션으로 조회합니다. 카테고리 필터링을 지원합니다.',
       querystring: Type.Object({
         limit: Type.Optional(Type.Number({
           description: '페이지당 항목 수 (기본: 20)',
@@ -121,6 +121,9 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           description: '시작 위치 (기본: 0)',
           default: 0,
           minimum: 0
+        })),
+        category: Type.Optional(Type.String({
+          description: '카테고리 필터 (예: 한식, 일식, 중식)'
         }))
       }),
       response: {
@@ -144,12 +147,16 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    const { limit = 20, offset = 0 } = request.query as { limit?: number; offset?: number };
+    const { limit = 20, offset = 0, category } = request.query as { 
+      limit?: number; 
+      offset?: number;
+      category?: string;
+    };
 
     try {
       const [restaurants, total] = await Promise.all([
-        restaurantRepository.findAll(limit, offset),
-        restaurantRepository.count()
+        restaurantRepository.findAll(limit, offset, category),
+        restaurantRepository.count(category)
       ]);
 
       return ResponseHelper.success(
@@ -160,7 +167,9 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           offset,
           restaurants
         },
-        `${restaurants.length}개 음식점 조회 성공`
+        category 
+          ? `${restaurants.length}개 음식점 조회 성공 (카테고리: ${category})`
+          : `${restaurants.length}개 음식점 조회 성공`
       );
     } catch (error) {
       console.error('음식점 목록 조회 에러:', error);

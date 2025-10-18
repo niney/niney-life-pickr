@@ -22,6 +22,8 @@ const DesktopLayout: React.FC<{
   restaurants: any[]
   restaurantsLoading: boolean
   total: number
+  selectedCategory: string | null
+  setSelectedCategory: (category: string | null) => void
   reviewCrawlStatus: any
   crawlProgress: any
   dbProgress: any
@@ -84,6 +86,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     restaurants,
     restaurantsLoading,
     total,
+    selectedCategory,
+    setSelectedCategory,
     handleCrawl,
     handleRestaurantClick,
     fetchRestaurants,
@@ -131,6 +135,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   restaurants={restaurants}
                   restaurantsLoading={restaurantsLoading}
                   total={total}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
                   reviewCrawlStatus={reviewCrawlStatus}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
@@ -157,6 +163,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   restaurants={restaurants}
                   restaurantsLoading={restaurantsLoading}
                   total={total}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
                   reviewCrawlStatus={reviewCrawlStatus}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}

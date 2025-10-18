@@ -19,6 +19,7 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
   const [restaurants, setRestaurants] = useState<RestaurantData[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [total, setTotal] = useState(0)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const fetchCategories = async () => {
     setCategoriesLoading(true)
@@ -37,7 +38,11 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
   const fetchRestaurants = async (limit: number = 100, offset: number = 0) => {
     setRestaurantsLoading(true)
     try {
-      const response = await apiService.getRestaurants(limit, offset)
+      const response = await apiService.getRestaurants(
+        limit, 
+        offset, 
+        selectedCategory || undefined
+      )
       if (response.result && response.data) {
         setRestaurants(response.data.restaurants)
         setTotal(response.data.total)
@@ -103,6 +108,11 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     fetchRestaurants()
   }, [])
 
+  // 카테고리 변경 시 레스토랑 재조회
+  useEffect(() => {
+    fetchRestaurants()
+  }, [selectedCategory])
+
   return {
     url,
     setUrl,
@@ -112,6 +122,8 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     restaurants,
     restaurantsLoading,
     total,
+    selectedCategory,
+    setSelectedCategory,
     handleCrawl,
     fetchRestaurants,
     fetchCategories,
