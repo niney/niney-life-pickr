@@ -2,14 +2,23 @@
 # Inherits from base.yml and overrides specific values
 
 server:
-  host: "0.0.0.0" # Allow external connections
-  port: 8080
-  strictPort: true # Must use this exact port in production
+  web:
+    host: "0.0.0.0"  # Allow external connections
+    port: 3000
+  friendly:
+    host: "0.0.0.0"
+    port: 4000
+    cors:
+      origin: "https://niney-life-pickr.com"  # Production domain
+    logLevel: "error"  # Production should only log errors
+  smart:
+    host: "0.0.0.0"
+    port: 5000
 
 vite:
   clearScreen: false
   logLevel: "error"
-  
+
 build:
   minify: true
   sourcemap: false
@@ -17,10 +26,10 @@ build:
 
 pwa:
   enabled: true
-  registerType: "prompt" # Ask user before updating
-  
+  registerType: "prompt"  # Ask user before updating in production
+
 api:
-  baseUrl: "https://api.niney-life-pickr.com"
+  url: "https://nlpfriendly.easypcb.co.kr"  # Production API URL
   timeout: 60000
   retries: 5
 

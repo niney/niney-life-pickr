@@ -38,9 +38,14 @@ interface SocketProviderProps {
 
 /**
  * 환경에 따른 서버 URL 결정
- * - Web: 현재 호스트 사용 (동일 도메인)
- * - Android: 10.0.2.2 (에뮬레이터) 또는 실제 IP
- * - iOS: localhost
+ *
+ * Web: Vite가 빌드 시점에 config/*.yml에서 읽어서 주입
+ * - Development: config/base.yml의 api.url (http://localhost:4000)
+ * - Production: config/production.yml의 api.url (https://nlpfriendly.easypcb.co.kr)
+ *
+ * Mobile: 플랫폼별 하드코딩 (React Native는 빌드 타임 주입 불가)
+ * - Android: 10.0.2.2:4000 (에뮬레이터 → 호스트 localhost)
+ * - iOS: 192.168.0.12:4000 (물리 기기, 개발자 IP에 맞게 수정 필요)
  */
 const getServerUrl = (customUrl?: string): string => {
   if (customUrl) return customUrl
@@ -48,24 +53,21 @@ const getServerUrl = (customUrl?: string): string => {
   const isWeb = Platform.OS === 'web'
 
   if (isWeb) {
-    // Web: 현재 호스트의 4000 포트 사용
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol
-      const hostname = window.location.hostname
-      return `${protocol}//${hostname}:4000`
+    // Web: Vite 빌드 시 YAML에서 주입된 값 사용 (api.service.ts와 동일)
+    // @ts-ignore - Vite injects this at build time
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_URL
     }
     return 'http://localhost:4000'
   }
 
-  // Android: 에뮬레이터는 10.0.2.2, 실제 기기는 환경변수나 설정 필요
+  // Mobile: 플랫폼별 기본값
   if (Platform.OS === 'android') {
-    // 개발 중: 에뮬레이터
     return 'http://10.0.2.2:4000'
-    // 실제 기기 테스트 시: process.env나 config에서 IP 가져오기
-    // return `http://${YOUR_DEV_MACHINE_IP}:4000`
   }
 
-  // iOS: localhost 사용
+  // iOS 및 기타 (개발자 IP에 맞게 수정 필요)
   return 'http://192.168.0.12:4000'
 }
 
