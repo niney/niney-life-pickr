@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.ts",
     "dev:clean": "npm run kill && npm run dev",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-assets.js",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "clean": "rm -rf dist",

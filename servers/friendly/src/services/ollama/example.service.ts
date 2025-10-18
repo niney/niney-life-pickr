@@ -1,6 +1,6 @@
 /**
  * Ollama 서비스 사용 예시
- * 
+ *
  * Recipe 생성을 위한 Local/Cloud Ollama 서비스 구현
  */
 
@@ -88,7 +88,7 @@ export class RecipeCloudService extends BaseCloudOllamaService {
    * 여러 재료 조합에 대한 레시피 일괄 생성
    */
   async generateRecipeBatch(ingredientsList: string[][]): Promise<(Recipe | null)[]> {
-    const prompts = ingredientsList.map(ingredients => 
+    const prompts = ingredientsList.map(ingredients =>
       `다음 재료로 레시피를 JSON 형식으로 생성해주세요:
 재료: ${ingredients.join(', ')}
 
@@ -117,7 +117,7 @@ export class RecipeCloudService extends BaseCloudOllamaService {
 
 /**
  * Recipe 서비스 팩토리 함수
- * 
+ *
  * @param useCloud - Cloud 사용 여부 (기본값: false)
  * @param customConfig - 커스텀 설정 (선택)
  * @returns RecipeLocalService | RecipeCloudService | null
@@ -128,7 +128,7 @@ export function createRecipeService(
 ): RecipeLocalService | RecipeCloudService | null {
   if (useCloud) {
     const cloudConfig = createCloudConfig(customConfig as Partial<CloudOllamaConfig>);
-    
+
     if (!cloudConfig) {
       console.error('❌ Cloud Ollama 설정 실패 (API 키가 없습니다)');
       console.log('💡 Local Ollama를 사용하려면 useCloud=false로 설정하세요.');
@@ -147,7 +147,7 @@ export function createRecipeService(
 /**
  * 사용 예시 (주석 처리)
  */
-async function example() {
+/*async function example() {
   // 1. Local Ollama 사용 (기본)
   const localService = createRecipeService(false);
   if (localService) {
@@ -183,4 +183,4 @@ async function example() {
     model: 'llama3:8b',
     timeout: 30000,
   });
-}
+}*/
