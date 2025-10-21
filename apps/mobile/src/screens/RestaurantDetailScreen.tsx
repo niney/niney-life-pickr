@@ -10,11 +10,13 @@ import {
   Image,
   Modal,
   Linking,
+  TextInput,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faStar, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons';
+import type { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { faStar, faStarHalfStroke, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons';
 import ImageViewing from 'react-native-image-viewing';
 import {
@@ -146,9 +148,12 @@ const RestaurantDetailScreen: React.FC = () => {
     reviewsTotal,
     hasMoreReviews,
     sentimentFilter,
+    searchText,
     fetchReviews,
     loadMoreReviews,
     changeSentimentFilter,
+    setSearchText,
+    changeSearchText,
   } = useReviews();
 
   const {
@@ -765,6 +770,39 @@ const RestaurantDetailScreen: React.FC = () => {
                   <Text style={[styles.filterButtonText, { color: sentimentFilter === 'neutral' ? '#fff' : colors.text }]}>
                     😐 중립
                   </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* 검색 UI */}
+              <View style={styles.searchContainer}>
+                <View style={[styles.searchInputWrapper, { backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface, borderColor: colors.border }]}>
+                  <FontAwesomeIcon icon={faSearch as IconProp} size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={[styles.searchInput, { color: colors.text }]}
+                    placeholder="리뷰 내용 검색..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    onSubmitEditing={() => changeSearchText(restaurantId, searchText)}
+                    returnKeyType="search"
+                  />
+                  {searchText && searchText.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSearchText('');
+                        changeSearchText(restaurantId, '');
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <FontAwesomeIcon icon={faTimes as IconProp} size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={[styles.searchButton, { backgroundColor: colors.primary }]}
+                  onPress={() => changeSearchText(restaurantId, searchText)}
+                >
+                  <Text style={styles.searchButtonText}>검색</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2017,6 +2055,38 @@ const styles = StyleSheet.create({
   },
   openMapButtonText: {
     fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // 검색 UI 스타일
+  searchContainer: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
+  },
+  searchButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchButtonText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },

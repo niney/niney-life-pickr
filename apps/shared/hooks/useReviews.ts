@@ -15,6 +15,7 @@ export const useReviews = () => {
   const [reviewsOffset, setReviewsOffset] = useState(0)
   const [hasMoreReviews, setHasMoreReviews] = useState(true)
   const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>('all')
+  const [searchText, setSearchText] = useState('')
 
   // 중복 요청 방지를 위한 ref
   const fetchingOffsetRef = useRef<number | null>(null)
@@ -40,7 +41,13 @@ export const useReviews = () => {
     try {
       // sentiment 필터 적용
       const sentiments = sentimentFilter === 'all' ? undefined : [sentimentFilter]
-      const response = await apiService.getReviewsByRestaurantId(restaurantId, reviewsLimit, offset, sentiments)
+      const response = await apiService.getReviewsByRestaurantId(
+        restaurantId, 
+        reviewsLimit, 
+        offset, 
+        sentiments,
+        searchText || undefined
+      )
       if (response.result && response.data) {
         const newReviews = response.data.reviews
 
@@ -106,11 +113,47 @@ export const useReviews = () => {
     setReviewsLoading(true)
     try {
       // 필터 변경 시에도 첫 로드는 1개
-      const response = await apiService.getReviewsByRestaurantId(restaurantId, 1, 0, sentiments)
+      const response = await apiService.getReviewsByRestaurantId(
+        restaurantId, 
+        1, 
+        0, 
+        sentiments,
+        searchText || undefined
+      )
       if (response.result && response.data) {
         setReviews(response.data.reviews)
         setReviewsTotal(response.data.total)
         setReviewsOffset(0)
+        const hasMore = response.data.reviews.length < response.data.total
+        setHasMoreReviews(hasMore)
+      }
+    } catch (err) {
+      console.error('리뷰 조회 실패:', err)
+      Alert.error('조회 실패', '리뷰를 불러오는데 실패했습니다')
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
+  const changeSearchText = async (restaurantId: number, text: string) => {
+    setSearchText(text)
+    // 검색어 변경 시 리뷰를 처음부터 다시 로드
+    clearReviews()
+    const sentiments = sentimentFilter === 'all' ? undefined : [sentimentFilter]
+
+    setReviewsLoading(true)
+    try {
+      const response = await apiService.getReviewsByRestaurantId(
+        restaurantId,
+        3,
+        0,
+        sentiments,
+        text || undefined
+      )
+      if (response.result && response.data) {
+        setReviews(response.data.reviews)
+        setReviewsTotal(response.data.total)
+        setReviewsOffset(response.data.reviews.length)
         const hasMore = response.data.reviews.length < response.data.total
         setHasMoreReviews(hasMore)
       }
@@ -130,10 +173,13 @@ export const useReviews = () => {
     reviewsOffset,
     hasMoreReviews,
     sentimentFilter,
+    searchText,
     fetchReviews,
     loadMoreReviews,
     clearReviews,
     changeSentimentFilter,
+    setSearchText,
+    changeSearchText,
   }
 }
 

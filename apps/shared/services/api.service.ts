@@ -409,16 +409,10 @@ class ApiService {
   }
 
   /**
-   * 음식점 목록 조회 (카테고리 필터 지원)
+   * 음식점 목록 조회
    */
-  async getRestaurants(limit: number = 20, offset: number = 0, category?: string): Promise<ApiResponse<RestaurantListResponse>> {
-    let url = `/api/restaurants?limit=${limit}&offset=${offset}`;
-
-    if (category) {
-      url += `&category=${encodeURIComponent(category)}`;
-    }
-
-    return this.request<RestaurantListResponse>(url, {
+  async getRestaurants(limit: number = 20, offset: number = 0): Promise<ApiResponse<RestaurantListResponse>> {
+    return this.request<RestaurantListResponse>(`/api/restaurants?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }
@@ -452,8 +446,8 @@ class ApiService {
     }
 
     // 검색어 추가
-    if (searchText && searchText.trim()) {
-      url += `&searchText=${encodeURIComponent(searchText.trim())}`;
+    if (searchText) {
+      url += `&searchText=${encodeURIComponent(searchText)}`;
     }
 
     return this.request<ReviewListResponse>(url, {
