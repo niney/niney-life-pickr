@@ -439,7 +439,8 @@ class ApiService {
     restaurantId: number,
     limit: number = 20,
     offset: number = 0,
-    sentiments?: ('positive' | 'negative' | 'neutral')[]
+    sentiments?: ('positive' | 'negative' | 'neutral')[],
+    searchText?: string
   ): Promise<ApiResponse<ReviewListResponse>> {
     let url = `/api/restaurants/${restaurantId}/reviews?limit=${limit}&offset=${offset}`;
 
@@ -448,6 +449,11 @@ class ApiService {
       sentiments.forEach(sentiment => {
         url += `&sentiment=${sentiment}`;
       });
+    }
+
+    // 검색어 추가
+    if (searchText && searchText.trim()) {
+      url += `&searchText=${encodeURIComponent(searchText.trim())}`;
     }
 
     return this.request<ReviewListResponse>(url, {

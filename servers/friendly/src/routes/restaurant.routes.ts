@@ -210,6 +210,9 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           Type.Array(Type.String({ enum: ['positive', 'negative', 'neutral'] }))
         ], {
           description: '감정 필터 (positive/negative/neutral, 쉼표로 구분하여 다중 선택 가능)'
+        })),
+        searchText: Type.Optional(Type.String({
+          description: '리뷰 내용 검색어'
         }))
       }),
       response: {
@@ -240,10 +243,11 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }, async (request, reply) => {
     const { id } = request.params as { id: number };
-    const { limit = 20, offset = 0, sentiment } = request.query as {
+    const { limit = 20, offset = 0, sentiment, searchText } = request.query as {
       limit?: number;
       offset?: number;
       sentiment?: string | string[];
+      searchText?: string;
     };
 
     try {
@@ -262,8 +266,8 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
 
       // 3. 리뷰 조회 (요약 데이터 포함 - LEFT JOIN 사용)
       const [reviewsWithSummary, total] = await Promise.all([
-        reviewRepository.findByRestaurantIdWithSummary(id, limit, offset, sentiments),
-        reviewRepository.countByRestaurantId(id, sentiments)
+        reviewRepository.findByRestaurantIdWithSummary(id, limit, offset, sentiments, searchText),
+        reviewRepository.countByRestaurantId(id, sentiments, searchText)
       ]);
 
       // 3. DB 데이터를 API 응답 형식으로 변환

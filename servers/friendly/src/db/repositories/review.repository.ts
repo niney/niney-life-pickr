@@ -80,7 +80,8 @@ export class ReviewRepository {
     restaurantId: number,
     limit: number = 20,
     offset: number = 0,
-    sentiments?: string[]
+    sentiments?: string[],
+    searchText?: string
   ): Promise<any[]> {
     // Sentiment 필터가 있으면 WHERE 절에 추가
     let query = `
@@ -94,6 +95,12 @@ export class ReviewRepository {
     `;
 
     const params: any[] = [restaurantId];
+
+    // 검색어 필터 적용
+    if (searchText && searchText.trim()) {
+      query += ` AND r.review_text LIKE ?`;
+      params.push(`%${searchText.trim()}%`);
+    }
 
     // Sentiment 필터 적용 (요약이 있는 리뷰만 필터링)
     if (sentiments && sentiments.length > 0) {
@@ -111,7 +118,7 @@ export class ReviewRepository {
   /**
    * 레스토랑의 리뷰 개수
    */
-  async countByRestaurantId(restaurantId: number, sentiments?: string[]): Promise<number> {
+  async countByRestaurantId(restaurantId: number, sentiments?: string[], searchText?: string): Promise<number> {
     let query = `
       SELECT COUNT(*) as count
       FROM reviews r
@@ -131,6 +138,12 @@ export class ReviewRepository {
     } else {
       query += ` WHERE r.restaurant_id = ?`;
       params.push(restaurantId);
+    }
+
+    // 검색어 필터 적용
+    if (searchText && searchText.trim()) {
+      query += ` AND r.review_text LIKE ?`;
+      params.push(`%${searchText.trim()}%`);
     }
 
     const result = await db.get<{ count: number }>(query, params);
@@ -162,7 +175,7 @@ export class ReviewRepository {
    */
   async findByIds(reviewIds: number[]): Promise<ReviewDB[]> {
     if (reviewIds.length === 0) return [];
-    
+
     const placeholders = reviewIds.map(() => '?').join(', ');
     return await db.all<ReviewDB>(
       `SELECT * FROM reviews WHERE id IN (${placeholders}) ORDER BY id ASC`,
@@ -175,7 +188,7 @@ export class ReviewRepository {
    */
   async findIdsByRestaurantId(restaurantId: number): Promise<number[]> {
     const rows = await db.all<{ id: number }>(
-      'SELECT id FROM reviews WHERE restaurant_id = ? ORDER BY id ASC',
+      'SELECT id FROM reviews WHERE restaurant_id = ? ORDER BY id',
       [restaurantId]
     );
     return rows.map(row => row.id);
