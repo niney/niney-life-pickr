@@ -12,7 +12,7 @@ interface RestaurantDetailProps {
   isMobile?: boolean
 }
 
-type TabType = 'menu' | 'review' | 'statistics'
+type TabType = 'menu' | 'review' | 'statistics' | 'map'
 
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
@@ -254,6 +254,30 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     setSelectedReviewId(null)
     setSelectedModel('gpt-oss:20b-cloud')
   }
+
+  // 네이버 지도 열기 (앱 우선, 웹 fallback)
+  const openNaverMap = useCallback((placeId: string) => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+    if (isMobile) {
+      // 모바일: 네이버맵 앱 스킴 시도
+      const appScheme = `nmap://place?id=${placeId}`
+      const webFallback = `https://m.place.naver.com/restaurant/${placeId}/location`
+
+      // 앱 스킴으로 시도
+      window.location.href = appScheme
+
+      // 1.5초 후 페이지가 여전히 활성 상태면 웹으로 fallback
+      setTimeout(() => {
+        if (!document.hidden) {
+          window.open(webFallback, '_blank')
+        }
+      }, 1500)
+    } else {
+      // 데스크톱: 바로 웹으로
+      window.open(`https://m.place.naver.com/restaurant/${placeId}/location`, '_blank')
+    }
+  }, [])
 
   // 재요약 실행
   const handleResummarize = async () => {
@@ -533,6 +557,26 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             📊 통계
           </Text>
           {activeTab === 'statistics' && (
+            <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'map' && styles.tabButtonActive
+          ]}
+          onPress={() => handleTabChange('map')}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              { color: activeTab === 'map' ? colors.primary : colors.textSecondary }
+            ]}
+          >
+            🗺️ 네이버맵
+          </Text>
+          {activeTab === 'map' && (
             <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
           )}
         </TouchableOpacity>
@@ -1056,6 +1100,42 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             ) : (
               <View style={styles.emptyContainer}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>통계 데이터가 없습니다</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* 네이버맵 탭 */}
+        {activeTab === 'map' && (
+          <>
+            {restaurant?.place_id ? (
+              <View style={styles.mapContainer}>
+                <iframe
+                  src={`https://m.place.naver.com/restaurant/${restaurant.place_id}/location`}
+                  style={{
+                    width: '100%',
+                    height: isMobile ? 'calc(100vh - 200px)' : '600px',
+                    border: 'none',
+                    borderRadius: '12px'
+                  }}
+                  title="네이버 지도"
+                />
+
+                {/* Fallback: iframe 차단 시 새 창 열기 버튼 (앱 우선) */}
+                <TouchableOpacity
+                  style={[styles.openMapButton, { backgroundColor: colors.primary }]}
+                  onPress={() => openNaverMap(restaurant.place_id)}
+                >
+                  <Text style={styles.openMapButtonText}>
+                    🔗 네이버 지도에서 열기
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  지도 정보가 없습니다
+                </Text>
               </View>
             )}
           </>
@@ -1699,6 +1779,24 @@ const styles = StyleSheet.create({
   menuStatReason: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  // 네이버맵 탭 스타일
+  mapContainer: {
+    position: 'relative',
+    marginBottom: 20,
+  },
+  openMapButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    cursor: 'pointer',
+  },
+  openMapButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
 })
 

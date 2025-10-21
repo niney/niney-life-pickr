@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Image,
   Modal,
+  Linking,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ import type { RestaurantStackParamList } from '../navigation/types';
 
 
 type RestaurantDetailRouteProp = RouteProp<RestaurantStackParamList, 'RestaurantDetail'>;
-type TabType = 'menu' | 'review' | 'statistics';
+type TabType = 'menu' | 'review' | 'statistics' | 'map';
 
 const RestaurantDetailScreen: React.FC = () => {
   const route = useRoute<RestaurantDetailRouteProp>();
@@ -379,6 +380,28 @@ const RestaurantDetailScreen: React.FC = () => {
     }
   };
 
+  // 네이버 지도 열기 (앱 우선, 웹 fallback)
+  const openNaverMap = useCallback(async (placeId: string) => {
+    const appScheme = `nmap://place?id=${placeId}`;
+    const webFallback = `https://m.place.naver.com/restaurant/${placeId}/location`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(appScheme);
+
+      if (canOpen) {
+        // 네이버맵 앱 설치됨 -> 앱으로 열기
+        await Linking.openURL(appScheme);
+      } else {
+        // 앱 미설치 -> 모바일 웹으로 열기
+        await Linking.openURL(webFallback);
+      }
+    } catch (error) {
+      console.error('❌ 네이버맵 열기 실패:', error);
+      // 에러 발생 시 웹으로 fallback
+      Linking.openURL(webFallback);
+    }
+  }, []);
+
   // 별점 렌더링 함수 (0~100 점수를 1~5 별점으로 변환, 반별 포함)
   const renderStars = (score: number) => {
     const normalizedScore = score / 20; // 0-100 → 0-5
@@ -660,6 +683,23 @@ const RestaurantDetailScreen: React.FC = () => {
               {activeTab === 'statistics' && (
                 <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.tabButton}
+              onPress={() => handleTabChange('map')}
+            >
+              <Text
+                  style={[
+                      styles.tabButtonText,
+                  { color: activeTab === 'map' ? colors.primary : colors.textSecondary }
+                ]}
+                  >
+                  🗺️ 네이버맵
+                  </Text>
+                {activeTab === 'map' && (
+                  <View style={[styles.tabIndicator, {backgroundColor: colors.primary}]}/>
+                )}
             </TouchableOpacity>
           </View>
 
@@ -1209,6 +1249,33 @@ const RestaurantDetailScreen: React.FC = () => {
             ) : (
               <View style={styles.emptyContainer}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>통계 데이터가 없습니다</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 네이버맵 탭 */}
+        {activeTab === 'map' && (
+          <View style={{ paddingHorizontal: 16 }}>
+            {restaurant?.place_id ? (
+              <View style={styles.mapButtonContainer}>
+                <Text style={[styles.mapDescription, { color: colors.textSecondary }]}>
+                  네이버 지도에서 위치를 확인하세요
+                </Text>
+                <TouchableOpacity
+                  style={[styles.openMapButton, { backgroundColor: colors.primary }]}
+                  onPress={() => openNaverMap(restaurant.place_id)}
+                >
+                  <Text style={styles.openMapButtonText}>
+                    🗺️ 네이버 지도에서 열기
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  지도 정보가 없습니다
+                </Text>
               </View>
             )}
           </View>
@@ -1930,6 +1997,28 @@ const styles = StyleSheet.create({
   },
   skeletonFull: {
     width: '100%',
+  },
+  // 네이버맵 탭 스타일
+  mapButtonContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  mapDescription: {
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  openMapButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 200,
+  },
+  openMapButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 
