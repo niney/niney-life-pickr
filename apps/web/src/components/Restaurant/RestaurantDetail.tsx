@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState, useEffectEvent } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text, Modal } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowLeft, faStar, faStarHalfStroke, faRedo } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft, faStar, faStarHalfStroke, faRedo, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons'
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
@@ -76,6 +76,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     fetchReviews,
     sentimentFilter,
     changeSentimentFilter,
+    searchText,
+    setSearchText,
+    changeSearchText,
     menus,
     menusLoading,
     handleBackToList,
@@ -672,6 +675,65 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
               <Text style={[styles.filterButtonText, { color: sentimentFilter === 'neutral' ? '#fff' : colors.text }]}>
                 😐 중립
               </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 검색 UI */}
+          <View style={styles.searchContainer}>
+            <View style={[styles.searchInputWrapper, { backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface, borderColor: colors.border }]}>
+              <FontAwesomeIcon icon={faSearch} style={{ marginRight: 8, fontSize: 16, color: colors.textSecondary }} />
+              <input
+                type="text"
+                placeholder="리뷰 내용 검색..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && id) {
+                    const restaurantId = parseInt(id, 10)
+                    if (!isNaN(restaurantId)) {
+                      changeSearchText(restaurantId, searchText)
+                    }
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  outline: 'none',
+                  backgroundColor: 'transparent',
+                  fontSize: 14,
+                  color: colors.text,
+                  padding: 0,
+                }}
+              />
+              {searchText && searchText.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchText('')
+                    if (id) {
+                      const restaurantId = parseInt(id, 10)
+                      if (!isNaN(restaurantId)) {
+                        changeSearchText(restaurantId, '')
+                      }
+                    }
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.searchButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                if (id) {
+                  const restaurantId = parseInt(id, 10)
+                  if (!isNaN(restaurantId)) {
+                    changeSearchText(restaurantId, searchText)
+                  }
+                }
+              }}
+            >
+              <Text style={styles.searchButtonText}>검색</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1795,6 +1857,34 @@ const styles = StyleSheet.create({
   },
   openMapButtonText: {
     fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // 검색 UI 스타일
+  searchContainer: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  searchButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+  },
+  searchButtonText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
