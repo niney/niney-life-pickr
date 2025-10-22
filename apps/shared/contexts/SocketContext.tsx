@@ -65,41 +65,67 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const lastImageSequenceRef = useRef<number>(0)
   const lastSummarySequenceRef = useRef<number>(0)
 
-  // ✅ 완료된 Job ID와 타임스탬프 추적 (5분 후 자동 삭제)
-  const completedJobsRef = useRef<Map<string, number>>(new Map())
+  // ✅ 완료된 Job ID와 타임스탬프 추적 (5분 후 자동 삭제) - 타입별 분리
+  const completedCrawlJobsRef = useRef<Map<string, number>>(new Map())
+  const completedSummaryJobsRef = useRef<Map<string, number>>(new Map())
   const JOB_RETENTION_MS = 5 * 60 * 1000 // 5분
 
   // ✅ 현재 작업 Job ID 추적
   const currentCrawlJobIdRef = useRef<string | null>(null)
   const currentSummaryJobIdRef = useRef<string | null>(null)
 
-  // ✅ 오래된 완료 Job 정리 함수
-  const cleanupCompletedJobs = () => {
+  // ✅ Crawl Job 관리 함수
+  const cleanupCompletedCrawlJobs = () => {
     const now = Date.now()
     const jobsToDelete: string[] = []
 
-    completedJobsRef.current.forEach((timestamp, jobId) => {
+    completedCrawlJobsRef.current.forEach((timestamp, jobId) => {
       if (now - timestamp > JOB_RETENTION_MS) {
         jobsToDelete.push(jobId)
       }
     })
 
     jobsToDelete.forEach(jobId => {
-      completedJobsRef.current.delete(jobId)
-      console.log(`[Socket.io] Cleaned up old job: ${jobId}`)
+      completedCrawlJobsRef.current.delete(jobId)
+      console.log(`[Socket.io] Cleaned up old crawl job: ${jobId}`)
     })
   }
 
-  // ✅ Job 완료 체크 함수
-  const isJobCompleted = (jobId: string): boolean => {
-    cleanupCompletedJobs() // 체크할 때마다 정리
-    return completedJobsRef.current.has(jobId)
+  const isCrawlJobCompleted = (jobId: string): boolean => {
+    cleanupCompletedCrawlJobs()
+    return completedCrawlJobsRef.current.has(jobId)
   }
 
-  // ✅ Job 완료 등록 함수
-  const markJobAsCompleted = (jobId: string) => {
-    completedJobsRef.current.set(jobId, Date.now())
-    console.log(`[Socket.io] Marked job as completed: ${jobId}`)
+  const markCrawlJobAsCompleted = (jobId: string) => {
+    completedCrawlJobsRef.current.set(jobId, Date.now())
+    console.log(`[Socket.io] Marked crawl job as completed: ${jobId}`)
+  }
+
+  // ✅ Summary Job 관리 함수
+  const cleanupCompletedSummaryJobs = () => {
+    const now = Date.now()
+    const jobsToDelete: string[] = []
+
+    completedSummaryJobsRef.current.forEach((timestamp, jobId) => {
+      if (now - timestamp > JOB_RETENTION_MS) {
+        jobsToDelete.push(jobId)
+      }
+    })
+
+    jobsToDelete.forEach(jobId => {
+      completedSummaryJobsRef.current.delete(jobId)
+      console.log(`[Socket.io] Cleaned up old summary job: ${jobId}`)
+    })
+  }
+
+  const isSummaryJobCompleted = (jobId: string): boolean => {
+    cleanupCompletedSummaryJobs()
+    return completedSummaryJobsRef.current.has(jobId)
+  }
+
+  const markSummaryJobAsCompleted = (jobId: string) => {
+    completedSummaryJobsRef.current.set(jobId, Date.now())
+    console.log(`[Socket.io] Marked summary job as completed: ${jobId}`)
   }
 
   // Socket.io 연결 초기화 (앱 전체에서 단 한 번)
@@ -166,8 +192,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료 체크
       if (jobId) {
-        if (isJobCompleted(jobId)) {
-          console.warn(`[Socket.io] Ignored - job ${jobId} already completed`)
+        if (isCrawlJobCompleted(jobId)) {
+          console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
           return
         }
 
@@ -201,8 +227,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const jobId = data.jobId
 
       // ✅ jobId가 있으면 완료 체크 (100% 완료 처리 전)
-      if (jobId && isJobCompleted(jobId)) {
-        console.warn(`[Socket.io] Ignored - job ${jobId} already completed`)
+      if (jobId && isCrawlJobCompleted(jobId)) {
+        console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
         return
       }
 
@@ -225,7 +251,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       if (data.percentage === 100 || data.current === data.total) {
         // ✅ jobId가 있으면 완료로 마킹
         if (jobId) {
-          markJobAsCompleted(jobId)
+          markCrawlJobAsCompleted(jobId)
           currentCrawlJobIdRef.current = null
         }
 
@@ -254,8 +280,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const jobId = data.jobId
 
       // ✅ jobId가 있으면 완료 체크
-      if (jobId && isJobCompleted(jobId)) {
-        console.warn(`[Socket.io] Ignored - job ${jobId} already completed`)
+      if (jobId && isCrawlJobCompleted(jobId)) {
+        console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
         return
       }
 
@@ -294,7 +320,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료로 마킹 (에러도 종료 상태)
       if (jobId) {
-        markJobAsCompleted(jobId)
+        markCrawlJobAsCompleted(jobId)
         currentCrawlJobIdRef.current = null
       }
 
@@ -323,8 +349,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료 체크 (100% 완료 처리 전)
       if (jobId) {
-        if (isJobCompleted(jobId)) {
-          console.warn(`[Socket.io] Ignored - job ${jobId} already completed`)
+        if (isSummaryJobCompleted(jobId)) {
+          console.warn(`[Socket.io] Ignored - summary job ${jobId} already completed`)
           return
         }
 
@@ -359,7 +385,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       if (data.percentage === 100 || data.current === data.total) {
         // ✅ jobId가 있으면 완료로 마킹
         if (jobId) {
-          markJobAsCompleted(jobId)
+          markSummaryJobAsCompleted(jobId)
           currentSummaryJobIdRef.current = null
         }
 
@@ -392,7 +418,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료로 마킹 (에러도 종료 상태)
       if (jobId) {
-        markJobAsCompleted(jobId)
+        markSummaryJobAsCompleted(jobId)
         currentSummaryJobIdRef.current = null
       }
 
@@ -403,7 +429,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     })
 
     // ✅ 주기적으로 오래된 완료 Job 정리 (5분마다)
-    const cleanupInterval = setInterval(cleanupCompletedJobs, JOB_RETENTION_MS)
+    const cleanupInterval = setInterval(() => {
+      cleanupCompletedCrawlJobs()
+      cleanupCompletedSummaryJobs()
+    }, JOB_RETENTION_MS)
 
     return () => {
       clearInterval(cleanupInterval)
