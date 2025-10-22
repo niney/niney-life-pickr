@@ -1024,32 +1024,33 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             {/* 더 보기 버튼 - 리뷰가 적어서 스크롤이 없을 때 표시 */}
             {!reviewsLoading && hasMoreReviews && reviews.length > 0 && (
               <View style={styles.loadMoreButtonContainer}>
-                <TouchableOpacity
-                  className="load-more-button"
-                  style={[styles.loadMoreButton, { backgroundColor: colors.primary }]}
-                  onPress={() => {
-                    if (id) {
-                      const restaurantId = parseInt(id, 10)
-                      if (!isNaN(restaurantId)) {
-                        loadMoreReviews(restaurantId)
+                <div className="load-more-button">
+                  <TouchableOpacity
+                    style={[styles.loadMoreButton, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      if (id) {
+                        const restaurantId = parseInt(id, 10)
+                        if (!isNaN(restaurantId)) {
+                          loadMoreReviews(restaurantId)
+                        }
                       }
-                    }
-                  }}
-                >
-                  <View style={styles.loadMoreButtonContent}>
-                    <View style={styles.loadMoreButtonIcon}>
-                      <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 16, color: '#fff' }} />
+                    }}
+                  >
+                    <View style={styles.loadMoreButtonContent}>
+                      <View style={styles.loadMoreButtonIcon}>
+                        <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 16, color: '#fff' }} />
+                      </View>
+                      <View style={styles.loadMoreButtonTextContainer}>
+                        <Text style={styles.loadMoreButtonText}>
+                          리뷰 더 보기
+                        </Text>
+                        <Text style={styles.loadMoreButtonSubtext}>
+                          {reviewsTotal - reviews.length}개 남음
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.loadMoreButtonTextContainer}>
-                      <Text style={styles.loadMoreButtonText}>
-                        리뷰 더 보기
-                      </Text>
-                      <Text style={styles.loadMoreButtonSubtext}>
-                        {reviewsTotal - reviews.length}개 남음
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </div>
               </View>
             )}
 
