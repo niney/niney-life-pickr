@@ -110,4 +110,28 @@ export default defineConfig({
   plugins: [
     react(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React 관련 라이브러리를 별도 chunk로 분리
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+
+          // React Native Web을 별도 chunk로 분리 (가장 큰 라이브러리)
+          'react-native-web': ['react-native-web'],
+
+          // FontAwesome 아이콘을 별도 chunk로 분리
+          'fontawesome': [
+            '@fortawesome/fontawesome-svg-core',
+            '@fortawesome/free-solid-svg-icons',
+            '@fortawesome/free-regular-svg-icons',
+            '@fortawesome/react-fontawesome'
+          ],
+        },
+      },
+    },
+
+    // Chunk 크기 경고 임계값 조정
+    chunkSizeWarningLimit: 600,
+  },
 })
