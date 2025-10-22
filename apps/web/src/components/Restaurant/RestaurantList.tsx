@@ -30,7 +30,7 @@ interface RestaurantListProps {
   dbProgress: { current: number; total: number; percentage: number } | null
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
-  fetchRestaurants: () => Promise<void>
+  fetchRestaurants: (limit?: number, offset?: number) => Promise<void | RestaurantData[]>
   fetchCategories: () => Promise<void>
   isMobile?: boolean
 }
@@ -125,7 +125,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     try {
       const response = await apiService.deleteRestaurant(restaurantToDelete.id)
 
-      if (response.result) {
+      if (response.result && response.data) {
         Alert.success(
           '삭제 완료',
           `${restaurantToDelete.name}이(가) 삭제되었습니다.\n메뉴 ${response.data.deletedMenus}개, 리뷰 ${response.data.deletedReviews}개가 함께 삭제되었습니다.`

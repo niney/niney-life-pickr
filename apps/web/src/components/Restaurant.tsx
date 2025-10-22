@@ -29,7 +29,7 @@ const DesktopLayout: React.FC<{
   dbProgress: any
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: any) => void
-  fetchRestaurants: () => Promise<void>
+  fetchRestaurants: (limit?: number, offset?: number) => Promise<any>
   fetchCategories: () => Promise<void>
 }> = (props) => {
   return (
