@@ -112,10 +112,10 @@ export const useReviews = () => {
 
     setReviewsLoading(true)
     try {
-      // 필터 변경 시에도 첫 로드는 1개
+      // 필터 변경 시에도 첫 로드는 3개
       const response = await apiService.getReviewsByRestaurantId(
         restaurantId, 
-        1, 
+        3, 
         0, 
         sentiments,
         searchText || undefined
@@ -123,7 +123,7 @@ export const useReviews = () => {
       if (response.result && response.data) {
         setReviews(response.data.reviews)
         setReviewsTotal(response.data.total)
-        setReviewsOffset(0)
+        setReviewsOffset(response.data.reviews.length)
         const hasMore = response.data.reviews.length < response.data.total
         setHasMoreReviews(hasMore)
       }
