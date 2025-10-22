@@ -1385,9 +1385,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
   menuCardContent: {
     flexDirection: 'row',
