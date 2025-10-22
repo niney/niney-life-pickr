@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState, useEffectEvent } from 'react'
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Text, Modal } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowLeft, faStar, faStarHalfStroke, faRedo, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft, faStar, faStarHalfStroke, faRedo, faSearch, faTimes, faChevronDown } from '@fortawesome/free-solid-svg-icons'
 import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
@@ -135,12 +135,12 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     if (id) {
       // 레스토랑 변경 시 통계 데이터 초기화
       setMenuStatistics(null)
-      
+
       // 레스토랑 변경 시 스크롤 초기화
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0
       }
-      
+
       joinRestaurantRoom(id)
 
       // 리뷰 크롤링/요약 완료 시 리뷰 재조회
@@ -679,8 +679,11 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           </View>
 
           {/* 검색 UI */}
-          <View style={styles.searchContainer}>
-            <View style={[styles.searchInputWrapper, { backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface, borderColor: colors.border }]}>
+          <div className="search-container">
+            <div
+              className={`search-input-wrapper ${theme}`}
+              style={{ borderColor: colors.border }}
+            >
               <FontAwesomeIcon icon={faSearch} style={{ marginRight: 8, fontSize: 16, color: colors.textSecondary }} />
               <input
                 type="text"
@@ -721,7 +724,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
                 </TouchableOpacity>
               )}
-            </View>
+            </div>
             <TouchableOpacity
               style={[styles.searchButton, { backgroundColor: colors.primary }]}
               onPress={() => {
@@ -735,7 +738,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             >
               <Text style={styles.searchButtonText}>검색</Text>
             </TouchableOpacity>
-          </View>
+          </div>
         </View>
       )}
 
@@ -1018,6 +1021,38 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
               ))}
             </div>
 
+            {/* 더 보기 버튼 - 리뷰가 적어서 스크롤이 없을 때 표시 */}
+            {!reviewsLoading && hasMoreReviews && reviews.length > 0 && (
+              <View style={styles.loadMoreButtonContainer}>
+                <TouchableOpacity
+                  className="load-more-button"
+                  style={[styles.loadMoreButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    if (id) {
+                      const restaurantId = parseInt(id, 10)
+                      if (!isNaN(restaurantId)) {
+                        loadMoreReviews(restaurantId)
+                      }
+                    }
+                  }}
+                >
+                  <View style={styles.loadMoreButtonContent}>
+                    <View style={styles.loadMoreButtonIcon}>
+                      <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 16, color: '#fff' }} />
+                    </View>
+                    <View style={styles.loadMoreButtonTextContainer}>
+                      <Text style={styles.loadMoreButtonText}>
+                        리뷰 더 보기
+                      </Text>
+                      <Text style={styles.loadMoreButtonSubtext}>
+                        {reviewsTotal - reviews.length}개 남음
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* 무한 스크롤 트리거 (모바일) */}
             {isMobile && hasMoreReviews && (
               <div ref={loadMoreTriggerRef} style={{ padding: '20px', textAlign: 'center' }}>
@@ -1126,7 +1161,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                     {menuStatistics.menuStatistics.map((stat: any, index: number) => {
                       const sentimentColor = stat.sentiment === 'positive' ? '#4caf50' : stat.sentiment === 'negative' ? '#f44336' : '#ff9800'
                       const sentimentBg = stat.sentiment === 'positive' ? '#e8f5e9' : stat.sentiment === 'negative' ? '#ffebee' : '#fff3e0'
-                      
+
                       return (
                         <View key={index} style={[styles.menuStatItem, { borderColor: colors.border }]}>
                           <View style={styles.menuStatHeader}>
@@ -1494,6 +1529,47 @@ const styles = StyleSheet.create({
   loadMoreButtonContainer: {
     padding: 20,
     alignItems: 'center',
+  },
+  loadMoreButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    minWidth: 220,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loadMoreButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadMoreButtonIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreButtonTextContainer: {
+    alignItems: 'flex-start',
+  },
+  loadMoreButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  loadMoreButtonSubtext: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   endMessageContainer: {
     padding: 20,
@@ -1864,21 +1940,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  // 검색 UI 스타일
-  searchContainer: {
-    flexDirection: 'row',
-    marginTop: 12,
-    gap: 8,
-  },
-  searchInputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
+  // 검색 버튼 스타일 (검색 컨테이너와 입력 래퍼는 CSS 클래스 사용)
   searchButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
