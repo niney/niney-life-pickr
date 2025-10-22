@@ -690,7 +690,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                 placeholder="리뷰 내용 검색..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                onKeyPress={(e) => {
+                onKeyDown={(e) => {
                   if (e.key === 'Enter' && id) {
                     const restaurantId = parseInt(id, 10)
                     if (!isNaN(restaurantId)) {
