@@ -835,8 +835,15 @@ const RestaurantDetailScreen: React.FC = () => {
                               {menu.description}
                             </Text>
                           )}
+                          <Text style={[styles.menuPrice, { color: colors.primary, marginTop: 8 }]}>{menu.price}</Text>
                         </View>
-                        <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
+                        {menu.image && (
+                          <Image
+                            source={{ uri: `${getDefaultApiUrl()}${menu.image}` }}
+                            style={styles.menuImage}
+                            resizeMode="cover"
+                          />
+                        )}
                       </View>
                     </View>
                   ))}
@@ -1488,11 +1495,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   menuInfo: {
     flex: 1,
-    marginRight: 12,
+  },
+  menuImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginLeft: 12,
   },
   menuName: {
     fontSize: 15,

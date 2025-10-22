@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import {promises as fs} from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
 
@@ -10,8 +10,8 @@ export class ImageDownloader {
   private baseDir: string;
 
   constructor() {
-    // data/images/reviews 디렉토리
-    this.baseDir = path.join(process.cwd(), 'data', 'images', 'reviews');
+    // data/images 디렉토리 (reviews, menus 하위 디렉토리 생성)
+    this.baseDir = path.join(process.cwd(), 'data', 'images');
   }
 
   /**
@@ -29,8 +29,8 @@ export class ImageDownloader {
     index: number
   ): Promise<string | null> {
     try {
-      // 1. 디렉토리 생성 (placeId/reviewHash)
-      const reviewDir = path.join(this.baseDir, placeId, reviewHash);
+      // 1. 디렉토리 생성 (reviews/placeId/reviewHash)
+      const reviewDir = path.join(this.baseDir, 'reviews', placeId, reviewHash);
       await fs.mkdir(reviewDir, { recursive: true });
 
       // 2. 이미지 다운로드
@@ -107,6 +107,62 @@ export class ImageDownloader {
     }
 
     return downloadedPaths;
+  }
+
+  /**
+   * 메뉴 이미지 다운로드
+   * @param imageUrl 이미지 URL
+   * @param placeId 레스토랑 Place ID
+   * @param menuIndex 메뉴 순번
+   * @returns 저장된 파일 경로 (상대 경로) 또는 null
+   */
+  async downloadMenuImage(
+    imageUrl: string,
+    placeId: string,
+    menuIndex: number
+  ): Promise<string | null> {
+    try {
+      // 1. 디렉토리 생성 (menus/placeId)
+      const menuDir = path.join(this.baseDir, 'menus', placeId);
+      await fs.mkdir(menuDir, { recursive: true });
+
+      // 2. 이미지 다운로드
+      const response = await fetch(imageUrl, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`메뉴 이미지 다운로드 실패 (HTTP ${response.status}):`, imageUrl);
+        return null;
+      }
+
+      // 3. 파일 크기 제한 체크 (5MB)
+      const contentLength = response.headers.get('content-length');
+      if (contentLength && parseInt(contentLength, 10) > 5 * 1024 * 1024) {
+        console.warn('메뉴 이미지 크기가 5MB를 초과하여 건너뜁니다');
+        return null;
+      }
+
+      const buffer = await response.buffer();
+
+      // 4. 파일 확장자 추출
+      const ext = this.getExtension(imageUrl) || 'jpg';
+      const filename = `menu_${menuIndex}.${ext}`;
+      const filePath = path.join(menuDir, filename);
+
+      // 5. 파일 저장
+      await fs.writeFile(filePath, buffer);
+
+      // 6. 상대 경로 반환 (API에서 서빙할 경로)
+      return `/data/images/menus/${placeId}/${filename}`;
+
+    } catch (error) {
+      console.error('메뉴 이미지 다운로드 중 오류:', error);
+      return null;
+    }
   }
 
   /**

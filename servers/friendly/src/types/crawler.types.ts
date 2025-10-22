@@ -10,7 +10,9 @@ export interface MenuItem {
   description?: string;
   /** 메뉴 가격 */
   price: string;
-  /** 메뉴 이미지 URL (선택) */
+  /** 크롤링한 이미지 URL (임시, 다운로드 전) */
+  imageUrl?: string;
+  /** 메뉴 이미지 로컬 경로 (다운로드 후) */
   image?: string;
   /** AI가 정규화한 메뉴 이름 (음식명|메뉴명, 선택) */
   normalizedName?: string;

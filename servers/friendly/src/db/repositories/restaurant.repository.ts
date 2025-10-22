@@ -116,10 +116,39 @@ export class RestaurantRepository {
   }
 
   /**
+   * 메뉴 이미지 파일 삭제 (place_id 기반)
+   *
+   * 주의: 현재 사용하지 않음
+   * 이유: 크롤링 시점에 이미지가 다운로드되므로,
+   * DB 저장 시점에 삭제하면 방금 다운로드한 이미지가 삭제됨
+   *
+   * 필요 시: 수동으로 메뉴를 완전 삭제할 때만 사용
+   */
+  /*
+  private async deleteMenuImagesByPlaceId(placeId: string): Promise<void> {
+    const menuDir = path.join(process.cwd(), 'data', 'images', 'menus', placeId);
+
+    try {
+      await fs.rm(menuDir, { recursive: true, force: true });
+      console.log(`✅ 메뉴 이미지 디렉토리 삭제: ${menuDir}`);
+    } catch (error) {
+      // 디렉토리가 없는 경우 무시
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.warn(`메뉴 이미지 삭제 실패 (${placeId}):`, error);
+      }
+    }
+  }
+  */
+
+  /**
    * 메뉴 저장 (기존 메뉴 삭제 후 재저장)
+   *
+   * 주의: 이미지 파일은 크롤링 단계에서 이미 새로 다운로드되어 있으므로
+   * 여기서 삭제하면 안 됩니다!
    */
   async saveMenus(restaurantId: number, menus: MenuInput[]): Promise<void> {
-    // 기존 메뉴 삭제
+    // 기존 메뉴 삭제 (DB만)
+    // 이미지 파일은 크롤링 시점에 이미 새 파일로 교체되어 있음
     await this.deleteMenusByRestaurantId(restaurantId);
 
     // 새 메뉴 삽입
@@ -128,10 +157,10 @@ export class RestaurantRepository {
         `INSERT INTO menus (restaurant_id, name, description, price, image, normalized_name)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
-          restaurantId, 
-          menu.name, 
-          menu.description || null, 
-          menu.price, 
+          restaurantId,
+          menu.name,
+          menu.description || null,
+          menu.price,
           menu.image || null,
           menu.normalized_name || null
         ]
@@ -206,7 +235,7 @@ export class RestaurantRepository {
         COUNT(*) as count
        FROM restaurants
        GROUP BY category
-       ORDER BY count DESC, category ASC`
+       ORDER BY count DESC, category`
     );
   }
 }

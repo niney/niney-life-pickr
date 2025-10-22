@@ -53,7 +53,6 @@ class NaverCrawlerService {
         return chromePath;
       } catch {
         // 파일이 없으면 다음 경로 시도
-        continue;
       }
     }
 
@@ -514,7 +513,8 @@ class NaverCrawlerService {
             const items: MenuItem[] = [];
 
             menuElements.forEach((element) => {
-              const nameSelectors = ['span.lPzHi', '.menu_name', '[class*="name"]'];
+              // 메뉴 이름 추출
+              const nameSelectors = ['span.lPzHi', '.yQlqY span', '.menu_name', '[class*="name"]'];
               let name: string | null = null;
 
               for (const selector of nameSelectors) {
@@ -525,7 +525,8 @@ class NaverCrawlerService {
                 }
               }
 
-              const descSelectors = ['div.kPogF', '.menu_desc', '[class*="desc"]'];
+              // 메뉴 설명 추출
+              const descSelectors = ['div.kPogF', '.TRxGt div', '.menu_desc', '[class*="desc"]'];
               let description: string | null = null;
 
               for (const selector of descSelectors) {
@@ -536,24 +537,48 @@ class NaverCrawlerService {
                 }
               }
 
+              // 가격 추출 (em 태그 포함 처리)
               const priceSelectors = ['div.GXS1X', '.menu_price', '[class*="price"]'];
               let price: string | null = null;
 
               for (const selector of priceSelectors) {
                 const priceElement = element.querySelector(selector);
                 if (priceElement?.textContent?.trim()) {
+                  // textContent로 전체 텍스트 가져오기 (em 태그 내용 + "원")
                   price = priceElement.textContent.trim();
                   break;
                 }
               }
 
+              // 메뉴 이미지 URL 추출
+              let imageUrl: string | null = null;
+              const imageElement = element.querySelector('.place_thumb img, .YBmM2 img, img.K0PDV');
+              
+              if (imageElement) {
+                // src 또는 data-src 속성 확인 (lazy loading 대응)
+                imageUrl = imageElement.getAttribute('src') || 
+                           imageElement.getAttribute('data-src') ||
+                           null;
+                
+                // http로 시작하는 유효한 URL만 사용
+                if (imageUrl && !imageUrl.startsWith('http')) {
+                  imageUrl = null;
+                }
+              }
+
               if (name) {
-                items.push({
+                const item: any = {
                   name,
                   description: description || undefined,
                   price: price || '가격 정보 없음',
-                  image: undefined
-                });
+                };
+
+                // imageUrl이 있을 때만 추가
+                if (imageUrl) {
+                  item.imageUrl = imageUrl;
+                }
+
+                items.push(item);
               }
             });
 
@@ -562,6 +587,48 @@ class NaverCrawlerService {
           startTime = this.logTiming('메뉴 페이지 크롤링 완료', startTime);
 
           console.log(`메뉴 페이지에서 ${menuItems.length}개의 메뉴 발견`);
+
+          // 메뉴 이미지 다운로드 (placeId가 있는 경우)
+          if (placeId && menuItems.length > 0) {
+            const menusWithImages = menuItems.filter(m => m.imageUrl).length;
+            
+            if (menusWithImages > 0) {
+              console.log(`메뉴 이미지 다운로드 시작... (${menusWithImages}개)`);
+              
+              let downloadedCount = 0;
+              let failedCount = 0;
+
+              for (let i = 0; i < menuItems.length; i++) {
+                const menu = menuItems[i];
+                
+                if (menu.imageUrl) {
+                  try {
+                    const localPath = await imageDownloader.downloadMenuImage(
+                      menu.imageUrl,
+                      placeId,
+                      i
+                    );
+
+                    if (localPath) {
+                      menu.image = localPath;
+                      downloadedCount++;
+                    } else {
+                      failedCount++;
+                    }
+
+                    delete menu.imageUrl;
+                  } catch (error) {
+                    failedCount++;
+                    console.error(`메뉴 이미지 다운로드 실패 (${menu.name}):`, error);
+                    delete menu.imageUrl;
+                  }
+                }
+              }
+
+              console.log(`✅ 메뉴 이미지 다운로드 완료: ${downloadedCount}개 성공${failedCount > 0 ? `, ${failedCount}개 실패` : ''}`);
+              startTime = this.logTiming('메뉴 이미지 다운로드 완료', startTime);
+            }
+          }
 
         } catch (menuError) {
           console.log('메뉴 페이지 크롤링 실패:', menuError);
@@ -602,7 +669,7 @@ class NaverCrawlerService {
         menuItems
       };
 
-      startTime = this.logTiming('전체 크롤링 완료', startTime);
+      this.logTiming('전체 크롤링 완료', startTime);
 
       console.log('전체 크롤링 완료:', {
         name: result.name,
@@ -1191,7 +1258,7 @@ class NaverCrawlerService {
 
       const reviews: ReviewInfo[] = rawReviews;
 
-      startTime = this.logTiming('리뷰 정보 추출 완료', startTime);
+      this.logTiming('리뷰 정보 추출 완료', startTime);
       console.log(`총 ${reviews.length}개의 리뷰 추출 완료`);
 
       // 진행 상황 콜백 호출 (실시간 전송)

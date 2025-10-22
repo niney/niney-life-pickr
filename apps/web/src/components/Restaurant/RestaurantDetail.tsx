@@ -764,8 +764,22 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                           {menu.description && (
                             <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>{menu.description}</Text>
                           )}
+                          <Text style={[styles.menuPrice, { color: colors.primary, marginTop: 8 }]}>{menu.price}</Text>
                         </View>
-                        <Text style={[styles.menuPrice, { color: colors.primary }]}>{menu.price}</Text>
+                        {menu.image && (
+                          <img
+                            src={`${getDefaultApiUrl()}${menu.image}`}
+                            alt={menu.name}
+                            style={{
+                              width: 100,
+                              height: 100,
+                              objectFit: 'cover',
+                              borderRadius: 8,
+                              marginLeft: 12,
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
                       </View>
                     </View>
                   ))}
@@ -1385,17 +1399,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuCard: {
-    paddingVertical: 16,
     borderBottomWidth: 1,
+    paddingVertical: 16,
   },
   menuCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   menuInfo: {
     flex: 1,
-    marginRight: 12,
   },
   menuName: {
     fontSize: 16,
