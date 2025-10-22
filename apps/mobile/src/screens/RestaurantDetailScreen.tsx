@@ -818,7 +818,7 @@ const RestaurantDetailScreen: React.FC = () => {
               </View>
             ) : menus.length > 0 ? (
               <View style={styles.menuSection}>
-                <View style={styles.menusList}>
+                <View style={styles.menusGrid}>
                   {menus.map((menu, index) => (
                     <View
                       key={index}
@@ -829,22 +829,22 @@ const RestaurantDetailScreen: React.FC = () => {
                     >
                       <View style={styles.menuCardContent}>
                         <View style={styles.menuInfo}>
-                          <Text style={[styles.menuName, { color: colors.text }]}>{menu.name}</Text>
+                          <Text style={[styles.menuName, { color: colors.text }]} numberOfLines={2}>{menu.name}</Text>
+                          <Text style={[styles.menuPrice, { color: colors.primary, marginTop: 4 }]}>{menu.price}</Text>
                           {menu.description && (
-                            <Text style={[styles.menuDescription, { color: colors.textSecondary }]}>
+                            <Text style={[styles.menuDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                               {menu.description}
                             </Text>
                           )}
-                          <Text style={[styles.menuPrice, { color: colors.primary, marginTop: 8 }]}>{menu.price}</Text>
                         </View>
-                        {menu.image && (
-                          <Image
-                            source={{ uri: `${getDefaultApiUrl()}${menu.image}` }}
-                            style={styles.menuImage}
-                            resizeMode="cover"
-                          />
-                        )}
                       </View>
+                      {menu.image && (
+                        <Image
+                          source={{ uri: `${getDefaultApiUrl()}${menu.image}` }}
+                          style={styles.menuImage}
+                          resizeMode="cover"
+                        />
+                      )}
                     </View>
                   ))}
                 </View>
@@ -1475,36 +1475,42 @@ const styles = StyleSheet.create({
   menuSection: {
     marginBottom: 16,
   },
+  menusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   menusList: {
     // gap 제거 - borderBottom으로 구분
   },
   menuCardContainer: {
     overflow: 'hidden',
-    borderBottomWidth: 1,
-    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    width: '48%', // 2열 그리드 (gap 12px 고려)
   },
   menuCardLight: {
-    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
-    backgroundColor: 'transparent',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: '#fff',
   },
   menuCardDark: {
-    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
-    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   menuCardContent: {
-    paddingVertical: 4,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingVertical: 0,
+    flexDirection: 'column',
   },
   menuInfo: {
     flex: 1,
   },
   menuImage: {
-    width: 100,
-    height: 100,
+    width: '100%',
+    height: 120,
     borderRadius: 8,
-    marginLeft: 12,
+    marginTop: 8,
   },
   menuName: {
     fontSize: 15,

@@ -752,7 +752,11 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
               </View>
             ) : menus.length > 0 ? (
               <View style={styles.menuSection}>
-                <View style={styles.menusList}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))',
+                  gap: '16px',
+                }}>
                   {menus.map((menu, index) => (
                     <View
                       key={index}
@@ -783,7 +787,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                       </View>
                     </View>
                   ))}
-                </View>
+                </div>
               </View>
             ) : (
               <View style={styles.emptyContainer}>
