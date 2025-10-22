@@ -29,6 +29,8 @@ const DesktopLayout: React.FC<{
   dbProgress: any
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: any) => void
+  fetchRestaurants: () => Promise<void>
+  fetchCategories: () => Promise<void>
 }> = (props) => {
   return (
     <>
@@ -142,6 +144,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   dbProgress={dbProgress}
                   handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClick}
+                  fetchRestaurants={fetchRestaurants}
+                  fetchCategories={fetchCategories}
                   isMobile={isMobile}
                 />
               )}
@@ -170,6 +174,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   dbProgress={dbProgress}
                   handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClick}
+                  fetchRestaurants={fetchRestaurants}
+                  fetchCategories={fetchCategories}
                 />
               )}
             />

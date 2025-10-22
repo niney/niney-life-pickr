@@ -465,6 +465,26 @@ class ApiService {
       method: 'GET',
     });
   }
+
+  /**
+   * 음식점 삭제 (하드 삭제)
+   * DB 레코드, 관련 데이터(메뉴, 리뷰, Job), 이미지 파일 모두 삭제
+   */
+  async deleteRestaurant(id: number): Promise<ApiResponse<{
+    restaurantId: number;
+    placeId: string;
+    deletedMenus: number;
+    deletedReviews: number;
+    deletedJobs: number;
+    deletedImages: {
+      menus: number;
+      reviews: number;
+    };
+  }>> {
+    return this.request(`/api/restaurants/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // 싱글톤 인스턴스 export

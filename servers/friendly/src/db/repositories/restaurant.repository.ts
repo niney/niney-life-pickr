@@ -238,6 +238,53 @@ export class RestaurantRepository {
        ORDER BY count DESC, category`
     );
   }
+
+  /**
+   * 음식점 삭제 (하드 삭제)
+   * CASCADE로 관련 데이터(메뉴, 리뷰, Job, 리뷰 요약)도 자동 삭제됩니다.
+   *
+   * @param id - 삭제할 음식점 ID
+   * @returns 삭제된 음식점 정보 및 관련 통계
+   */
+  async deleteById(id: number): Promise<{
+    placeId: string;
+    deletedMenus: number;
+    deletedReviews: number;
+    deletedJobs: number;
+  } | null> {
+    // 1. 음식점 존재 여부 확인 (placeId 조회용)
+    const restaurant = await this.findById(id);
+    if (!restaurant) {
+      return null;
+    }
+
+    // 2. CASCADE 삭제될 레코드 수 조회
+    const menuCount = await db.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM menus WHERE restaurant_id = ?',
+      [id]
+    );
+
+    const reviewCount = await db.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM reviews WHERE restaurant_id = ?',
+      [id]
+    );
+
+    const jobCount = await db.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM jobs WHERE restaurant_id = ?',
+      [id]
+    );
+
+    // 3. 음식점 삭제 (CASCADE로 관련 데이터도 자동 삭제)
+    await db.run('DELETE FROM restaurants WHERE id = ?', [id]);
+
+    // 4. 삭제 통계 반환
+    return {
+      placeId: restaurant.place_id,
+      deletedMenus: menuCount?.count || 0,
+      deletedReviews: reviewCount?.count || 0,
+      deletedJobs: jobCount?.count || 0
+    };
+  }
 }
 
 export const restaurantRepository = new RestaurantRepository();

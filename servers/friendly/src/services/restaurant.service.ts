@@ -4,6 +4,8 @@ import { RestaurantInput, MenuInput } from '../types/db.types';
 import { RestaurantInfo, MenuItem } from '../types/crawler.types';
 import { normalizeMenuItems } from './menu-normalization.service';
 import { SOCKET_EVENTS } from '../socket/events';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 /**
  * Restaurant Service
@@ -499,6 +501,157 @@ export class RestaurantService {
       limit,
       offset
     };
+  }
+
+  /**
+   * 이미지 파일 삭제 헬퍼
+   * @param placeId - Place ID
+   * @returns 삭제된 이미지 통계
+   */
+  private async deleteRestaurantImages(placeId: string): Promise<{
+    menuImagesDeleted: number;
+    reviewImagesDeleted: number;
+  }> {
+    const menuDir = path.join(process.cwd(), 'data', 'images', 'menus', placeId);
+    const reviewDir = path.join(process.cwd(), 'data', 'images', 'reviews', placeId);
+
+    let menuImagesDeleted = 0;
+    let reviewImagesDeleted = 0;
+
+    // 메뉴 이미지 삭제
+    try {
+      const menuStats = await fs.stat(menuDir);
+      if (menuStats.isDirectory()) {
+        // 파일 개수 카운트 (재귀적으로)
+        const countFiles = async (dir: string): Promise<number> => {
+          let count = 0;
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isFile()) {
+              count++;
+            } else if (entry.isDirectory()) {
+              count += await countFiles(path.join(dir, entry.name));
+            }
+          }
+          return count;
+        };
+        menuImagesDeleted = await countFiles(menuDir);
+        await fs.rm(menuDir, { recursive: true, force: true });
+        console.log(`✅ 메뉴 이미지 ${menuImagesDeleted}개 삭제: ${menuDir}`);
+      }
+    } catch (error) {
+      // 디렉토리가 없는 경우 무시
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.warn(`메뉴 이미지 삭제 실패 (${placeId}):`, error);
+      }
+    }
+
+    // 리뷰 이미지 삭제
+    try {
+      const reviewStats = await fs.stat(reviewDir);
+      if (reviewStats.isDirectory()) {
+        const countFiles = async (dir: string): Promise<number> => {
+          let count = 0;
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isFile()) {
+              count++;
+            } else if (entry.isDirectory()) {
+              count += await countFiles(path.join(dir, entry.name));
+            }
+          }
+          return count;
+        };
+        reviewImagesDeleted = await countFiles(reviewDir);
+        await fs.rm(reviewDir, { recursive: true, force: true });
+        console.log(`✅ 리뷰 이미지 ${reviewImagesDeleted}개 삭제: ${reviewDir}`);
+      }
+    } catch (error) {
+      // 디렉토리가 없는 경우 무시
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.warn(`리뷰 이미지 삭제 실패 (${placeId}):`, error);
+      }
+    }
+
+    return {
+      menuImagesDeleted,
+      reviewImagesDeleted
+    };
+  }
+
+  /**
+   * 음식점 삭제 (하드 삭제)
+   * DB 레코드 + 이미지 파일 모두 삭제
+   *
+   * @param id - 삭제할 음식점 ID
+   * @returns 삭제 결과 및 통계
+   */
+  async deleteRestaurant(id: number): Promise<{
+    success: boolean;
+    placeId: string;
+    deletedMenus: number;
+    deletedReviews: number;
+    deletedJobs: number;
+    deletedImages: { menus: number; reviews: number; };
+    error?: string;
+  } | null> {
+    try {
+      console.log('[RestaurantService] 음식점 삭제 시작:', id);
+
+      // 1. DB 삭제 (CASCADE로 관련 데이터도 자동 삭제)
+      const dbResult = await restaurantRepository.deleteById(id);
+
+      if (!dbResult) {
+        console.log('[RestaurantService] 음식점을 찾을 수 없음:', id);
+        return null;
+      }
+
+      console.log('[RestaurantService] DB 삭제 완료:', {
+        placeId: dbResult.placeId,
+        deletedMenus: dbResult.deletedMenus,
+        deletedReviews: dbResult.deletedReviews,
+        deletedJobs: dbResult.deletedJobs
+      });
+
+      // 2. 이미지 파일 삭제 (실패해도 계속 진행)
+      let deletedImages = { menus: 0, reviews: 0 };
+      try {
+        const imageResult = await this.deleteRestaurantImages(dbResult.placeId);
+        deletedImages = {
+          menus: imageResult.menuImagesDeleted,
+          reviews: imageResult.reviewImagesDeleted
+        };
+      } catch (imageError) {
+        console.error('[RestaurantService] 이미지 삭제 실패 (무시):', imageError);
+        // DB는 이미 삭제되었으므로 에러를 무시하고 계속 진행
+      }
+
+      console.log('[RestaurantService] 음식점 삭제 완료:', {
+        restaurantId: id,
+        placeId: dbResult.placeId,
+        deletedImages
+      });
+
+      return {
+        success: true,
+        placeId: dbResult.placeId,
+        deletedMenus: dbResult.deletedMenus,
+        deletedReviews: dbResult.deletedReviews,
+        deletedJobs: dbResult.deletedJobs,
+        deletedImages
+      };
+    } catch (error) {
+      console.error('[RestaurantService] 음식점 삭제 실패:', error);
+      return {
+        success: false,
+        placeId: '',
+        deletedMenus: 0,
+        deletedReviews: 0,
+        deletedJobs: 0,
+        deletedImages: { menus: 0, reviews: 0 },
+        error: error instanceof Error ? error.message : 'Delete failed'
+      };
+    }
   }
 }
 

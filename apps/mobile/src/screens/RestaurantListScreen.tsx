@@ -173,14 +173,50 @@ const RestaurantListScreen: React.FC = () => {
     try {
       const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options);
       if (response.result) {
-        Alert.alert('재크롤링 시작', '백그라운드에서 크롤링이 진행됩니다.');
+        Alert.show('재크롤링 시작', '백그라운드에서 크롤링이 진행됩니다.');
       } else {
-        Alert.alert('재크롤링 실패', response.message || '재크롤링을 시작할 수 없습니다.');
+        Alert.error('재크롤링 실패', response.message || '재크롤링을 시작할 수 없습니다.');
       }
     } catch (error) {
       console.error('Recrawl error:', error);
-      Alert.alert('오류', '재크롤링 중 오류가 발생했습니다.');
+      Alert.error('오류', '재크롤링 중 오류가 발생했습니다.');
     }
+  };
+
+  const handleDeleteClick = (restaurant: RestaurantData, event: any) => {
+    event.stopPropagation();
+
+    Alert.confirm(
+      '레스토랑 삭제',
+      `${restaurant.name}을(를) 삭제하시겠습니까?\n모든 메뉴, 리뷰, 이미지가 함께 삭제되며 복구할 수 없습니다.`,
+      async () => {
+        // 확인 버튼 클릭 시
+        try {
+          const response = await apiService.deleteRestaurant(restaurant.id);
+
+          if (response.result) {
+            Alert.success(
+              '삭제 완료',
+              `${restaurant.name}이(가) 삭제되었습니다.\n메뉴 ${response.data.deletedMenus}개, 리뷰 ${response.data.deletedReviews}개가 함께 삭제되었습니다.`
+            );
+
+            // 목록 새로고침
+            await Promise.all([
+              fetchRestaurants(),
+              fetchCategories()
+            ]);
+          } else {
+            Alert.error('삭제 실패', response.message || '레스토랑 삭제에 실패했습니다');
+          }
+        } catch (error) {
+          console.error('Delete error:', error);
+          Alert.error('삭제 오류', '레스토랑 삭제 중 오류가 발생했습니다');
+        }
+      },
+      () => {
+        // 취소 버튼 클릭 시 (아무것도 하지 않음)
+      }
+    );
   };
 
   return (
@@ -368,12 +404,20 @@ const RestaurantListScreen: React.FC = () => {
                         </Text>
                       )}
                     </View>
-                    <TouchableOpacity
-                      style={[styles.recrawlButton, { backgroundColor: colors.border }]}
-                      onPress={(e: any) => handleRecrawlClick(restaurant, e)}
-                    >
-                      <Text style={[styles.recrawlIcon, { color: colors.text }]}>↻</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.border }]}
+                        onPress={(e: any) => handleRecrawlClick(restaurant, e)}
+                      >
+                        <Text style={[styles.actionIcon, { color: colors.text }]}>↻</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: '#ff4444' }]}
+                        onPress={(e: any) => handleDeleteClick(restaurant, e)}
+                      >
+                        <Text style={[styles.actionIcon, { color: '#fff' }]}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -502,6 +546,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  actionIcon: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   recrawlButton: {
     width: 36,

@@ -27,7 +27,17 @@ class Database {
           reject(err);
         } else {
           console.log(`Connected to SQLite database at ${this.dbPath}`);
-          resolve();
+
+          // Enable foreign key constraints (required for CASCADE delete)
+          this.db.run('PRAGMA foreign_keys = ON', (pragmaErr) => {
+            if (pragmaErr) {
+              console.error('Error enabling foreign keys:', pragmaErr);
+              reject(pragmaErr);
+            } else {
+              console.log('Foreign key constraints enabled');
+              resolve();
+            }
+          });
         }
       });
     });

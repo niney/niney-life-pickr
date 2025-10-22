@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import restaurantRepository from '../db/repositories/restaurant.repository';
 import reviewRepository from '../db/repositories/review.repository';
+import restaurantService from '../services/restaurant.service';
 import { ResponseHelper } from '../utils/response.utils';
 
 /**
@@ -539,6 +540,90 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       return ResponseHelper.error(
         reply,
         error instanceof Error ? error.message : 'Failed to fetch restaurant',
+        500
+      );
+    }
+  });
+
+  /**
+   * DELETE /api/restaurants/:id
+   * 음식점 삭제 (하드 삭제)
+   * DB 레코드, 관련 데이터(메뉴, 리뷰, Job), 이미지 파일 모두 삭제
+   */
+  fastify.delete('/:id', {
+    schema: {
+      tags: ['restaurants'],
+      summary: '음식점 삭제',
+      description: 'Restaurant ID로 음식점 및 관련 데이터(메뉴, 리뷰, Job, 이미지 파일)를 완전히 삭제합니다. CASCADE로 관련 데이터도 자동 삭제되며, 복구가 불가능합니다.',
+      params: Type.Object({
+        id: Type.Number({ description: '삭제할 음식점 ID' })
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            restaurantId: Type.Number({ description: '삭제된 음식점 ID' }),
+            placeId: Type.String({ description: '삭제된 음식점 Place ID' }),
+            deletedMenus: Type.Number({ description: '삭제된 메뉴 수' }),
+            deletedReviews: Type.Number({ description: '삭제된 리뷰 수' }),
+            deletedJobs: Type.Number({ description: '삭제된 Job 수' }),
+            deletedImages: Type.Object({
+              menus: Type.Number({ description: '삭제된 메뉴 이미지 수' }),
+              reviews: Type.Number({ description: '삭제된 리뷰 이미지 수' })
+            })
+          }),
+          timestamp: Type.String()
+        }),
+        404: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: number };
+
+    try {
+      const result = await restaurantService.deleteRestaurant(id);
+
+      if (!result) {
+        return ResponseHelper.notFound(reply, `음식점 ID ${id}를 찾을 수 없습니다`);
+      }
+
+      if (!result.success) {
+        return ResponseHelper.error(
+          reply,
+          result.error || '음식점 삭제 중 오류가 발생했습니다',
+          500
+        );
+      }
+
+      return ResponseHelper.success(
+        reply,
+        {
+          restaurantId: id,
+          placeId: result.placeId,
+          deletedMenus: result.deletedMenus,
+          deletedReviews: result.deletedReviews,
+          deletedJobs: result.deletedJobs,
+          deletedImages: result.deletedImages
+        },
+        '음식점 삭제 완료'
+      );
+    } catch (error) {
+      console.error('음식점 삭제 에러:', error);
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to delete restaurant',
         500
       );
     }

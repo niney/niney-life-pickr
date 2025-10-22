@@ -330,6 +330,149 @@ describe('Restaurant Routes', () => {
     });
   });
 
+  describe('DELETE /api/restaurants/:id', () => {
+    beforeEach(async () => {
+      // Extra cleanup to ensure clean state
+      await db.run('DELETE FROM menus WHERE restaurant_id IN (SELECT id FROM restaurants WHERE place_id LIKE ?)', ['test%']);
+      await db.run('DELETE FROM restaurants WHERE place_id LIKE ?', ['test%']);
+    });
+
+    it('should delete restaurant and return statistics', async () => {
+      // Insert test restaurant
+      const restaurantId = await restaurantRepository.upsertRestaurant({
+        place_id: 'test_delete_001',
+        name: '삭제테스트음식점',
+        place_name: '삭제테스트음식점',
+        category: '한식',
+        phone: '02-1234-5678',
+        address: '서울시 강남구',
+        description: '삭제 테스트',
+        business_hours: null,
+        lat: null,
+        lng: null,
+        url: 'https://map.naver.com/p/entry/place/test_delete_001',
+        crawled_at: new Date().toISOString()
+      });
+
+      // Insert test menus
+      await restaurantRepository.saveMenus(restaurantId, [
+        {
+          name: '메뉴1',
+          description: '설명1',
+          price: '10,000원',
+          image: null
+        },
+        {
+          name: '메뉴2',
+          description: '설명2',
+          price: '12,000원',
+          image: null
+        }
+      ]);
+
+      // Delete restaurant
+      const response = await request(app.server)
+        .delete(`/api/restaurants/${restaurantId}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('result', true);
+      expect(response.body.message).toContain('삭제 완료');
+      expect(response.body.data).toMatchObject({
+        restaurantId,
+        placeId: 'test_delete_001',
+        deletedMenus: 2,
+        deletedReviews: 0,
+        deletedJobs: 0
+      });
+      expect(response.body.data.deletedImages).toHaveProperty('menus');
+      expect(response.body.data.deletedImages).toHaveProperty('reviews');
+
+      // Verify restaurant is deleted
+      const checkResponse = await request(app.server)
+        .get(`/api/restaurants/${restaurantId}`);
+
+      expect(checkResponse.status).toBe(404);
+    });
+
+    it('should return 404 for non-existent restaurant', async () => {
+      const response = await request(app.server)
+        .delete('/api/restaurants/999999');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('result', false);
+      expect(response.body.message).toContain('찾을 수 없습니다');
+    });
+
+    it('should delete restaurant with CASCADE (menus should be deleted)', async () => {
+      // Insert test restaurant
+      const restaurantId = await restaurantRepository.upsertRestaurant({
+        place_id: 'test_delete_cascade',
+        name: 'CASCADE테스트',
+        place_name: 'CASCADE테스트',
+        category: '중식',
+        phone: '02-1234-5679',
+        address: '서울시 강남구',
+        description: 'CASCADE 테스트',
+        business_hours: null,
+        lat: null,
+        lng: null,
+        url: 'https://map.naver.com/p/entry/place/test_delete_cascade',
+        crawled_at: new Date().toISOString()
+      });
+
+      // Insert test menus
+      await restaurantRepository.saveMenus(restaurantId, [
+        { name: '짜장면', description: null, price: '6,000원', image: null },
+        { name: '짬뽕', description: null, price: '7,000원', image: null },
+        { name: '탕수육', description: null, price: '15,000원', image: null }
+      ]);
+
+      // Verify menus exist before deletion
+      const menusBefore = await restaurantRepository.findMenusByRestaurantId(restaurantId);
+      expect(menusBefore.length).toBe(3);
+
+      // Delete restaurant
+      const response = await request(app.server)
+        .delete(`/api/restaurants/${restaurantId}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.deletedMenus).toBe(3);
+
+      // Verify menus are also deleted (CASCADE)
+      const menusAfter = await restaurantRepository.findMenusByRestaurantId(restaurantId);
+      expect(menusAfter.length).toBe(0);
+    });
+
+    it('should handle restaurant without menus', async () => {
+      // Insert test restaurant without menus
+      const restaurantId = await restaurantRepository.upsertRestaurant({
+        place_id: 'test_delete_no_menu',
+        name: '메뉴없는음식점',
+        place_name: '메뉴없는음식점',
+        category: '카페',
+        phone: '02-1234-5680',
+        address: '서울시 강남구',
+        description: '메뉴 없음',
+        business_hours: null,
+        lat: null,
+        lng: null,
+        url: 'https://map.naver.com/p/entry/place/test_delete_no_menu',
+        crawled_at: new Date().toISOString()
+      });
+
+      const response = await request(app.server)
+        .delete(`/api/restaurants/${restaurantId}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toMatchObject({
+        restaurantId,
+        deletedMenus: 0,
+        deletedReviews: 0,
+        deletedJobs: 0
+      });
+    });
+  });
+
   describe('Response Format', () => {
     it('should follow standardized response format', async () => {
       const response = await request(app.server)

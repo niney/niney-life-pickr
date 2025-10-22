@@ -9,7 +9,7 @@ import {
   View
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faRotate, faTimes } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTheme, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData } from '@shared'
 import { useLocation } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
@@ -30,6 +30,8 @@ interface RestaurantListProps {
   dbProgress: { current: number; total: number; percentage: number } | null
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
+  fetchRestaurants: () => Promise<void>
+  fetchCategories: () => Promise<void>
   isMobile?: boolean
 }
 
@@ -49,21 +51,27 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   dbProgress,
   handleCrawl,
   handleRestaurantClick,
+  fetchRestaurants,
+  fetchCategories,
   isMobile = false,
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const location = useLocation()
-  
+
   // URL에서 restaurant id 추출 (/restaurant/:id)
   const restaurantId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
 
   // 재크롤링 모달 상태
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null)
-  
+
   // 카테고리 모달 상태
   const [categoryModalVisible, setCategoryModalVisible] = useState(false)
+
+  // 삭제 확인 다이얼로그 상태
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false)
+  const [restaurantToDelete, setRestaurantToDelete] = useState<RestaurantData | null>(null)
 
   // 카테고리 클릭 핸들러
   const handleCategoryClick = (category: string) => {
@@ -92,7 +100,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
 
     try {
       const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options)
-      
+
       if (!response.result) {
         Alert.error('재크롤링 실패', response.message || '재크롤링에 실패했습니다')
       }
@@ -100,6 +108,43 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     } catch (error) {
       console.error('재크롤링 오류:', error)
       Alert.error('재크롤링 오류', '재크롤링 중 오류가 발생했습니다')
+    }
+  }
+
+  // 삭제 버튼 클릭
+  const handleDeleteClick = (restaurant: RestaurantData, event: React.MouseEvent) => {
+    event.stopPropagation() // 카드 클릭 이벤트 방지
+    setRestaurantToDelete(restaurant)
+    setDeleteDialogVisible(true)
+  }
+
+  // 삭제 실행
+  const handleDeleteConfirm = async () => {
+    if (!restaurantToDelete) return
+
+    try {
+      const response = await apiService.deleteRestaurant(restaurantToDelete.id)
+
+      if (response.result) {
+        Alert.success(
+          '삭제 완료',
+          `${restaurantToDelete.name}이(가) 삭제되었습니다.\n메뉴 ${response.data.deletedMenus}개, 리뷰 ${response.data.deletedReviews}개가 함께 삭제되었습니다.`
+        )
+
+        // 목록 새로고침
+        await Promise.all([
+          fetchRestaurants(),
+          fetchCategories()
+        ])
+      } else {
+        Alert.error('삭제 실패', response.message || '레스토랑 삭제에 실패했습니다')
+      }
+    } catch (error) {
+      console.error('삭제 오류:', error)
+      Alert.error('삭제 오류', '레스토랑 삭제 중 오류가 발생했습니다')
+    } finally {
+      setDeleteDialogVisible(false)
+      setRestaurantToDelete(null)
     }
   }
 
@@ -295,7 +340,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                     <View style={styles.restaurantCardContent}>
                       <View style={styles.restaurantInfo}>
                         <Text style={[
-                          styles.restaurantName, 
+                          styles.restaurantName,
                           { color: isSelected ? colors.primary : colors.text }
                         ]}>
                           {restaurant.name}
@@ -309,12 +354,20 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                           </Text>
                         )}
                       </View>
-                      <TouchableOpacity
-                        style={[styles.recrawlButton, { backgroundColor: colors.border }]}
-                        onPress={(e: any) => handleRecrawlClick(restaurant, e)}
-                      >
-                        <FontAwesomeIcon icon={faRotate} style={{ fontSize: 14, color: colors.text }} />
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={[styles.actionButton, { backgroundColor: colors.border }]}
+                          onPress={(e: any) => handleRecrawlClick(restaurant, e)}
+                        >
+                          <FontAwesomeIcon icon={faRotate} style={{ fontSize: 14, color: colors.text }} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionButton, { backgroundColor: '#ff4444' }]}
+                          onPress={(e: any) => handleDeleteClick(restaurant, e)}
+                        >
+                          <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14, color: '#fff' }} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 )
@@ -331,6 +384,41 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
           onConfirm={handleRecrawlConfirm}
           restaurantName={selectedRestaurant?.name || ''}
         />
+
+        {/* 삭제 확인 다이얼로그 */}
+        <Modal
+          visible={deleteDialogVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setDeleteDialogVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.deleteDialogContent, { backgroundColor: colors.surface }]}>
+              <View style={styles.deleteDialogHeader}>
+                <FontAwesomeIcon icon={faTrash} style={{ fontSize: 24, color: '#ff4444' }} />
+              </View>
+              <Text style={[styles.deleteDialogTitle, { color: colors.text }]}>레스토랑 삭제</Text>
+              <Text style={[styles.deleteDialogMessage, { color: colors.textSecondary }]}>
+                {restaurantToDelete?.name}을(를) 삭제하시겠습니까?{'\n'}
+                모든 메뉴, 리뷰, 이미지가 함께 삭제되며 복구할 수 없습니다.
+              </Text>
+              <View style={styles.deleteDialogButtons}>
+                <TouchableOpacity
+                  style={[styles.deleteDialogButton, styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => setDeleteDialogVisible(false)}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.deleteDialogButton, styles.confirmButton, { backgroundColor: '#ff4444' }]}
+                  onPress={handleDeleteConfirm}
+                >
+                  <Text style={styles.confirmButtonText}>삭제</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* 카테고리 선택 모달 */}
         <Modal
@@ -549,6 +637,13 @@ const styles = StyleSheet.create({
   restaurantInfo: {
     flex: 1,
   },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   recrawlButton: {
     width: 36,
     height: 36,
@@ -636,6 +731,61 @@ const styles = StyleSheet.create({
   },
   modalCategoryCount: {
     fontSize: 14,
+  },
+  // 삭제 다이얼로그 스타일
+  deleteDialogContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  deleteDialogHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  deleteDialogTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  deleteDialogMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  deleteDialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteDialogButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmButton: {
+    // backgroundColor set inline
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 })
 
