@@ -105,10 +105,9 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
 
   useEffect(() => {
     fetchCategories()
-    fetchRestaurants()
   }, [])
 
-  // 카테고리 변경 시 레스토랑 재조회
+  // 카테고리 변경 시 레스토랑 재조회 (마운트 시에도 실행됨)
   useEffect(() => {
     fetchRestaurants()
   }, [selectedCategory])

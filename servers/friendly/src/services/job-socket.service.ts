@@ -310,6 +310,75 @@ export class JobService {
 
     io.to(`restaurant:${restaurantId}`).emit(eventName, eventData);
   }
+
+  // ==================== Job Chain ====================
+
+  /**
+   * Job Chain 실행 (순차적 백그라운드 실행)
+   * - 모든 Job을 순차적으로 실행
+   * - 중간 실패 시 체인 중단
+   * - 각 Job별 Socket 이벤트 자동 발행
+   */
+  async executeChain(config: {
+    jobs: Array<{
+      type: JobType;
+      execute: () => Promise<void>;
+      metadata?: Record<string, any>;
+    }>;
+    restaurantId: number;
+    onComplete?: (results: any[]) => void;
+    onError?: (error: Error, failedJobIndex: number) => void;
+  }): Promise<void> {
+    const { jobs, restaurantId, onComplete, onError } = config;
+    const results: any[] = [];
+
+    console.log(`[Job Chain] 시작 - 레스토랑 ${restaurantId}, ${jobs.length}개 Job`);
+
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+
+      try {
+        // Job 시작
+        const jobId = await this.start({
+          type: job.type,
+          restaurantId,
+          metadata: job.metadata
+        });
+
+        console.log(`[Job Chain ${i + 1}/${jobs.length}] Job ${jobId} (${job.type}) 시작`);
+
+        // Job 실행 (완료까지 대기)
+        await job.execute();
+        results.push({ jobId, type: job.type, success: true });
+
+        // Job 완료
+        await this.complete(jobId, { chainIndex: i, chainTotal: jobs.length });
+
+        console.log(`[Job Chain ${i + 1}/${jobs.length}] Job ${jobId} 완료`);
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[Job Chain ${i + 1}/${jobs.length}] Job 실패:`, errorMessage);
+
+        results.push({ type: job.type, success: false, error: errorMessage });
+
+        // 에러 콜백 실행
+        if (onError) {
+          onError(error as Error, i);
+        }
+
+        // 체인 중단
+        throw error;
+      }
+    }
+
+    // 모든 Job 완료
+    console.log(`[Job Chain] 완료 - 레스토랑 ${restaurantId}`);
+
+    if (onComplete) {
+      onComplete(results);
+    }
+  }
 }
 
 export const jobService = new JobService();

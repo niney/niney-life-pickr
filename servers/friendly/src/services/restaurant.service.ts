@@ -49,7 +49,78 @@ export class RestaurantService {
   }
 
   /**
-   * 음식점 크롤링 및 DB 저장
+   * 메뉴만 재크롤링 (Job Chain용)
+   * @param url 네이버맵 URL
+   * @returns 크롤링 결과
+   */
+  async crawlAndSaveMenusOnly(url: string): Promise<{
+    savedToDb: boolean;
+    restaurantId?: number;
+    menusCount: number;
+    error?: string;
+  }> {
+    try {
+      console.log('[RestaurantService] 메뉴 크롤링 시작:', url);
+
+      // 1. 레스토랑 정보 + 메뉴 크롤링 (리뷰 제외)
+      const restaurantInfo = await naverCrawlerService.crawlRestaurant(url, {
+        crawlMenus: true,
+        crawlReviews: false
+      });
+
+      // placeId가 없으면 DB 저장 불가
+      if (!restaurantInfo.placeId) {
+        console.warn('[RestaurantService] placeId가 없어 DB 저장 생략:', url);
+        return {
+          savedToDb: false,
+          menusCount: 0,
+          error: 'Missing placeId - cannot save to database'
+        };
+      }
+
+      try {
+        console.log('[RestaurantService] 메뉴 DB 저장 시작:', restaurantInfo.placeId);
+
+        // 2-1. 음식점 정보 UPSERT
+        const restaurantInput = this.convertToRestaurantInput(restaurantInfo);
+        const restaurantId = await restaurantRepository.upsertRestaurant(restaurantInput);
+
+        // 2-2. 메뉴 저장 (있는 경우)
+        let menusCount = 0;
+        if (restaurantInfo.menuItems && restaurantInfo.menuItems.length > 0) {
+          // AI로 메뉴 정규화 (normalized_name 추가)
+          console.log(`[RestaurantService] AI로 ${restaurantInfo.menuItems.length}개 메뉴 정규화 중...`);
+          const normalizedMenuItems = await normalizeMenuItems(restaurantInfo.menuItems, true); // true = Cloud 우선 (실패 시 Local)
+
+          const menuInputs = this.convertToMenuInputs(restaurantId, normalizedMenuItems);
+          await restaurantRepository.saveMenus(restaurantId, menuInputs);
+          menusCount = menuInputs.length;
+          console.log(`[RestaurantService] 메뉴 ${menusCount}개 저장 완료 (정규화 포함)`);
+        }
+
+        console.log('[RestaurantService] 메뉴 DB 저장 완료:', restaurantId);
+
+        return {
+          savedToDb: true,
+          restaurantId,
+          menusCount
+        };
+      } catch (dbError) {
+        console.error('[RestaurantService] 메뉴 DB 저장 실패:', dbError);
+        return {
+          savedToDb: false,
+          menusCount: 0,
+          error: dbError instanceof Error ? dbError.message : 'Database save failed'
+        };
+      }
+    } catch (crawlError) {
+      console.error('[RestaurantService] 메뉴 크롤링 실패:', crawlError);
+      throw crawlError;
+    }
+  }
+
+  /**
+   * 음식점 크롤링 및 DB 저장 (신규 크롤링용)
    * @param url 네이버맵 URL
    * @param options 크롤링 옵션 (crawlMenus, crawlReviews, createSummary, resetSummary 등)
    * @returns 크롤링 결과 및 DB 저장 여부
@@ -106,13 +177,13 @@ export class RestaurantService {
             // 리뷰 URL 생성
             const reviewUrl = `https://m.place.naver.com/restaurant/${restaurantInfo.placeId}/review/visitor?reviewSort=recent`;
 
-            console.log('[RestaurantService] 리뷰 크롤링 Job 시작');
+            console.log('[RestaurantService] 리뷰 크롤링 Job 시작 (요약 포함)');
 
-            // 백그라운드로 리뷰 크롤링 시작 (Job ID는 자동 생성)
-            reviewCrawlerProcessor.process(restaurantInfo.placeId, reviewUrl, restaurantId)
+            // 백그라운드로 리뷰 크롤링 시작 (Job ID는 자동 생성, 요약 자동 시작)
+            reviewCrawlerProcessor.processWithSummary(restaurantInfo.placeId, reviewUrl, restaurantId)
               .catch(err => console.error('[RestaurantService] 리뷰 크롤링 에러:', err));
 
-            console.log('[RestaurantService] 리뷰 크롤링 백그라운드 시작됨');
+            console.log('[RestaurantService] 리뷰 크롤링 백그라운드 시작됨 (요약 포함)');
           } catch (reviewError) {
             console.error('[RestaurantService] 리뷰 크롤링 Job 생성 실패:', reviewError);
             // 리뷰 크롤링 실패해도 레스토랑 크롤링은 성공으로 처리

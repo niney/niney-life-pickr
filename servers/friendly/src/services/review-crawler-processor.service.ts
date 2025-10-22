@@ -12,7 +12,8 @@ import type { ReviewInfo } from '../types/crawler.types';
  */
 export class ReviewCrawlerProcessor {
   /**
-   * 리뷰 크롤링 실행 (백그라운드)
+   * 리뷰 크롤링 실행 (기본)
+   * 요약 제외 - Job Chain에서 사용
    */
   async process(placeId: string, url: string, restaurantId: number): Promise<void> {
     const startTime = Date.now();
@@ -56,8 +57,70 @@ export class ReviewCrawlerProcessor {
           crawlDuration: Date.now() - startTime
         });
 
+        // ⚠️ 요약 자동 시작 제거 - 필요 시 processWithSummary() 사용
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[Job ${jobId}] 리뷰 크롤링 실패:`, errorMessage);
+
+      // Job 실패 처리 + Socket ERROR 이벤트 자동 발행
+      if (jobId) {
+        await jobService.error(jobId, errorMessage, { placeId });
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * 리뷰 크롤링 실행 (요약 포함)
+   * 신규 크롤링용 - 자동으로 요약 시작
+   */
+  async processWithSummary(placeId: string, url: string, restaurantId: number): Promise<void> {
+    const startTime = Date.now();
+    let jobId: string | undefined;
+
+    try {
+      // 1. Job 시작 (ID 자동 생성 + Socket 시작 알림)
+      jobId = await jobService.start({
+        type: 'review_crawl',
+        restaurantId,
+        metadata: {
+          placeId,
+          url,
+          batchSize: 10
+        }
+      });
+
+      console.log(`[Job ${jobId}] 리뷰 크롤링 시작 (요약 포함)`);
+
+      // 2. 크롤링 실행
+      const reviews = await this.crawlWithProgress(jobId, placeId, url, restaurantId);
+
+      // 3. 완료 처리
+      if (jobService.isCancelled(jobId)) {
+        console.log(`[Job ${jobId}] 크롤링 취소됨`);
+        
+        // Job 취소 + Socket CANCELLED 이벤트 자동 발행
+        await jobService.cancel(jobId, {
+          placeId,
+          totalReviews: reviews.length
+        });
+      } else {
+        console.log(`[Job ${jobId}] 리뷰 크롤링 완료: ${reviews.length}개 (요약 포함)`);
+
+        // Job 완료 + Socket COMPLETED 이벤트 자동 발행
+        await jobService.complete(jobId, {
+          placeId,
+          totalReviews: reviews.length,
+          savedToDb: reviews.length,
+          duplicates: 0,
+          crawlDuration: Date.now() - startTime
+        });
+
         // 4. 리뷰 크롤링 완료 후 자동으로 요약 시작
-        console.log(`[Job ${jobId}] 리뷰 요약 시작...`);
+        console.log(`[Job ${jobId}] 리뷰 요약 자동 시작...`);
         this.startReviewSummary(restaurantId);
       }
 

@@ -247,69 +247,89 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
           ? `https://m.place.naver.com/restaurant/${restaurant.place_id}/home`
           : restaurant.url;
 
-        let reviewJobId: string | undefined;
+        console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 재크롤링 시작`);
 
-        // 메뉴만 재크롤링 (리뷰와 요약은 별도 처리)
-        if (crawlMenus && standardUrl) {
-          console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 메뉴 크롤링 시작`);
-          await restaurantService.crawlAndSaveRestaurant(standardUrl, { 
-            crawlMenus: true, 
-            crawlReviews: false,
-            createSummary: false
-          });
-        }
+        // ✅ Job Chain으로 순차 실행 (백그라운드)
+        const jobService = await import('../services/job-socket.service');
 
-        // 리뷰 재크롤링
-        if (crawlReviews && restaurant.place_id) {
-          console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 리뷰 크롤링 시작`);
-          
-          const reviewUrl = `https://m.place.naver.com/restaurant/${restaurant.place_id}/review/visitor?reviewSort=recent`;
+        // 백그라운드에서 체인 실행 (await 없음)
+        jobService.default.executeChain({
+          restaurantId,
+          jobs: [
+            // 1️⃣ 메뉴 크롤링
+            ...(crawlMenus && standardUrl ? [{
+              type: 'restaurant_crawl' as const,
+              metadata: { url: standardUrl, placeId: restaurant.place_id, includeMenus: true },
+              execute: async () => {
+                console.log(`[Job Chain] 메뉴 크롤링 시작`);
+                const result = await restaurantService.crawlAndSaveMenusOnly(standardUrl);
+                console.log(`[Job Chain] 메뉴 크롤링 완료 - ${result.menusCount}개 저장`);
+              }
+            }] : []),
 
-          // Job 생성은 review-crawler-processor.process()에서 자동 처리
-          const reviewCrawlerProcessor = await import('../services/review-crawler-processor.service');
-          reviewCrawlerProcessor.default.process(
-            restaurant.place_id, 
-            reviewUrl, 
-            restaurant.id
-          ).catch(err => {
-            console.error(`[Restaurant ${restaurant.id}] Background processing error:`, err);
-          });
+            // 2️⃣ 리뷰 크롤링 (요약 제외)
+            ...(crawlReviews && restaurant.place_id ? [{
+              type: 'review_crawl' as const,
+              metadata: { placeId: restaurant.place_id, url: '', batchSize: 10 },
+              execute: async () => {
+                console.log(`[Job Chain] 리뷰 크롤링 시작`);
+                const reviewUrl = `https://m.place.naver.com/restaurant/${restaurant.place_id}/review/visitor?reviewSort=recent`;
+                const reviewCrawlerProcessor = await import('../services/review-crawler-processor.service');
 
-          // reviewJobId는 processor 내부에서 생성되므로 추적 불가
-          reviewJobId = undefined;
-        }
+                // 기본 process() 사용 (요약 제외)
+                await reviewCrawlerProcessor.default.process(
+                  restaurant.place_id,
+                  reviewUrl,
+                  restaurant.id
+                );
+                console.log(`[Job Chain] 리뷰 크롤링 완료`);
+              }
+            }] : []),
 
-        // 리뷰 요약 생성
-        if (createSummary) {
-          // resetSummary 옵션이 true면 기존 요약 먼저 삭제
-          if (resetSummary) {
-            console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 기존 요약 삭제 중...`);
-            const reviewSummaryRepository = await import('../db/repositories/review-summary.repository');
-            await reviewSummaryRepository.default.deleteByRestaurantId(restaurantId);
-            console.log(`[통합 크롤링] 기존 요약 삭제 완료`);
+            // 3️⃣ 리뷰 요약 생성
+            ...(createSummary ? [{
+              type: 'review_summary' as const,
+              metadata: { useCloud: true, aiService: 'cloud' as const, resetSummary },
+              execute: async () => {
+                console.log(`[Job Chain] 리뷰 요약 시작`);
+
+                // resetSummary 처리
+                if (resetSummary) {
+                  const reviewSummaryRepository = await import('../db/repositories/review-summary.repository');
+                  await reviewSummaryRepository.default.deleteByRestaurantId(restaurantId);
+                  console.log(`[Job Chain] 기존 요약 삭제 완료`);
+                }
+
+                const reviewSummaryProcessor = await import('../services/review-summary-processor.service');
+                await reviewSummaryProcessor.default.processIncompleteReviews(
+                  restaurant.id,
+                  true // useCloud
+                );
+                console.log(`[Job Chain] 리뷰 요약 완료`);
+              }
+            }] : [])
+          ],
+          onComplete: (results) => {
+            console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 모든 작업 완료:`, results);
+          },
+          onError: (error, failedJobIndex) => {
+            console.error(`[통합 크롤링] 레스토랑 ${restaurantId} Job ${failedJobIndex} 실패:`, error);
           }
+        }).catch(err => {
+          console.error(`[통합 크롤링] 레스토랑 ${restaurantId} 체인 실행 오류:`, err);
+        });
 
-          console.log(`[통합 크롤링] 레스토랑 ${restaurantId} 리뷰 요약 생성 시작`);
-
-          const reviewSummaryProcessor = await import('../services/review-summary-processor.service');
-          reviewSummaryProcessor.default.processIncompleteReviews(
-            restaurant.id,
-            true // useCloud
-          ).catch(err => {
-            console.error(`[레스토랑 ${restaurant.id}] 요약 생성 오류:`, err);
-          });
-        }
-
+        // 즉시 202 응답 (백그라운드 실행)
         return reply.code(202).send({
           result: true,
-          message: '재크롤링 작업 시작',
+          message: '재크롤링 작업 시작 (백그라운드 실행)',
           data: {
             restaurantId,
             isNewCrawl: false,
             crawlMenus,
             crawlReviews,
             createSummary,
-            ...(reviewJobId && { reviewJobId })
+            chainLength: [crawlMenus, crawlReviews, createSummary].filter(Boolean).length
           },
           timestamp: new Date().toISOString()
         });
