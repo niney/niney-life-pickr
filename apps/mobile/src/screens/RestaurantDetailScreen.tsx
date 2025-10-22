@@ -65,6 +65,9 @@ const RestaurantDetailScreen: React.FC = () => {
   // 현재 스크롤 위치 추적
   const currentScrollY = useRef(0);
 
+  // 크롤링 완료 추적 (wasCrawling)
+  const wasCrawling = useRef(false);
+
   // 탭 상태 관리
   const [activeTab, setActiveTab] = useState<TabType>('menu');
 
@@ -263,13 +266,11 @@ const RestaurantDetailScreen: React.FC = () => {
     return () => {
       leaveRestaurantRoom(restaurantIdStr);
     };
-  }, [restaurantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- headerHeight는 의도적으로 제외 (레스토랑 변경 시에만 실행)
+  }, [restaurantId, joinRestaurantRoom, leaveRestaurantRoom, setRestaurantCallbacks]);
 
   // 크롤링 완료 후 3초 뒤 상태 초기화 (진행률이 모두 null이 되면 완료로 간주)
   useEffect(() => {
-    // 이전에 크롤링 중이었는데 지금 아니면 완료된 것
-    const wasCrawling = useRef(false);
-    
     if (isCrawling) {
       wasCrawling.current = true;
     } else if (wasCrawling.current) {
@@ -290,12 +291,12 @@ const RestaurantDetailScreen: React.FC = () => {
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [reviewSummaryStatus.status]);
+  }, [reviewSummaryStatus.status, resetSummaryStatus]);
 
   useEffect(() => {
     fetchReviews(restaurantId);
     fetchMenus(restaurantId);
-  }, [restaurantId]);
+  }, [restaurantId, fetchReviews, fetchMenus]);
 
   // 통계 탭 활성화 시 데이터 로드
   useEffect(() => {
@@ -328,7 +329,7 @@ const RestaurantDetailScreen: React.FC = () => {
     if (isNearBottom && activeTab === 'review' && !reviewsLoadingMore && !reviewsLoading && hasMoreReviews) {
       loadMoreReviews(restaurantId);
     }
-  }, [activeTab, restaurantId, reviewsLoadingMore, reviewsLoading, hasMoreReviews, headerHeight]);
+  }, [activeTab, restaurantId, reviewsLoadingMore, reviewsLoading, hasMoreReviews, headerHeight, loadMoreReviews]);
 
   // 핵심 키워드 토글 함수
   const toggleKeywords = (reviewId: number) => {
@@ -466,7 +467,7 @@ const RestaurantDetailScreen: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  }, [restaurantId]);
+  }, [restaurantId, fetchReviews, fetchMenus]);
 
   // 이미지 클릭 핸들러
   const handleImagePress = (images: string[], index: number) => {

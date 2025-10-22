@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 import {
   Alert,
@@ -449,7 +449,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   }, [])
 
   // Restaurant room 입장
-  const joinRestaurantRoom = (restaurantId: string) => {
+  const joinRestaurantRoom = useCallback((restaurantId: string) => {
     const socket = socketRef.current
     if (!socket) {
       console.error('[Socket.io] Socket not initialized')
@@ -467,10 +467,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // 새 room 입장
     socket.emit('subscribe:restaurant', restaurantId)
     console.log(`[Socket.io] Joined room: restaurant:${restaurantId}`)
-  }
+  }, [])
 
   // Restaurant room 퇴장
-  const leaveRestaurantRoom = (restaurantId: string) => {
+  const leaveRestaurantRoom = useCallback((restaurantId: string) => {
     const socket = socketRef.current
     if (!socket) return
 
@@ -481,20 +481,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       currentRestaurantIdRef.current = null
       callbacksRef.current = {}
     }
-  }
+  }, [])
 
   // 콜백 설정 (크롤링 시작 시 호출)
-  const setRestaurantCallbacks = (callbacks: {
+  const setRestaurantCallbacks = useCallback((callbacks: {
     onMenuCrawlCompleted?: (data: { restaurantId: string }) => void
     onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
     onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
     onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
   }) => {
     callbacksRef.current = callbacks
-  }
+  }, [])
 
   // 크롤링 상태 초기화
-  const resetCrawlStatus = () => {
+  const resetCrawlStatus = useCallback(() => {
     setMenuProgress(null)
     setCrawlProgress(null)
     setDbProgress(null)
@@ -502,13 +502,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
     lastDbSequenceRef.current = 0 // ✅ Sequence 초기화
     lastImageSequenceRef.current = 0 // ✅ Sequence 초기화
-  }
+  }, [])
 
   // 요약 상태 초기화
-  const resetSummaryStatus = () => {
+  const resetSummaryStatus = useCallback(() => {
     setReviewSummaryStatus({ status: 'idle' })
     setSummaryProgress(null)
-  }
+  }, [])
 
   const value: SocketContextValue = {
     socket: socketRef.current,

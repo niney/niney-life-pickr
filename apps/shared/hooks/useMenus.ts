@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { apiService, type MenuItem, Alert } from '../'
 
 /**
@@ -9,7 +9,7 @@ export const useMenus = () => {
   const [menus, setMenus] = useState<MenuItem[]>([])
   const [menusLoading, setMenusLoading] = useState(false)
 
-  const fetchMenus = async (restaurantId: number) => {
+  const fetchMenus = useCallback(async (restaurantId: number) => {
     setMenusLoading(true)
     try {
       const response = await apiService.getRestaurantById(restaurantId)
@@ -22,11 +22,11 @@ export const useMenus = () => {
     } finally {
       setMenusLoading(false)
     }
-  }
+  }, [])
 
-  const clearMenus = () => {
+  const clearMenus = useCallback(() => {
     setMenus([])
-  }
+  }, [])
 
   return {
     menus,
