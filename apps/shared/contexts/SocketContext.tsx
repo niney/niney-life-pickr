@@ -20,6 +20,7 @@ interface SocketContextValue {
   joinRestaurantRoom: (restaurantId: string) => void
   leaveRestaurantRoom: (restaurantId: string) => void
   setRestaurantCallbacks: (callbacks: {
+    onMenuCrawlCompleted?: (data: { restaurantId: string }) => void
     onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
     onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
     onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
@@ -51,6 +52,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   })
   const [summaryProgress, setSummaryProgress] = useState<SummaryProgress | null>(null)
   const callbacksRef = useRef<{
+    onMenuCrawlCompleted?: (data: { restaurantId: string }) => void
     onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
     onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
     onReviewSummaryCompleted?: (data: { restaurantId: string }) => void
@@ -141,11 +143,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         percentage: data.percentage || 0
       })
 
-      // 100% 완료 시 초기화
+      // 100% 완료 시 초기화 + 콜백 호출
       if (data.percentage === 100 || data.current === data.total) {
         setTimeout(() => {
           setMenuProgress(null)
         }, 1000) // 1초 후 사라짐
+
+        // 메뉴 크롤링 완료 콜백 호출
+        if (callbacksRef.current.onMenuCrawlCompleted) {
+          callbacksRef.current.onMenuCrawlCompleted({
+            restaurantId: data.restaurantId?.toString() || ''
+          })
+        }
       }
     })
 
@@ -447,6 +456,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
   // 콜백 설정 (크롤링 시작 시 호출)
   const setRestaurantCallbacks = (callbacks: {
+    onMenuCrawlCompleted?: (data: { restaurantId: string }) => void
     onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
     onReviewCrawlError?: (data: { restaurantId: string; error: string }) => void
     onReviewSummaryCompleted?: (data: { restaurantId: string }) => void

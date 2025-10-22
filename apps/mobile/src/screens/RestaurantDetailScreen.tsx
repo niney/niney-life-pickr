@@ -226,14 +226,20 @@ const RestaurantDetailScreen: React.FC = () => {
 
     joinRestaurantRoom(restaurantIdStr);
 
-    // 크롤링 완료 시 리뷰 갱신 콜백 설정
+    // 크롤링 완료 시 리뷰/메뉴 갱신 콜백 설정
     setRestaurantCallbacks({
+      onMenuCrawlCompleted: async () => {
+        // 메뉴만 크롤링한 경우 메뉴만 갱신
+        await fetchMenusRef.current(restaurantId);
+
+        // 통계 탭이면 통계도 새로고침
+        if (activeTabRef.current === 'statistics') {
+          await fetchMenuStatisticsRef.current();
+        }
+      },
       onReviewCrawlCompleted: async () => {
         // 리뷰 다시 로드 (shared 훅 사용)
         await fetchReviewsRef.current(restaurantId, 0, false); // offset 0으로 초기화
-
-        // 메뉴도 함께 갱신
-        await fetchMenusRef.current(restaurantId);
 
         // 통계 탭이면 통계도 새로고침
         if (activeTabRef.current === 'statistics') {
@@ -251,7 +257,6 @@ const RestaurantDetailScreen: React.FC = () => {
       },
       onReviewCrawlError: async () => {
         await fetchReviewsRef.current(restaurantId, 0, false);
-        await fetchMenusRef.current(restaurantId);
       }
     });
 

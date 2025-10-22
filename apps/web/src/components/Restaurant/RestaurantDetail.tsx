@@ -81,6 +81,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     changeSearchText,
     menus,
     menusLoading,
+    fetchMenus,
     handleBackToList,
   } = useRestaurantDetail()
 
@@ -105,6 +106,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       setStatisticsLoading(false)
     }
   }, [])
+
+  // Effect Event: 메뉴 크롤링 완료 시 실행할 로직 (non-reactive)
+  const onMenuCrawlCompleted = useEffectEvent(async () => {
+    const restaurantId = parseInt(id!, 10)
+    if (!isNaN(restaurantId)) {
+      await fetchMenus(restaurantId)
+    }
+  })
 
   // Effect Event: 크롤링 완료 시 실행할 로직 (non-reactive)
   const onReviewCrawlCompleted = useEffectEvent(async () => {
@@ -143,8 +152,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
       joinRestaurantRoom(id)
 
-      // 리뷰 크롤링/요약 완료 시 리뷰 재조회
+      // 메뉴/리뷰 크롤링, 요약 완료 시 재조회
       setRestaurantCallbacks({
+        onMenuCrawlCompleted,
         onReviewCrawlCompleted,
         onReviewSummaryCompleted
       })

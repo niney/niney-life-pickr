@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { apiService, type RestaurantCategory, type RestaurantData, Alert } from '../'
 
 export interface RestaurantListHookOptions {
-  onCrawlSuccess?: (restaurant: RestaurantData | null, placeId: string) => void
+  onCrawlSuccess?: (restaurant: RestaurantData | null) => void
   onCrawlError?: (error: string) => void
 }
 
@@ -39,8 +39,8 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     setRestaurantsLoading(true)
     try {
       const response = await apiService.getRestaurants(
-        limit, 
-        offset, 
+        limit,
+        offset,
         selectedCategory || undefined
       )
       if (response.result && response.data) {
@@ -72,7 +72,7 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
       })
 
       if (response.result && response.data) {
-        const placeId = response.data.placeId
+        const restaurantId = response.data.restaurantId
 
         // 목록 갱신
         const updatedRestaurants = await fetchRestaurants()
@@ -81,14 +81,14 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
         // 성공 시 URL 초기화
         setUrl('')
 
-        if (placeId) {
-          // placeId로 레스토랑 찾기
-          const newRestaurant = updatedRestaurants.find(r => r.place_id === placeId) || null
+        if (restaurantId) {
+          // restaurantId로 레스토랑 찾기
+          const newRestaurant = updatedRestaurants.find(r => r.id === restaurantId) || null
 
           // 성공 콜백 호출 (플랫폼별 네비게이션 처리)
-          options?.onCrawlSuccess?.(newRestaurant, placeId)
+          options?.onCrawlSuccess?.(newRestaurant)
         } else {
-          options?.onCrawlSuccess?.(null, '')
+          options?.onCrawlSuccess?.(null)
         }
       } else {
         await fetchRestaurants()
