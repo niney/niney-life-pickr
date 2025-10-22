@@ -30,7 +30,7 @@ const RestaurantListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
-  const { setRestaurantCallbacks, resetCrawlStatus } = useSocket();
+  const { menuProgress, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket();
 
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
@@ -127,11 +127,11 @@ const RestaurantListScreen: React.FC = () => {
     resetCrawlStatus();
 
     setRestaurantCallbacks({
-      onCompleted: async () => {
+      onReviewCrawlCompleted: async () => {
         await fetchRestaurants();
         await fetchCategories();
       },
-      onError: async () => {
+      onReviewCrawlError: async () => {
         await fetchRestaurants();
         await fetchCategories();
       }
@@ -266,6 +266,73 @@ const RestaurantListScreen: React.FC = () => {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
           ) : null}
         </View>
+
+        {/* 크롤링 진행 상황 */}
+        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null) && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링 진행 상황</Text>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+
+            {menuProgress && menuProgress.total > 0 && (
+              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#ffffff' : colors.surface, borderColor: colors.border }]}>
+                <View style={styles.progressHeader}>
+                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
+                  <Text style={[styles.progressValue, { color: colors.text }]}>
+                    {menuProgress.current} / {menuProgress.total}
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[styles.progressBarFill, { width: `${menuProgress.percentage}%`, backgroundColor: '#4caf50' }]}
+                  />
+                </View>
+                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+                  {menuProgress.percentage}%
+                </Text>
+              </View>
+            )}
+
+            {crawlProgress && crawlProgress.total > 0 && (
+              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#ffffff' : colors.surface, borderColor: colors.border }]}>
+                <View style={styles.progressHeader}>
+                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>리뷰 수집</Text>
+                  <Text style={[styles.progressValue, { color: colors.text }]}>
+                    {crawlProgress.current} / {crawlProgress.total}
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%`, backgroundColor: '#2196f3' }]}
+                  />
+                </View>
+                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+                  {crawlProgress.percentage}%
+                </Text>
+              </View>
+            )}
+
+            {dbProgress && dbProgress.total > 0 && (
+              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#ffffff' : colors.surface, borderColor: colors.border }]}>
+                <View style={styles.progressHeader}>
+                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
+                  <Text style={[styles.progressValue, { color: colors.text }]}>
+                    {dbProgress.current} / {dbProgress.total}
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[styles.progressBarFill, { width: `${dbProgress.percentage}%`, backgroundColor: colors.primary }]}
+                  />
+                </View>
+                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+                  {dbProgress.percentage}%
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* 레스토랑 목록 */}
         <View style={styles.section}>
@@ -465,6 +532,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
+  },
+  progressCard: {
+    padding: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressPercentage: {
+    fontSize: 13,
+    textAlign: 'right',
   },
 });
 

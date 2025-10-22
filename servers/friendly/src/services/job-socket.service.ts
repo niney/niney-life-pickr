@@ -11,11 +11,15 @@ import jobRepository from '../db/repositories/job.repository';
 import { getSocketIO } from '../socket/socket';
 import { getSocketEvent, JobEventType, JobEventData } from '../socket/events';
 import { v4 as uuidv4 } from 'uuid';
-import { JobProgress, JobType } from '../types/db.types';
+import { JobType } from '../types/db.types';
 
 export class JobService {
+  // ==================== Socket 이벤트 발행 ====================
+
   /**
-   * Socket 이벤트 발행 (통일된 방식)
+   * Socket 이벤트 발행 (기본)
+   * - 모든 Socket 이벤트는 이 메서드를 통해 발행
+   * - JobType에 매핑된 표준 이벤트명 사용
    */
   private emitSocketEvent(
     type: JobType,
@@ -31,63 +35,124 @@ export class JobService {
   }
 
   /**
+   * Socket 진행률 이벤트 발행 (커스텀 이벤트명)
+   * - 실시간 진행률 전송용 (DB 저장 없음)
+   * - 크롤링/이미지 다운로드 등 커스텀 이벤트명이 필요한 경우 사용
+   * - 내부적으로 Socket.IO 직접 호출 (표준 JobType 이벤트가 아니므로)
+   */
+  emitProgressSocketEvent(
+    jobId: string,
+    restaurantId: number,
+    eventName: string,
+    progress: {
+      current: number;
+      total: number;
+      metadata?: Record<string, any>;
+    }
+  ): void {
+    const percentage = Math.floor((progress.current / progress.total) * 100);
+
+    const eventData: JobEventData = {
+      jobId,
+      type: 'review_crawl', // 커스텀 이벤트이므로 type은 참고용
+      restaurantId,
+      status: 'progress',
+      current: progress.current,
+      total: progress.total,
+      percentage,
+      sequence: progress.current,
+      timestamp: Date.now(),
+      ...progress.metadata
+    };
+
+    // 커스텀 이벤트명으로 Socket 발행
+    const io = getSocketIO();
+    io.to(`restaurant:${restaurantId}`).emit(eventName, eventData);
+  }
+
+  // ==================== Job 생명주기 관리 ====================
+
+  /**
    * START: Job 생성 + Socket 시작 알림
+   * - 기존 Job 확인 및 종료 (중복 방지)
    * - ID 자동 생성 (옵션)
-   * - Memory + DB Job 생성 (모든 타입 동일)
+   * - Memory + DB Job 생성
    * - Socket 이벤트 자동 발행
    */
   async start(params: {
     jobId?: string;
-    type: JobType;
+    type?: JobType;  // 선택적, 기본값 'restaurant_crawl'
     restaurantId: number;
     metadata?: Record<string, any>;
   }): Promise<string> {
+    const type = params.type || 'restaurant_crawl';  // 기본값 설정
+
+    // 0. 기존 Job 확인 및 종료
+    console.log(`[JobService] Restaurant ${params.restaurantId} - 기존 Job 확인 중...`);
+
+    // 0-1. 메모리에서 기존 Job 확인
+    const existingMemoryJob = jobManager.findJobByRestaurantAndType(params.restaurantId, type);
+    if (existingMemoryJob) {
+      console.log(`[JobService] 메모리에서 기존 Job 발견: ${existingMemoryJob.jobId} - 종료 처리`);
+      jobManager.terminateJob(existingMemoryJob.jobId);
+    }
+
+    // 0-2. DB에서 기존 Job 확인
+    const existingDbJob = await jobRepository.findByRestaurantAndType(params.restaurantId, type);
+    if (existingDbJob) {
+      console.log(`[JobService] DB에서 기존 Job 발견: ${existingDbJob.id} - 삭제 예정 (UPSERT)`);
+      // DB는 create() 메서드에서 자동 삭제됨 (UNIQUE 제약 조건 우회)
+    }
+
     // 1. Job ID 생성 (미제공 시 UUID 자동 생성)
     const jobId = params.jobId || uuidv4();
 
-    // 2. 메모리 Job 생성 (모든 타입 동일하게 처리)
+    // 2. 메모리 Job 생성
     jobManager.createJob(jobId, {
-      type: params.type,
+      type,
       restaurantId: params.restaurantId,
       ...(params.metadata || {})
     });
 
-    // 3. DB Job 생성
+    // 3. DB Job 생성 (기존 Job 자동 삭제 후 생성)
     await jobRepository.create({
       id: jobId,
-      type: params.type,
       restaurantId: params.restaurantId,
-      metadata: params.metadata
+      metadata: {
+        type,
+        ...params.metadata
+      }
     });
 
-    console.log(`[JobService] Job 시작 - ID: ${jobId}, Type: ${params.type}`);
+    console.log(`[JobService] Job 시작 - ID: ${jobId}, Type: ${type}, Restaurant: ${params.restaurantId}`);
 
-    // 4. Socket 이벤트 발행 (통일된 데이터 구조)
+    // 4. Socket 이벤트 발행
     const eventData: JobEventData = {
       jobId,
-      type: params.type,
+      type,
       restaurantId: params.restaurantId,
       status: 'started',
       timestamp: Date.now(),
       ...params.metadata
     };
 
-    this.emitSocketEvent(params.type, params.restaurantId, 'started', eventData);
+    this.emitSocketEvent(type, params.restaurantId, 'started', eventData);
 
     return jobId;
   }
 
   /**
-   * PROGRESS: 진행률 업데이트 + Socket 진행 알림
-   * - DB에서 Job 조회하여 type, restaurantId 자동 획득
-   * - Memory + DB 업데이트 (메모리 Job은 항상 존재)
-   * - Socket 이벤트 자동 발행
+   * UPDATE: 메타데이터 업데이트 + Socket 이벤트 (진행률 포함)
+   * - Job의 metadata를 업데이트하고 Socket 이벤트 발행
+   * - DB 저장 없이 Socket 통신만 수행
+   * - 진행률 업데이트에도 사용 가능
+   * 
+   * @deprecated 현재는 start/complete만 사용. 향후 필요 시 사용
    */
-  async progress(
+  async update(
     jobId: string,
-    current: number,
-    total: number,
-    metadata?: Record<string, any>
+    metadata: Record<string, any>,
+    eventType?: 'progress' | 'custom'
   ): Promise<void> {
     // 1. DB에서 Job 조회 (type, restaurantId 획득)
     const dbJob = await jobRepository.findById(jobId);
@@ -96,34 +161,53 @@ export class JobService {
       return;
     }
 
-    const percentage = Math.floor((current / total) * 100);
-    const progress: JobProgress = { current, total, percentage };
+    console.log(`[JobService] Job 업데이트 (Socket만) - ID: ${jobId}`);
 
-    // 2. 메모리 업데이트 (모든 Job이 메모리 Job 보유)
-    jobManager.updateProgress(jobId, current, total);
-
-    // 3. DB 업데이트
-    await jobRepository.updateProgress(jobId, progress);
-
-    console.log(
-      `[JobService] 진행률 업데이트 - ${current}/${total} (${percentage}%)`
-    );
-
-    // 4. Socket 이벤트 발행 (통일된 데이터 구조)
+    // 2. Socket 이벤트 발행
+    const status: JobEventType = eventType === 'progress' ? 'progress' : 'started';
     const eventData: JobEventData = {
       jobId,
       type: dbJob.type,
       restaurantId: dbJob.restaurant_id,
-      status: 'progress',
-      current,
-      total,
-      percentage,
-      sequence: current,
+      status,
       timestamp: Date.now(),
       ...metadata
     };
 
-    this.emitSocketEvent(dbJob.type, dbJob.restaurant_id, 'progress', eventData);
+    this.emitSocketEvent(dbJob.type, dbJob.restaurant_id, status, eventData);
+  }
+
+  /**
+   * PROGRESS: 진행률 업데이트 + Socket 진행 알림
+   * - update() 메서드를 활용하여 진행률 업데이트
+   * - DB 저장 없이 Socket 통신만 수행
+   * 
+   * @deprecated 현재는 start/complete만 사용. 향후 필요 시 사용
+   */
+  async progress(
+    jobId: string,
+    current: number,
+    total: number,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    const percentage = Math.floor((current / total) * 100);
+
+    console.log(
+      `[JobService] 진행률 업데이트 (Socket만) - ${current}/${total} (${percentage}%)`
+    );
+
+    // update() 메서드를 사용하여 진행률 Socket 이벤트 발행
+    await this.update(
+      jobId,
+      {
+        current,
+        total,
+        percentage,
+        sequence: current,
+        ...metadata
+      },
+      'progress'
+    );
   }
 
   /**
@@ -275,40 +359,6 @@ export class JobService {
    */
   async findActiveJobsByRestaurant(restaurantId: number) {
     return jobRepository.findActiveByRestaurant(restaurantId);
-  }
-
-  /**
-   * Socket 진행률 이벤트만 발행 (DB 저장 없음)
-   * - 크롤링 진행률처럼 실시간 업데이트만 필요한 경우 사용
-   * - DB 업데이트 없이 Socket 이벤트만 전송
-   */
-  emitProgressSocketEvent(
-    jobId: string,
-    restaurantId: number,
-    eventName: string,
-    progress: {
-      current: number;
-      total: number;
-      metadata?: Record<string, any>;
-    }
-  ): void {
-    const io = getSocketIO();
-    const percentage = Math.floor((progress.current / progress.total) * 100);
-
-    const eventData: JobEventData = {
-      jobId,
-      type: 'review_crawl', // 타입은 필요에 따라 조정 가능
-      restaurantId,
-      status: 'progress',
-      current: progress.current,
-      total: progress.total,
-      percentage,
-      sequence: progress.current,
-      timestamp: Date.now(),
-      ...progress.metadata
-    };
-
-    io.to(`restaurant:${restaurantId}`).emit(eventName, eventData);
   }
 
   // ==================== Job Chain ====================

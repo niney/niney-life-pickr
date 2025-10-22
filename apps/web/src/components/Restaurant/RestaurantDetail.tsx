@@ -21,7 +21,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     joinRestaurantRoom,
     leaveRestaurantRoom,
     setRestaurantCallbacks,
-    reviewCrawlStatus,
+    menuProgress,
     crawlProgress,
     dbProgress,
     imageProgress,
@@ -228,8 +228,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     }
   }, [isMobile, handleLoadMore])
 
-  // 크롤링 중인지 체크
-  const isCrawling = reviewCrawlStatus.status === 'active'
+  // 크롤링 중인지 체크 (진행률이 하나라도 있으면 크롤링 중)
+  const isCrawling = menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null
   const isSummarizing = reviewSummaryStatus.status === 'active'
 
   // 핵심 키워드 토글 함수
@@ -390,8 +390,30 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       {isCrawling && (
         <View style={[styles.crawlProgressContainer, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
-            🔄 리뷰 크롤링 중...
+            🔄 크롤링 중...
           </Text>
+
+          {menuProgress && menuProgress.total > 0 && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressInfo}>
+                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
+                <Text style={[styles.progressText, { color: colors.text }]}>
+                  {menuProgress.current} / {menuProgress.total} ({menuProgress.percentage}%)
+                </Text>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      backgroundColor: '#4caf50',
+                      width: `${menuProgress.percentage}%`
+                    }
+                  ]}
+                />
+              </View>
+            </View>
+          )}
 
           {crawlProgress && (
             <View style={styles.progressSection}>
@@ -406,7 +428,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   style={[
                     styles.progressBarFill,
                     {
-                      backgroundColor: colors.primary,
+                      backgroundColor: '#2196f3',
                       width: `${crawlProgress.percentage}%`
                     }
                   ]}
@@ -450,7 +472,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   style={[
                     styles.progressBarFill,
                     {
-                      backgroundColor: '#4caf50',
+                      backgroundColor: colors.primary,
                       width: `${dbProgress.percentage}%`
                     }
                   ]}

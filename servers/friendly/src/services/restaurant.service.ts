@@ -2,8 +2,8 @@ import naverCrawlerService from './naver-crawler.service';
 import restaurantRepository from '../db/repositories/restaurant.repository';
 import { RestaurantInput, MenuInput } from '../types/db.types';
 import { RestaurantInfo, MenuItem } from '../types/crawler.types';
-import reviewCrawlerProcessor from './review-crawler-processor.service';
 import { normalizeMenuItems } from './menu-normalization.service';
+import { SOCKET_EVENTS } from '../socket/events';
 
 /**
  * Restaurant Service
@@ -49,11 +49,129 @@ export class RestaurantService {
   }
 
   /**
+   * 레스토랑 정보만 크롤링 (DB 저장 제외)
+   * 신규 크롤링 1단계용
+   */
+  async crawlRestaurantInfo(url: string): Promise<{
+    success: boolean;
+    data?: RestaurantInfo;
+    error?: string;
+  }> {
+    try {
+      console.log('[RestaurantService] 레스토랑 정보 크롤링 시작:', url);
+      
+      const restaurantInfo = await naverCrawlerService.crawlRestaurant(url, {
+        crawlMenus: true,
+        crawlReviews: false
+      });
+
+      return {
+        success: true,
+        data: restaurantInfo
+      };
+    } catch (error) {
+      console.error('[RestaurantService] 크롤링 실패:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Crawling failed'
+      };
+    }
+  }
+
+  /**
+   * 레스토랑 + 메뉴 DB 저장
+   * 신규 크롤링 2단계용
+   * @param restaurantInfo 레스토랑 정보
+   * @param jobId Job ID (Socket 통신용, 선택적)
+   */
+  async saveRestaurantAndMenus(
+    restaurantInfo: RestaurantInfo,
+    jobId?: string
+  ): Promise<{
+    restaurantId: number;
+    menusCount: number;
+  }> {
+    if (!restaurantInfo.placeId) {
+      throw new Error('Missing placeId - cannot save to database');
+    }
+
+    console.log('[RestaurantService] DB 저장 시작:', restaurantInfo.placeId);
+
+    // 1. 음식점 정보 UPSERT
+    const restaurantInput = this.convertToRestaurantInput(restaurantInfo);
+    const restaurantId = await restaurantRepository.upsertRestaurant(restaurantInput);
+
+    // Socket 통신: AI 정규화 시작
+    const menuItems = restaurantInfo.menuItems || [];
+    if (jobId && menuItems.length > 0) {
+      const jobService = await import('./job-socket.service');
+      jobService.default.emitProgressSocketEvent(
+        jobId,
+        restaurantId,
+        SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
+        {
+          current: 2,
+          total: 3,
+          metadata: {
+            step: 'menu',
+            substep: 'normalizing',
+            menusCount: menuItems.length
+          }
+        }
+      );
+    }
+
+    // 2. 메뉴 저장 (AI 정규화 포함)
+    let menusCount = 0;
+    if (menuItems.length > 0) {
+      console.log(`[RestaurantService] AI로 ${menuItems.length}개 메뉴 정규화 중...`);
+      const normalizedMenuItems = await normalizeMenuItems(menuItems, true);
+
+      // Socket 통신: DB 저장 시작
+      if (jobId) {
+        const jobService = await import('./job-socket.service');
+        jobService.default.emitProgressSocketEvent(
+          jobId,
+          restaurantId,
+          SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
+          {
+            current: 3,
+            total: 3,
+            metadata: {
+              step: 'menu',
+              substep: 'saving',
+              menusCount: normalizedMenuItems.length
+            }
+          }
+        );
+      }
+      
+      const menuInputs = this.convertToMenuInputs(restaurantId, normalizedMenuItems);
+      await restaurantRepository.saveMenus(restaurantId, menuInputs);
+      menusCount = menuInputs.length;
+      console.log(`[RestaurantService] 메뉴 ${menusCount}개 저장 완료 (정규화 포함)`);
+    }
+
+    console.log('[RestaurantService] DB 저장 완료:', restaurantId);
+
+    return {
+      restaurantId,
+      menusCount
+    };
+  }
+
+  /**
    * 메뉴만 재크롤링 (Job Chain용)
    * @param url 네이버맵 URL
+   * @param restaurantId 레스토랑 ID (선택적)
+   * @param jobId Job ID (Socket 통신용, 선택적)
    * @returns 크롤링 결과
    */
-  async crawlAndSaveMenusOnly(url: string): Promise<{
+  async crawlAndSaveMenusOnly(
+    url: string,
+    restaurantId?: number,
+    jobId?: string
+  ): Promise<{
     savedToDb: boolean;
     restaurantId?: number;
     menusCount: number;
@@ -61,6 +179,25 @@ export class RestaurantService {
   }> {
     try {
       console.log('[RestaurantService] 메뉴 크롤링 시작:', url);
+
+      // Socket 통신: 1단계 - 크롤링 시작
+      if (jobId && restaurantId) {
+        const jobService = await import('./job-socket.service');
+        jobService.default.emitProgressSocketEvent(
+          jobId,
+          restaurantId,
+          SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
+          {
+            current: 1,
+            total: 4,
+            metadata: {
+              step: 'menu',
+              substep: 'fetching',
+              url
+            }
+          }
+        );
+      }
 
       // 1. 레스토랑 정보 + 메뉴 크롤링 (리뷰 제외)
       const restaurantInfo = await naverCrawlerService.crawlRestaurant(url, {
@@ -83,26 +220,85 @@ export class RestaurantService {
 
         // 2-1. 음식점 정보 UPSERT
         const restaurantInput = this.convertToRestaurantInput(restaurantInfo);
-        const restaurantId = await restaurantRepository.upsertRestaurant(restaurantInput);
+        const savedRestaurantId = await restaurantRepository.upsertRestaurant(restaurantInput);
+
+        // Socket 통신: 2단계 - AI 정규화 시작
+        const menuItems = restaurantInfo.menuItems || [];
+        if (jobId && restaurantId) {
+          const jobService = await import('./job-socket.service');
+          jobService.default.emitProgressSocketEvent(
+            jobId,
+            restaurantId,
+            SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
+            {
+              current: 2,
+              total: 4,
+              metadata: {
+                step: 'menu',
+                substep: 'normalizing',
+                menusCount: menuItems.length
+              }
+            }
+          );
+        }
 
         // 2-2. 메뉴 저장 (있는 경우)
         let menusCount = 0;
-        if (restaurantInfo.menuItems && restaurantInfo.menuItems.length > 0) {
+        if (menuItems.length > 0) {
           // AI로 메뉴 정규화 (normalized_name 추가)
-          console.log(`[RestaurantService] AI로 ${restaurantInfo.menuItems.length}개 메뉴 정규화 중...`);
-          const normalizedMenuItems = await normalizeMenuItems(restaurantInfo.menuItems, true); // true = Cloud 우선 (실패 시 Local)
+          console.log(`[RestaurantService] AI로 ${menuItems.length}개 메뉴 정규화 중...`);
+          const normalizedMenuItems = await normalizeMenuItems(menuItems, true); // true = Cloud 우선 (실패 시 Local)
 
-          const menuInputs = this.convertToMenuInputs(restaurantId, normalizedMenuItems);
-          await restaurantRepository.saveMenus(restaurantId, menuInputs);
+          // Socket 통신: 3단계 - DB 저장 시작
+          if (jobId && restaurantId) {
+            const jobService = await import('./job-socket.service');
+            jobService.default.emitProgressSocketEvent(
+              jobId,
+              restaurantId,
+              SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
+              {
+                current: 3,
+                total: 4,
+                metadata: {
+                  step: 'menu',
+                  substep: 'saving',
+                  menusCount: normalizedMenuItems.length
+                }
+              }
+            );
+          }
+
+          const menuInputs = this.convertToMenuInputs(savedRestaurantId, normalizedMenuItems);
+          await restaurantRepository.saveMenus(savedRestaurantId, menuInputs);
           menusCount = menuInputs.length;
           console.log(`[RestaurantService] 메뉴 ${menusCount}개 저장 완료 (정규화 포함)`);
         }
 
-        console.log('[RestaurantService] 메뉴 DB 저장 완료:', restaurantId);
+        console.log('[RestaurantService] 메뉴 DB 저장 완료:', savedRestaurantId);
+
+        // Socket 통신: 4단계 - 완료
+        if (jobId && restaurantId) {
+          const jobService = await import('./job-socket.service');
+          jobService.default.emitProgressSocketEvent(
+            jobId,
+            restaurantId,
+            SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
+            {
+              current: 4,
+              total: 4,
+              metadata: {
+                step: 'menu',
+                substep: 'completed',
+                menusCount,
+                restaurantId: savedRestaurantId
+              }
+            }
+          );
+        }
 
         return {
           savedToDb: true,
-          restaurantId,
+          restaurantId: savedRestaurantId,
           menusCount
         };
       } catch (dbError) {
@@ -171,49 +367,8 @@ export class RestaurantService {
 
         console.log('[RestaurantService] DB 저장 완료:', restaurantId);
 
-        // 3. 리뷰 크롤링 시작 (옵션이 true인 경우)
-        if (options.crawlReviews && restaurantInfo.placeId) {
-          try {
-            // 리뷰 URL 생성
-            const reviewUrl = `https://m.place.naver.com/restaurant/${restaurantInfo.placeId}/review/visitor?reviewSort=recent`;
-
-            console.log('[RestaurantService] 리뷰 크롤링 Job 시작 (요약 포함)');
-
-            // 백그라운드로 리뷰 크롤링 시작 (Job ID는 자동 생성, 요약 자동 시작)
-            reviewCrawlerProcessor.processWithSummary(restaurantInfo.placeId, reviewUrl, restaurantId)
-              .catch(err => console.error('[RestaurantService] 리뷰 크롤링 에러:', err));
-
-            console.log('[RestaurantService] 리뷰 크롤링 백그라운드 시작됨 (요약 포함)');
-          } catch (reviewError) {
-            console.error('[RestaurantService] 리뷰 크롤링 Job 생성 실패:', reviewError);
-            // 리뷰 크롤링 실패해도 레스토랑 크롤링은 성공으로 처리
-          }
-        }
-
-        // 4. 리뷰 요약 생성 (옵션이 true인 경우)
-        if (options.createSummary && restaurantId) {
-          try {
-            // resetSummary 옵션이 true면 기존 요약 먼저 삭제
-            if (options.resetSummary) {
-              console.log(`[RestaurantService] 레스토랑 ${restaurantId} 기존 요약 삭제 중...`);
-              const reviewSummaryRepository = await import('../db/repositories/review-summary.repository');
-              await reviewSummaryRepository.default.deleteByRestaurantId(restaurantId);
-              console.log(`[RestaurantService] 기존 요약 삭제 완료`);
-            }
-
-            console.log(`[RestaurantService] 레스토랑 ${restaurantId} 리뷰 요약 생성 시작`);
-            const reviewSummaryProcessor = await import('./review-summary-processor.service');
-            reviewSummaryProcessor.default.processIncompleteReviews(
-              restaurantId,
-              true // useCloud
-            ).catch(err => {
-              console.error(`[RestaurantService] 레스토랑 ${restaurantId} 요약 생성 오류:`, err);
-            });
-          } catch (summaryError) {
-            console.error('[RestaurantService] 리뷰 요약 생성 실패:', summaryError);
-            // 요약 생성 실패해도 레스토랑 크롤링은 성공으로 처리
-          }
-        }
+        // ⚠️ 리뷰/요약 자동 시작 로직 제거
+        // API 레벨에서 Job으로 관리하도록 변경됨
 
         return {
           restaurantInfo,

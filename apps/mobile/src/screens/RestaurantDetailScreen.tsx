@@ -43,7 +43,7 @@ const RestaurantDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   const {
-    reviewCrawlStatus,
+    menuProgress,
     crawlProgress,
     dbProgress,
     imageProgress,
@@ -55,6 +55,9 @@ const RestaurantDetailScreen: React.FC = () => {
     resetCrawlStatus,
     resetSummaryStatus
   } = useSocket();
+
+  // 크롤링 중인지 체크
+  const isCrawling = menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null;
 
   // 레스토랑 정보 섹션 높이 추적
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -257,15 +260,22 @@ const RestaurantDetailScreen: React.FC = () => {
     };
   }, [restaurantId]);
 
-  // 크롤링 완료 후 3초 뒤 상태 초기화
+  // 크롤링 완료 후 3초 뒤 상태 초기화 (진행률이 모두 null이 되면 완료로 간주)
   useEffect(() => {
-    if (reviewCrawlStatus.status === 'completed') {
+    // 이전에 크롤링 중이었는데 지금 아니면 완료된 것
+    const wasCrawling = useRef(false);
+    
+    if (isCrawling) {
+      wasCrawling.current = true;
+    } else if (wasCrawling.current) {
+      // 크롤링이 완료됨
       const timer = setTimeout(() => {
         resetCrawlStatus();
+        wasCrawling.current = false;
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [reviewCrawlStatus.status]);
+  }, [isCrawling, resetCrawlStatus]);
 
   // 요약 완료 후 3초 뒤 상태 초기화
   useEffect(() => {
@@ -516,12 +526,34 @@ const RestaurantDetailScreen: React.FC = () => {
           </View>
 
           {/* 크롤링 진행 상태 */}
-          {reviewCrawlStatus.status === 'active' && (
+          {isCrawling && (
             <View style={styles.crawlProgressContainer}>
               <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
                 <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
-                  🔄 리뷰 크롤링 중...
+                  🔄 크롤링 중...
                 </Text>
+
+                {menuProgress && menuProgress.total > 0 && (
+                  <View style={styles.progressSection}>
+                    <View style={styles.progressInfo}>
+                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
+                      <Text style={[styles.progressText, { color: colors.text }]}>
+                        {menuProgress.current} / {menuProgress.total} ({menuProgress.percentage}%)
+                      </Text>
+                    </View>
+                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            backgroundColor: '#4caf50',
+                            width: `${menuProgress.percentage}%`
+                          }
+                        ]}
+                      />
+                    </View>
+                  </View>
+                )}
 
                 {crawlProgress && (
                   <View style={styles.progressSection}>
@@ -536,7 +568,7 @@ const RestaurantDetailScreen: React.FC = () => {
                         style={[
                           styles.progressBarFill,
                           {
-                            backgroundColor: colors.primary,
+                            backgroundColor: '#2196f3',
                             width: `${crawlProgress.percentage}%`
                           }
                         ]}
@@ -580,7 +612,7 @@ const RestaurantDetailScreen: React.FC = () => {
                         style={[
                           styles.progressBarFill,
                           {
-                            backgroundColor: '#4caf50',
+                            backgroundColor: colors.primary,
                             width: `${dbProgress.percentage}%`
                           }
                         ]}

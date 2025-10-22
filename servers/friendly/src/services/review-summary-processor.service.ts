@@ -7,88 +7,76 @@ import jobService from './job-socket.service';
 import reviewRepository from '../db/repositories/review.repository';
 import reviewSummaryRepository from '../db/repositories/review-summary.repository';
 import { createReviewSummaryService } from './review-summary.service';
+import { SOCKET_EVENTS } from '../socket/events';
 import type { ReviewDB } from '../types/db.types';
 import type { BaseOllamaConfig } from './ollama/ollama.types';
 
 export class ReviewSummaryProcessor {
   
   /**
-   * 레스토랑의 미완료 요약 처리 (JobService 통합)
-   * - 리뷰 ID와 요약 ID 비교하여 차이분만 처리
-   * - pending 데이터를 1000개씩 페이지네이션으로 처리
-   * - JobService를 통한 DB 저장 + Socket 이벤트 자동 발행
+   * 레스토랑의 미완료 요약 처리 (외부 Job ID 사용)
+   * - 외부에서 생성한 Job ID로 요약 실행
+   * - Job 생명주기는 외부에서 관리 (complete/error는 orchestrator가 처리)
    */
-  async processIncompleteReviews(
+  async processWithJobId(
+    jobId: string,
     restaurantId: number,
     useCloud: boolean = false
-  ): Promise<string> {
-    console.log(`🤖 레스토랑 ${restaurantId} 미완료 요약 처리 시작...`);
+  ): Promise<{ completed: number; failed: number; totalIncomplete: number }> {
+    console.log(`🤖 레스토랑 ${restaurantId} 미완료 요약 처리 시작 [Job ${jobId}]...`);
     
-    let jobId: string | null = null;
+    // 1. 리뷰 ID 목록과 요약 review_id 목록 조회
+    console.log(`📊 리뷰 및 요약 ID 목록 조회 중...`);
+    const [reviewIds, summaryReviewIds] = await Promise.all([
+      reviewRepository.findIdsByRestaurantId(restaurantId),
+      reviewSummaryRepository.findReviewIdsByRestaurantId(restaurantId)
+    ]);
     
-    try {
-      // 1. 리뷰 ID 목록과 요약 review_id 목록 조회 (효율적)
-      console.log(`📊 리뷰 및 요약 ID 목록 조회 중...`);
-      const [reviewIds, summaryReviewIds] = await Promise.all([
-        reviewRepository.findIdsByRestaurantId(restaurantId),
-        reviewSummaryRepository.findReviewIdsByRestaurantId(restaurantId)
-      ]);
-      
-      console.log(`📊 리뷰 개수: ${reviewIds.length}, 요약 개수: ${summaryReviewIds.length}`);
+    console.log(`📊 리뷰 개수: ${reviewIds.length}, 요약 개수: ${summaryReviewIds.length}`);
 
-      // 2. ID 차이 분석 (Set을 사용한 효율적인 비교)
-      const reviewIdSet = new Set(reviewIds);
-      const summaryReviewIdSet = new Set(summaryReviewIds);
-      
-      // 리뷰에만 있는 ID (요약 생성 필요)
-      const reviewIdsToCreate = reviewIds.filter(id => !summaryReviewIdSet.has(id));
-      
-      // 요약에만 있는 ID (삭제 필요 - 리뷰가 없는 요약)
-      const reviewIdsToDelete = summaryReviewIds.filter(id => !reviewIdSet.has(id));
-      
-      console.log(`🔍 생성 필요: ${reviewIdsToCreate.length}개, 삭제 필요: ${reviewIdsToDelete.length}개`);
+    // 2. ID 차이 분석
+    const reviewIdSet = new Set(reviewIds);
+    const summaryReviewIdSet = new Set(summaryReviewIds);
+    
+    const reviewIdsToCreate = reviewIds.filter(id => !summaryReviewIdSet.has(id));
+    const reviewIdsToDelete = summaryReviewIds.filter(id => !reviewIdSet.has(id));
+    
+    console.log(`🔍 생성 필요: ${reviewIdsToCreate.length}개, 삭제 필요: ${reviewIdsToDelete.length}개`);
 
-      // 3. 불필요한 요약 삭제
-      if (reviewIdsToDelete.length > 0) {
-        console.log(`🗑️  ${reviewIdsToDelete.length}개 요약 삭제 중...`);
-        await reviewSummaryRepository.deleteBatchByReviewIds(reviewIdsToDelete);
-        console.log(`✅ 삭제 완료`);
-      }
+    // 3. 불필요한 요약 삭제
+    if (reviewIdsToDelete.length > 0) {
+      console.log(`🗑️  ${reviewIdsToDelete.length}개 요약 삭제 중...`);
+      await reviewSummaryRepository.deleteBatchByReviewIds(reviewIdsToDelete);
+      console.log(`✅ 삭제 완료`);
+    }
 
-      // 4. 필요한 pending 레코드 일괄 생성
-      if (reviewIdsToCreate.length > 0) {
-        console.log(`📝 ${reviewIdsToCreate.length}개 pending 레코드 생성 중...`);
-        await reviewSummaryRepository.createBatch(restaurantId, reviewIdsToCreate);
-        console.log(`✅ 생성 완료`);
-      }
+    // 4. 필요한 pending 레코드 일괄 생성
+    if (reviewIdsToCreate.length > 0) {
+      console.log(`📝 ${reviewIdsToCreate.length}개 pending 레코드 생성 중...`);
+      await reviewSummaryRepository.createBatch(restaurantId, reviewIdsToCreate);
+      console.log(`✅ 생성 완료`);
+    }
 
-      // 5. AI 서비스 준비
-      const summaryService = createReviewSummaryService(useCloud);
-      await summaryService.ensureReady();
-      
-      const serviceType = summaryService.getCurrentServiceType();
-      
-      // 전체 미완료 개수 조회
-      const totalIncomplete = await reviewSummaryRepository.countIncompleteByRestaurant(restaurantId);
-      
-      if (totalIncomplete === 0) {
-        console.log('✅ 모든 요약이 완료되었습니다.');
-        // Job 없이 종료 (처리할 것이 없음)
-        throw new Error('NO_INCOMPLETE_REVIEWS');
-      }
+    // 5. AI 서비스 준비
+    const summaryService = createReviewSummaryService(useCloud);
+    await summaryService.ensureReady();
+    
+    const serviceType = summaryService.getCurrentServiceType();
+    
+    // 전체 미완료 개수 조회
+    const totalIncomplete = await reviewSummaryRepository.countIncompleteByRestaurant(restaurantId);
+    
+    if (totalIncomplete === 0) {
+      console.log('✅ 모든 요약이 완료되었습니다.');
+      return {
+        totalIncomplete: 0,
+        completed: 0,
+        failed: 0
+      };
+    }
       
       console.log(`🔄 총 ${totalIncomplete}개 미완료 요약 처리 시작`);
       console.log(`🤖 ${serviceType.toUpperCase()} AI 사용`);
-
-      // Job 시작 (DB 저장 + Socket 이벤트 자동 발행)
-      jobId = await jobService.start({
-        type: 'review_summary',
-        restaurantId,
-        metadata: {
-          total: totalIncomplete,
-          serviceType
-        }
-      });
 
       const globalStartTime = Date.now();
       let globalCompletedCount = 0;
@@ -125,10 +113,11 @@ export class ReviewSummaryProcessor {
       
       if (allReviews.length === 0) {
         console.log('⚠️ 처리할 리뷰가 없습니다.');
-        if (jobId) {
-          await jobService.complete(jobId, { message: '처리할 리뷰 없음' });
-        }
-        throw new Error('NO_REVIEWS_TO_PROCESS');
+        return {
+          totalIncomplete: 0,
+          completed: 0,
+          failed: 0
+        };
       }
       
       console.log(`✅ 총 ${allReviews.length}개 리뷰 데이터 조회 완료`);
@@ -161,57 +150,36 @@ export class ReviewSummaryProcessor {
               globalFailedCount += batchResults.length;
             });
             
-            processedCount = batchEndIndex;
+            processedCount += batchResults.length;
           }
           
-          // JobService를 통한 진행률 업데이트 (DB 저장 + Socket 이벤트 자동 발행)
-          if (jobId) {
-            await jobService.progress(jobId, current, total, {
-              completed: globalCompletedCount,
-              failed: globalFailedCount
-            });
-          }
+          // Socket 진행률 업데이트 (Socket 이벤트만, DB 저장 없음)
+          jobService.emitProgressSocketEvent(
+            jobId,
+            restaurantId,
+            SOCKET_EVENTS.REVIEW_SUMMARY_PROGRESS,
+            {
+              current,
+              total,
+              metadata: {
+                serviceType,
+                succeeded: globalCompletedCount,
+                failed: globalFailedCount
+              }
+            }
+          );
         }
       );
       
-      // 저장 완료 대기
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // 9. 최종 완료
-      const globalElapsed = Date.now() - globalStartTime;
-      console.log(`\n✅ 전체 처리 완료 (${(globalElapsed / 1000).toFixed(2)}초)`);
-      console.log(`   성공: ${globalCompletedCount}개, 실패: ${globalFailedCount}개`);
+      const duration = Date.now() - globalStartTime;
+      console.log(`✅ 전체 처리 완료! 성공: ${globalCompletedCount}개, 실패: ${globalFailedCount}개 (소요: ${(duration / 1000).toFixed(1)}초)`);
       
-      // JobService를 통한 완료 처리 (DB 저장 + Socket 이벤트 자동 발행)
-      if (jobId) {
-        await jobService.complete(jobId, {
-          total: allReviews.length,
-          completed: globalCompletedCount,
-          failed: globalFailedCount,
-          elapsed: Math.floor(globalElapsed / 1000)
-        });
-      }
-
-      return jobId!;
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      // NO_INCOMPLETE_REVIEWS, NO_REVIEWS_TO_PROCESS는 에러가 아님
-      if (errorMessage === 'NO_INCOMPLETE_REVIEWS' || errorMessage === 'NO_REVIEWS_TO_PROCESS') {
-        console.log('✅ 처리할 항목 없음');
-        return jobId || 'NO_JOB';
-      }
-      
-      console.error('❌ 요약 처리 중 오류:', errorMessage);
-      
-      // JobService를 통한 에러 처리 (DB 저장 + Socket 이벤트 자동 발행)
-      if (jobId) {
-        await jobService.error(jobId, errorMessage);
-      }
-      
-      throw error;
-    }
+      // 결과 반환 (Job 생명주기는 orchestrator가 관리)
+      return {
+        totalIncomplete,
+        completed: globalCompletedCount,
+        failed: globalFailedCount
+      };
   }
 
   /**
@@ -328,11 +296,14 @@ export class ReviewSummaryProcessor {
 
   /**
    * 전체 미완료 요약 처리 (모든 레스토랑)
+   * ⚠️ Deprecated: API 레벨에서 Job으로 관리하도록 변경됨
+   * 대신 processWithJobId()를 사용하세요
    */
   async processAllIncomplete(useCloud: boolean = false): Promise<void> {
     const allIncomplete = await reviewSummaryRepository.findIncomplete();
     
     console.log(`🌍 전체 미완료 요약 ${allIncomplete.length}개 처리 시작...`);
+    console.warn('⚠️ processAllIncomplete()는 Deprecated 되었습니다. processWithJobId()를 사용하세요.');
     
     // 레스토랑별로 그룹핑 (restaurant_id를 직접 사용)
     const byRestaurant = new Map<number, number[]>();
@@ -344,10 +315,21 @@ export class ReviewSummaryProcessor {
       byRestaurant.get(summary.restaurant_id)!.push(summary.review_id);
     }
     
-    // 레스토랑별 처리
+    // 레스토랑별 처리 (각각 Job 생성)
     for (const [restaurantId, reviewIds] of byRestaurant.entries()) {
       console.log(`\n📍 레스토랑 ${restaurantId}: ${reviewIds.length}개 미완료`);
-      await this.processIncompleteReviews(restaurantId, useCloud);
+      
+      // Job 생성 후 processWithJobId 사용
+      const jobService = await import('./job-socket.service');
+      const jobId = await jobService.default.start({
+        restaurantId,
+        metadata: {
+          step: 'started',
+          total: reviewIds.length
+        }
+      });
+      
+      await this.processWithJobId(jobId, restaurantId, useCloud);
     }
     
     console.log('\n🎉 전체 처리 완료!');

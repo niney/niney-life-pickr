@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faRotate, faTimes } from '@fortawesome/free-solid-svg-icons'
-import { useTheme, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData, type ReviewCrawlStatus } from '@shared'
+import { useTheme, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData } from '@shared'
 import { useLocation } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
 
@@ -25,7 +25,7 @@ interface RestaurantListProps {
   total: number
   selectedCategory: string | null
   setSelectedCategory: (category: string | null) => void
-  reviewCrawlStatus: ReviewCrawlStatus
+  menuProgress: { current: number; total: number; percentage: number } | null
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
   handleCrawl: () => Promise<void>
@@ -44,7 +44,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   total,
   selectedCategory,
   setSelectedCategory,
-  reviewCrawlStatus,
+  menuProgress,
   crawlProgress,
   dbProgress,
   handleCrawl,
@@ -93,11 +93,10 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     try {
       const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options)
       
-      if (response.result) {
-        Alert.success('재크롤링 시작', '선택하신 항목의 크롤링이 시작되었습니다')
-      } else {
+      if (!response.result) {
         Alert.error('재크롤링 실패', response.message || '재크롤링에 실패했습니다')
       }
+      // 성공 시 alert 제거 (백그라운드 실행)
     } catch (error) {
       console.error('재크롤링 오류:', error)
       Alert.error('재크롤링 오류', '재크롤링 중 오류가 발생했습니다')
@@ -201,12 +200,31 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         </View>
 
         {/* 크롤링 진행 상황 */}
-        {reviewCrawlStatus.status !== 'idle' && (
+        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null) && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링 진행 상황</Text>
-              {reviewCrawlStatus.status === 'active' && <ActivityIndicator size="small" color={colors.primary} />}
+              <ActivityIndicator size="small" color={colors.primary} />
             </View>
+            
+            {menuProgress && menuProgress.total > 0 && (
+              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+                <View style={styles.progressHeader}>
+                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
+                  <Text style={[styles.progressValue, { color: colors.text }]}>
+                    {menuProgress.current} / {menuProgress.total}
+                  </Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[styles.progressBarFill, { width: `${menuProgress.percentage}%`, backgroundColor: '#4caf50' }]}
+                  />
+                </View>
+                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+                  {menuProgress.percentage}%
+                </Text>
+              </View>
+            )}
 
             {crawlProgress && crawlProgress.total > 0 && (
               <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
@@ -243,17 +261,6 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                 <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
                   {dbProgress.percentage}%
                 </Text>
-              </View>
-            )}
-
-            {reviewCrawlStatus.status === 'completed' && (
-              <View style={[styles.statusCard, { backgroundColor: '#d4edda', borderColor: '#c3e6cb' }]}>
-                <Text style={[styles.statusText, { color: '#155724' }]}>✓ 크롤링 완료</Text>
-              </View>
-            )}
-            {reviewCrawlStatus.status === 'failed' && (
-              <View style={[styles.statusCard, { backgroundColor: '#f8d7da', borderColor: '#f5c6cb' }]}>
-                <Text style={[styles.statusText, { color: '#721c24' }]}>✗ {reviewCrawlStatus.error || '크롤링 실패'}</Text>
               </View>
             )}
           </View>

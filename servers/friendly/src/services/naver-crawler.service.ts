@@ -553,13 +553,13 @@ class NaverCrawlerService {
               // 메뉴 이미지 URL 추출
               let imageUrl: string | null = null;
               const imageElement = element.querySelector('.place_thumb img, .YBmM2 img, img.K0PDV');
-              
+
               if (imageElement) {
                 // src 또는 data-src 속성 확인 (lazy loading 대응)
-                imageUrl = imageElement.getAttribute('src') || 
+                imageUrl = imageElement.getAttribute('src') ||
                            imageElement.getAttribute('data-src') ||
                            null;
-                
+
                 // http로 시작하는 유효한 URL만 사용
                 if (imageUrl && !imageUrl.startsWith('http')) {
                   imageUrl = null;
@@ -591,16 +591,16 @@ class NaverCrawlerService {
           // 메뉴 이미지 다운로드 (placeId가 있는 경우)
           if (placeId && menuItems.length > 0) {
             const menusWithImages = menuItems.filter(m => m.imageUrl).length;
-            
+
             if (menusWithImages > 0) {
               console.log(`메뉴 이미지 다운로드 시작... (${menusWithImages}개)`);
-              
+
               let downloadedCount = 0;
               let failedCount = 0;
 
               for (let i = 0; i < menuItems.length; i++) {
                 const menu = menuItems[i];
-                
+
                 if (menu.imageUrl) {
                   try {
                     const localPath = await imageDownloader.downloadMenuImage(
@@ -931,16 +931,16 @@ class NaverCrawlerService {
       // 🔥 스크롤 기반 이미지 로딩 (옵션 활성화 시)
       if (enableScrollForImages) {
         console.log('📸 스크롤 기반 이미지 로딩 시작...');
-        
+
         const totalScrollItems = await page.evaluate(() => {
           return document.querySelectorAll('#_review_list li.place_apply_pui').length;
         });
-        
+
         // 브라우저 컨텍스트에 진행 상태를 저장할 변수 설정
         await page.evaluate(() => {
           (window as any).__scrollProgress = 0;
         });
-        
+
         // 스크롤 작업 시작 (비동기) - Skip + 검증 방식
         const scrollPromise = page.evaluate(() => {
           return new Promise<void>((resolve) => {
@@ -1015,30 +1015,23 @@ class NaverCrawlerService {
             scrollToNext();
           });
         });
-        
+
         // 스크롤 진행률 모니터링 (1초마다 체크)
         const progressInterval = setInterval(async () => {
           try {
             if (!page) return;
             const currentProgress = await page.evaluate(() => (window as any).__scrollProgress);
             if (onImageProgress && currentProgress > 0) {
-              onImageProgress(currentProgress, totalScrollItems);
               console.log(`📸 스크롤 진행률: ${currentProgress}/${totalScrollItems}`);
             }
           } catch (error) {
             // 페이지가 닫혔거나 오류 발생 시 무시
           }
         }, 1000);
-        
+
         // 스크롤 작업 완료 대기
         await scrollPromise;
         clearInterval(progressInterval);
-        
-        // 최종 100% 진행률 전송
-        if (onImageProgress) {
-          onImageProgress(totalScrollItems, totalScrollItems);
-        }
-        
         console.log('✅ 스크롤 기반 이미지 로딩 완료');
       }
 
@@ -1208,13 +1201,13 @@ class NaverCrawlerService {
 
       // 리뷰 날짜 파싱 및 이미지 다운로드
       console.log('📷 리뷰 이미지 다운로드 처리 시작...');
-      
+
       // 이미지가 있는 리뷰 개수 계산 (정확한 진행률 표시용)
       const reviewsWithImages = rawReviews.filter(r => r.imageUrls && r.imageUrls.length > 0).length;
       console.log(`📊 이미지 다운로드 대상: ${reviewsWithImages}개 리뷰`);
-      
+
       let processedReviews = 0;
-      
+
       for (const review of rawReviews) {
         // 날짜 파싱
         review.visitInfo.visitDate = parseVisitDate(review.visitInfo.visitDate);
@@ -1242,7 +1235,7 @@ class NaverCrawlerService {
           // 다운로드된 이미지 경로로 교체
           review.images = downloadedPaths;
           console.log(`✅ ${downloadedPaths.length}개 이미지 다운로드 완료`);
-          
+
           // 이미지 다운로드 진행률 콜백 (이미지가 있는 리뷰만 카운트)
           processedReviews++;
           if (onImageProgress) {
@@ -1253,7 +1246,7 @@ class NaverCrawlerService {
         // imageUrls 제거 (임시 데이터)
         delete (review as any).imageUrls;
       }
-      
+
       console.log(`✅ 총 ${processedReviews}개 리뷰의 이미지 다운로드 완료`);
 
       const reviews: ReviewInfo[] = rawReviews;

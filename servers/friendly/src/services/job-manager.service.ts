@@ -29,6 +29,32 @@ class JobManager {
   private abortControllers = new Map<string, AbortController>();
 
   /**
+   * restaurantId와 type으로 기존 Job 찾기
+   */
+  findJobByRestaurantAndType(restaurantId: number, type: string = 'restaurant_crawl'): JobData | undefined {
+    for (const job of this.jobs.values()) {
+      if (job.restaurantId === restaurantId && job.type === type) {
+        return job;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Job 강제 종료 (메모리에서 제거)
+   */
+  terminateJob(jobId: string): void {
+    const controller = this.abortControllers.get(jobId);
+    if (controller) {
+      controller.abort();
+      this.abortControllers.delete(jobId);
+    }
+    
+    this.jobs.delete(jobId);
+    console.log(`[JobManager] Job ${jobId} terminated and removed from memory`);
+  }
+
+  /**
    * Job 생성
    */
   createJob(jobId: string, data: {
@@ -103,6 +129,18 @@ class JobManager {
 
     const percentage = total > 0 ? Math.floor((current / total) * 100) : 0;
     job.progress = { current, total, percentage };
+    this.jobs.set(jobId, job);
+  }
+
+  /**
+   * 메타데이터 업데이트 (Socket 통신 데이터)
+   */
+  updateMetadata(jobId: string, metadata: Record<string, any>): void {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+
+    // 기존 데이터에 metadata 병합
+    Object.assign(job, metadata);
     this.jobs.set(jobId, job);
   }
 

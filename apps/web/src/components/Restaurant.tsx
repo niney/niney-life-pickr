@@ -24,7 +24,7 @@ const DesktopLayout: React.FC<{
   total: number
   selectedCategory: string | null
   setSelectedCategory: (category: string | null) => void
-  reviewCrawlStatus: any
+  menuProgress: any
   crawlProgress: any
   dbProgress: any
   handleCrawl: () => Promise<void>
@@ -45,7 +45,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const restaurantState = useRestaurant()
   
   // Socket 연결 (전역 단일 연결)
-  const { reviewCrawlStatus, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
+  const { menuProgress, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
   
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -137,7 +137,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   total={total}
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
-                  reviewCrawlStatus={reviewCrawlStatus}
+                  menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
                   handleCrawl={handleCrawlWithSocket}
@@ -165,7 +165,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   total={total}
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
-                  reviewCrawlStatus={reviewCrawlStatus}
+                  menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
                   handleCrawl={handleCrawlWithSocket}

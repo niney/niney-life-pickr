@@ -1,151 +1,162 @@
 /**
- * Job Repository (범용 작업 추적)
- * - 리뷰 크롤링, 리뷰 요약, 레스토랑 크롤링 등 모든 백그라운드 작업 추적
+ * Job Repository (단순화 버전)
+ * - restaurant_crawl 타입 고정
+ * - metadata에 Socket 통신 데이터 저장
  */
 
 import db from '../database';
-import { 
-  JobDB, 
-  JobType, 
-  JobStatus, 
-  JobProgress
-} from '../../types/db.types';
-import { v4 as uuidv4 } from 'uuid';
+import {JobDB, JobStatus} from '../../types/db.types';
+import {v4 as uuidv4} from 'uuid';
 
 class JobRepository {
-  
+
   /**
-   * Job 생성 (범용)
-   * - id를 외부에서 제공하거나 자동 생성
+   * restaurant_id와 type으로 Job 조회
    */
-  async create<T extends JobType>(params: {
+  async findByRestaurantAndType(
+    restaurantId: number,
+    type: string = 'restaurant_crawl'
+  ): Promise<JobDB | undefined> {
+    return await db.get<JobDB>(`
+      SELECT * FROM jobs
+      WHERE restaurant_id = ? AND type = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [restaurantId, type]);
+  }
+
+  /**
+   * Job 생성 (단순화)
+   * - 기존 Job이 있으면 삭제 후 생성 (UNIQUE 제약 조건 우회)
+   */
+  async create(params: {
     id?: string; // 선택적: 미제공 시 UUID 자동 생성
-    type: T;
     restaurantId: number;
     metadata?: Record<string, any>;
   }): Promise<JobDB> {
     const id = params.id || uuidv4(); // 외부 ID 우선, 없으면 생성
     const now = new Date().toISOString();
-    
+
+    // 기존 Job 삭제 (UNIQUE 제약 조건 회피)
+    await db.run(`
+      DELETE FROM jobs
+      WHERE restaurant_id = ? AND type = ?
+    `, [params.restaurantId, 'restaurant_crawl']);
+
     await db.run(`
       INSERT INTO jobs (
         id, type, restaurant_id, status,
-        progress_current, progress_total, progress_percentage,
-        metadata, result, error_message,
+        metadata, error_message,
         started_at, completed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id,
-      params.type,
+      'restaurant_crawl', // 고정
       params.restaurantId,
       'active',
-      0,
-      0,
-      0,
       params.metadata ? JSON.stringify(params.metadata) : null,
-      null,
       null,
       now,
       null,
       now,
       now
     ]);
-    
+
     const job = await db.get<JobDB>('SELECT * FROM jobs WHERE id = ?', [id]);
     if (!job) {
       throw new Error('Failed to create job');
     }
-    
+
     return job;
   }
-  
+
   /**
-   * 진행률 업데이트
+   * 메타데이터 업데이트 (Socket 통신 데이터 저장)
    */
-  async updateProgress(
-    jobId: string, 
-    progress: JobProgress
+  async updateMetadata(
+    jobId: string,
+    metadata: Record<string, any>
   ): Promise<void> {
     await db.run(`
-      UPDATE jobs 
-      SET progress_current = ?,
-          progress_total = ?,
-          progress_percentage = ?,
+      UPDATE jobs
+      SET metadata = ?,
           updated_at = ?
       WHERE id = ?
     `, [
-      progress.current,
-      progress.total,
-      progress.percentage,
+      JSON.stringify(metadata),
       new Date().toISOString(),
       jobId
     ]);
   }
-  
+
   /**
    * Job 완료
    */
   async complete(
-    jobId: string, 
-    result?: Record<string, any>
+    jobId: string,
+    finalMetadata?: Record<string, any>
   ): Promise<void> {
     const now = new Date().toISOString();
-    
+
     await db.run(`
       UPDATE jobs
       SET status = 'completed',
-          result = ?,
+          metadata = ?,
           completed_at = ?,
           updated_at = ?
       WHERE id = ?
     `, [
-      result ? JSON.stringify(result) : null,
+      finalMetadata ? JSON.stringify(finalMetadata) : null,
       now,
       now,
       jobId
     ]);
   }
-  
+
   /**
    * Job 실패
    */
-  async fail(jobId: string, error: string): Promise<void> {
+  async fail(jobId: string, error: string, metadata?: Record<string, any>): Promise<void> {
     const now = new Date().toISOString();
-    
+
     await db.run(`
       UPDATE jobs
       SET status = 'failed',
           error_message = ?,
+          metadata = ?,
           completed_at = ?,
           updated_at = ?
       WHERE id = ?
     `, [
       error,
+      metadata ? JSON.stringify(metadata) : null,
       now,
       now,
       jobId
     ]);
   }
-  
+
   /**
    * Job 취소
    */
-  async cancel(jobId: string): Promise<void> {
+  async cancel(jobId: string, metadata?: Record<string, any>): Promise<void> {
     const now = new Date().toISOString();
-    
+
     await db.run(`
       UPDATE jobs
       SET status = 'cancelled',
+          metadata = ?,
           completed_at = ?,
           updated_at = ?
       WHERE id = ?
     `, [
+      metadata ? JSON.stringify(metadata) : null,
       now,
       now,
       jobId
     ]);
   }
-  
+
   /**
    * ID로 조회
    */
@@ -156,40 +167,18 @@ class JobRepository {
     );
     return job || null;
   }
-  
+
   /**
-   * 레스토랑의 활성 Job 조회 (타입 필터 가능)
+   * 레스토랑의 활성 Job 조회
    */
-  async findActiveByRestaurant(
-    restaurantId: number,
-    type?: JobType
-  ): Promise<JobDB[]> {
-    if (type) {
-      return db.all<JobDB>(`
-        SELECT * FROM jobs
-        WHERE restaurant_id = ? AND status = 'active' AND type = ?
-        ORDER BY created_at DESC
-      `, [restaurantId, type]);
-    }
-    
+  async findActiveByRestaurant(restaurantId: number): Promise<JobDB[]> {
     return db.all<JobDB>(`
       SELECT * FROM jobs
       WHERE restaurant_id = ? AND status = 'active'
       ORDER BY created_at DESC
     `, [restaurantId]);
   }
-  
-  /**
-   * 타입별 활성 Job 조회
-   */
-  async findActiveByType(type: JobType): Promise<JobDB[]> {
-    return db.all<JobDB>(`
-      SELECT * FROM jobs
-      WHERE type = ? AND status = 'active'
-      ORDER BY created_at DESC
-    `, [type]);
-  }
-  
+
   /**
    * 모든 활성 Job 조회
    */
@@ -200,24 +189,14 @@ class JobRepository {
       ORDER BY created_at DESC
     `);
   }
-  
+
   /**
    * 레스토랑의 Job 히스토리 조회
    */
   async findByRestaurant(
     restaurantId: number,
-    limit: number = 10,
-    type?: JobType
+    limit: number = 10
   ): Promise<JobDB[]> {
-    if (type) {
-      return db.all<JobDB>(`
-        SELECT * FROM jobs
-        WHERE restaurant_id = ? AND type = ?
-        ORDER BY created_at DESC
-        LIMIT ?
-      `, [restaurantId, type, limit]);
-    }
-    
     return db.all<JobDB>(`
       SELECT * FROM jobs
       WHERE restaurant_id = ?
@@ -225,7 +204,7 @@ class JobRepository {
       LIMIT ?
     `, [restaurantId, limit]);
   }
-  
+
   /**
    * 실패한 Job 조회
    */
@@ -237,28 +216,28 @@ class JobRepository {
       LIMIT ?
     `, [limit]);
   }
-  
+
   /**
    * 오래된 완료 Job 삭제 (정리용)
    */
   async deleteOldCompleted(daysOld: number = 30): Promise<number> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-    
+
     await db.run(`
       DELETE FROM jobs
       WHERE status IN ('completed', 'failed', 'cancelled')
         AND completed_at < ?
     `, [cutoffDate.toISOString()]);
-    
+
     // SQLite에서는 변경된 행 수를 별도로 조회해야 함
     const result = await db.get<{ count: number }>(`
       SELECT changes() as count
     `);
-    
+
     return result?.count || 0;
   }
-  
+
   /**
    * Job 상태 업데이트
    */
@@ -274,7 +253,7 @@ class JobRepository {
       jobId
     ]);
   }
-  
+
   /**
    * 메타데이터 파싱 헬퍼
    */
@@ -282,18 +261,6 @@ class JobRepository {
     if (!job.metadata) return null;
     try {
       return JSON.parse(job.metadata) as T;
-    } catch {
-      return null;
-    }
-  }
-  
-  /**
-   * 결과 데이터 파싱 헬퍼
-   */
-  parseResult<T = any>(job: JobDB): T | null {
-    if (!job.result) return null;
-    try {
-      return JSON.parse(job.result) as T;
     } catch {
       return null;
     }
