@@ -131,9 +131,9 @@ class MenuStatisticsService {
    * Top 긍정 메뉴
    */
   private getTopPositiveMenus(
-    stats: MenuSentimentStats[], 
+    stats: MenuSentimentStats[],
     limit: number
-  ): Array<{ menuName: string; positiveRate: number; mentions: number }> {
+  ): Array<{ menuName: string; positiveRate: number; mentions: number; positive: number; negative: number; neutral: number }> {
     return stats
       .filter(s => s.totalMentions >= 3)  // 최소 3회 이상 언급
       .sort((a, b) => b.positiveRate - a.positiveRate)
@@ -141,7 +141,10 @@ class MenuStatisticsService {
       .map(s => ({
         menuName: s.menuName,
         positiveRate: s.positiveRate,
-        mentions: s.totalMentions
+        mentions: s.totalMentions,
+        positive: s.positive,
+        negative: s.negative,
+        neutral: s.neutral
       }));
   }
   
@@ -149,9 +152,9 @@ class MenuStatisticsService {
    * Top 부정 메뉴
    */
   private getTopNegativeMenus(
-    stats: MenuSentimentStats[], 
+    stats: MenuSentimentStats[],
     limit: number
-  ): Array<{ menuName: string; negativeRate: number; mentions: number }> {
+  ): Array<{ menuName: string; negativeRate: number; mentions: number; positive: number; negative: number; neutral: number }> {
     return stats
       .filter(s => s.totalMentions >= 3)
       .sort((a, b) => {
@@ -163,7 +166,10 @@ class MenuStatisticsService {
       .map(s => ({
         menuName: s.menuName,
         negativeRate: Math.round((s.negative / s.totalMentions) * 1000) / 10,
-        mentions: s.totalMentions
+        mentions: s.totalMentions,
+        positive: s.positive,
+        negative: s.negative,
+        neutral: s.neutral
       }));
   }
 }

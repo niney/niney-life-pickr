@@ -12,7 +12,10 @@ const TopMenuSchema = Type.Object({
   menuName: Type.String({ description: '메뉴명' }),
   positiveRate: Type.Optional(Type.Number({ description: '긍정률 (%)' })),
   negativeRate: Type.Optional(Type.Number({ description: '부정률 (%)' })),
-  mentions: Type.Number({ description: '언급 횟수' })
+  mentions: Type.Number({ description: '언급 횟수' }),
+  positive: Type.Number({ description: '긍정 언급 수' }),
+  negative: Type.Number({ description: '부정 언급 수' }),
+  neutral: Type.Number({ description: '중립 언급 수' })
 });
 
 // 메뉴별 감정 통계 스키마

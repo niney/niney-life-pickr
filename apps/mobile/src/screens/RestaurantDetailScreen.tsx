@@ -1195,6 +1195,9 @@ const RestaurantDetailScreen: React.FC = () => {
                             <Text style={[styles.topMenuStats, { color: colors.textSecondary }]}>
                               긍정률 {menu.positiveRate}% • {menu.mentions}회 언급
                             </Text>
+                            <Text style={[styles.topMenuStats, { color: colors.textSecondary, fontSize: 11, marginTop: 2 }]}>
+                              😊 {menu.positive} · 😞 {menu.negative} · 😐 {menu.neutral}
+                            </Text>
                           </View>
                         </View>
                       ))}
@@ -1216,6 +1219,9 @@ const RestaurantDetailScreen: React.FC = () => {
                             <Text style={[styles.topMenuName, { color: colors.text }]}>{menu.menuName}</Text>
                             <Text style={[styles.topMenuStats, { color: colors.textSecondary }]}>
                               부정률 {menu.negativeRate}% • {menu.mentions}회 언급
+                            </Text>
+                            <Text style={[styles.topMenuStats, { color: colors.textSecondary, fontSize: 11, marginTop: 2 }]}>
+                              😊 {menu.positive} · 😞 {menu.negative} · 😐 {menu.neutral}
                             </Text>
                           </View>
                         </View>

@@ -1128,6 +1128,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                             <Text style={[styles.topMenuStats, { color: '#2e7d32' }]}>
                               긍정률 {menu.positiveRate}% · {menu.mentions}회 언급
                             </Text>
+                            <Text style={[styles.topMenuStats, { color: '#2e7d32', fontSize: 13, marginTop: 2 }]}>
+                              😊 {menu.positive} · 😞 {menu.negative} · 😐 {menu.neutral}
+                            </Text>
                           </View>
                         </View>
                       ))}
@@ -1147,6 +1150,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                             <Text style={[styles.topMenuName, { color: '#b71c1c' }]}>{menu.menuName}</Text>
                             <Text style={[styles.topMenuStats, { color: '#c62828' }]}>
                               부정률 {menu.negativeRate}% · {menu.mentions}회 언급
+                            </Text>
+                            <Text style={[styles.topMenuStats, { color: '#c62828', fontSize: 13, marginTop: 2 }]}>
+                              😊 {menu.positive} · 😞 {menu.negative} · 😐 {menu.neutral}
                             </Text>
                           </View>
                         </View>
