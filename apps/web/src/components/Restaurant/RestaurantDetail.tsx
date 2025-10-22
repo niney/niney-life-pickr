@@ -187,7 +187,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   // 데스크톱 스크롤 이벤트 (스크롤 영역 감지)
   useEffect(() => {
-    if (isMobile || !scrollContainerRef.current) return
+    if (activeTab !== 'review' || isMobile || !scrollContainerRef.current) return
 
     const handleScroll = () => {
       const container = scrollContainerRef.current
@@ -209,11 +209,11 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     return () => {
       container.removeEventListener('scroll', handleScroll)
     }
-  }, [isMobile, handleLoadMore])
+  }, [activeTab, isMobile, handleLoadMore])
 
   // Intersection Observer 설정 (모바일 무한 스크롤)
   useEffect(() => {
-    if (!isMobile || !loadMoreTriggerRef.current) return
+    if (activeTab !== 'review' || !isMobile || !loadMoreTriggerRef.current) return
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
@@ -236,7 +236,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         observerRef.current.disconnect()
       }
     }
-  }, [isMobile, handleLoadMore])
+  }, [activeTab, isMobile, handleLoadMore])
 
   // 크롤링 중인지 체크 (진행률이 하나라도 있으면 크롤링 중)
   const isCrawling = menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null
