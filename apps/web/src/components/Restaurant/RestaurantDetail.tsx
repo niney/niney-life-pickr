@@ -785,7 +785,11 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
               </View>
             ) : reviews.length > 0 ? (
           <>
-            <View style={styles.reviewsList}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(450px, 1fr))',
+              gap: '16px',
+            }}>
               {reviews.map((review: ReviewData) => (
                 <View
                   key={review.id}
@@ -1012,7 +1016,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   </View>
                 </View>
               ))}
-            </View>
+            </div>
 
             {/* 무한 스크롤 트리거 (모바일) */}
             {isMobile && hasMoreReviews && (
