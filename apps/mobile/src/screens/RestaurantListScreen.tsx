@@ -144,7 +144,7 @@ const RestaurantListScreen: React.FC = () => {
     // 포커스 복원을 재시도하는 함수 (100ms 간격으로 최대 5번 시도)
     const waitForFocus = (attempt: number = 0) => {
       const maxAttempts = 5; // 최대 500ms
-      
+
       if (navigation.isFocused()) {
         // 포커스 확인 → 네비게이션 실행
         navigation.navigate('RestaurantDetail', {
@@ -156,7 +156,7 @@ const RestaurantListScreen: React.FC = () => {
         setTimeout(() => waitForFocus(attempt + 1), 100);
       }
     };
-    
+
     // 포커스 체크 시작
     waitForFocus(0);
   };
@@ -194,12 +194,7 @@ const RestaurantListScreen: React.FC = () => {
         try {
           const response = await apiService.deleteRestaurant(restaurant.id);
 
-          if (response.result) {
-            Alert.success(
-              '삭제 완료',
-              `${restaurant.name}이(가) 삭제되었습니다.\n메뉴 ${response.data.deletedMenus}개, 리뷰 ${response.data.deletedReviews}개가 함께 삭제되었습니다.`
-            );
-
+          if (response.result && response.data) {
             // 목록 새로고침
             await Promise.all([
               fetchRestaurants(),
@@ -221,8 +216,8 @@ const RestaurantListScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -264,8 +259,8 @@ const RestaurantListScreen: React.FC = () => {
             {categoriesLoading && <ActivityIndicator size="small" color={colors.text} />}
           </View>
           {categories.length > 0 ? (
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesScrollContent}
             >
@@ -287,7 +282,7 @@ const RestaurantListScreen: React.FC = () => {
                   >
                     <View style={styles.categoryCardContent}>
                       <Text style={[
-                        styles.categoryName, 
+                        styles.categoryName,
                         { color: selectedCategory === category.category ? colors.primary : colors.text }
                       ]}>
                         {category.category}

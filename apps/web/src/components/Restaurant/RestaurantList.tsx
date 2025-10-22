@@ -126,11 +126,6 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
       const response = await apiService.deleteRestaurant(restaurantToDelete.id)
 
       if (response.result && response.data) {
-        Alert.success(
-          '삭제 완료',
-          `${restaurantToDelete.name}이(가) 삭제되었습니다.\n메뉴 ${response.data.deletedMenus}개, 리뷰 ${response.data.deletedReviews}개가 함께 삭제되었습니다.`
-        )
-
         // 목록 새로고침
         await Promise.all([
           fetchRestaurants(),
