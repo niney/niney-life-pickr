@@ -118,6 +118,7 @@ export interface CrawlRestaurantRequest {
   url: string;
   crawlMenus?: boolean;
   crawlReviews?: boolean;
+  createSummary?: boolean;
 }
 
 export interface RestaurantCategory {
@@ -344,7 +345,7 @@ class ApiService {
       url: request.url,
       crawlMenus: request.crawlMenus,
       crawlReviews: request.crawlReviews,
-      createSummary: false // 명시적으로 지정
+      createSummary: true // 크롤링 시 자동으로 리뷰 요약 생성
     });
 
     // 기존 인터페이스 유지를 위해 변환

@@ -68,7 +68,8 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
       const response = await apiService.crawlRestaurant({
         url: url.trim(),
         crawlMenus: true,
-        crawlReviews: true
+        crawlReviews: true,
+        createSummary: true // 크롤링 완료 후 자동으로 리뷰 요약 생성
       })
 
       if (response.result && response.data) {
