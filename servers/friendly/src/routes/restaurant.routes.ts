@@ -103,13 +103,13 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /api/restaurants
-   * 음식점 목록 조회 (페이지네이션 + 카테고리 필터)
+   * 음식점 목록 조회 (페이지네이션)
    */
   fastify.get('/', {
     schema: {
       tags: ['restaurants'],
       summary: '음식점 목록 조회',
-      description: '저장된 음식점 목록을 페이지네이션으로 조회합니다. 카테고리 필터링을 지원합니다.',
+      description: '저장된 음식점 목록을 페이지네이션으로 조회합니다.',
       querystring: Type.Object({
         limit: Type.Optional(Type.Number({
           description: '페이지당 항목 수 (기본: 20)',
@@ -121,9 +121,6 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           description: '시작 위치 (기본: 0)',
           default: 0,
           minimum: 0
-        })),
-        category: Type.Optional(Type.String({
-          description: '카테고리 필터 (예: 한식, 일식, 중식)'
         }))
       }),
       response: {
@@ -147,16 +144,12 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    const { limit = 20, offset = 0, category } = request.query as { 
-      limit?: number; 
-      offset?: number;
-      category?: string;
-    };
+    const { limit = 20, offset = 0 } = request.query as { limit?: number; offset?: number };
 
     try {
       const [restaurants, total] = await Promise.all([
-        restaurantRepository.findAll(limit, offset, category),
-        restaurantRepository.count(category)
+        restaurantRepository.findAll(limit, offset),
+        restaurantRepository.count()
       ]);
 
       return ResponseHelper.success(
@@ -167,9 +160,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           offset,
           restaurants
         },
-        category 
-          ? `${restaurants.length}개 음식점 조회 성공 (카테고리: ${category})`
-          : `${restaurants.length}개 음식점 조회 성공`
+        `${restaurants.length}개 음식점 조회 성공`
       );
     } catch (error) {
       console.error('음식점 목록 조회 에러:', error);
@@ -210,9 +201,6 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           Type.Array(Type.String({ enum: ['positive', 'negative', 'neutral'] }))
         ], {
           description: '감정 필터 (positive/negative/neutral, 쉼표로 구분하여 다중 선택 가능)'
-        })),
-        searchText: Type.Optional(Type.String({
-          description: '리뷰 내용 검색어'
         }))
       }),
       response: {
@@ -243,11 +231,10 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }, async (request, reply) => {
     const { id } = request.params as { id: number };
-    const { limit = 20, offset = 0, sentiment, searchText } = request.query as {
+    const { limit = 20, offset = 0, sentiment } = request.query as {
       limit?: number;
       offset?: number;
       sentiment?: string | string[];
-      searchText?: string;
     };
 
     try {
@@ -266,8 +253,8 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
 
       // 3. 리뷰 조회 (요약 데이터 포함 - LEFT JOIN 사용)
       const [reviewsWithSummary, total] = await Promise.all([
-        reviewRepository.findByRestaurantIdWithSummary(id, limit, offset, sentiments, searchText),
-        reviewRepository.countByRestaurantId(id, sentiments, searchText)
+        reviewRepository.findByRestaurantIdWithSummary(id, limit, offset, sentiments),
+        reviewRepository.countByRestaurantId(id, sentiments)
       ]);
 
       // 3. DB 데이터를 API 응답 형식으로 변환
@@ -295,17 +282,21 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
               }
             }
             
-            summaryData = {
-              summary: parsed.summary || '',
-              keyKeywords: parsed.keyKeywords || [],
-              sentiment: parsed.sentiment || 'neutral',
-              sentimentReason: parsed.sentimentReason || '',
-              satisfactionScore: parsed.satisfactionScore,
-              tips: parsed.tips || [],
-              menuItems
-            };
+            // 필수 필드가 모두 있을 때만 summaryData 생성
+            if (parsed.summary && parsed.sentiment) {
+              summaryData = {
+                summary: parsed.summary || '',
+                keyKeywords: parsed.keyKeywords || [],
+                sentiment: parsed.sentiment || 'neutral',
+                sentimentReason: parsed.sentimentReason || '',
+                satisfactionScore: parsed.satisfactionScore ?? null,
+                tips: parsed.tips || [],
+                menuItems
+              };
+            }
           } catch (error) {
             console.error(`Failed to parse summary_data for review ${row.id}:`, error);
+            summaryData = null;
           }
         }
 
