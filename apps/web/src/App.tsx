@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import Login from './components/Login'
 import Home from './components/Home'
 import Restaurant from './components/Restaurant'
@@ -6,12 +7,11 @@ import { useAuth } from '@shared/hooks'
 import { ThemeProvider, SocketProvider } from '@shared/contexts'
 
 function AppContent() {
-  const { isAuthenticated, isLoading, logout } = useAuth()
+  const { isAuthenticated, isLoading, logout, checkAuth } = useAuth()
 
   const handleLoginSuccess = async () => {
-    // useLogin hook에서 이미 storage에 저장되므로
-    // 여기서는 페이지를 리로드하여 useAuth가 자동으로 체크하도록 함
-    window.location.href = '/'
+    // 인증 상태 재확인
+    await checkAuth()
   }
 
   // 로딩 중
@@ -33,7 +33,7 @@ function AppContent() {
         {!isAuthenticated ? (
           <>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<RedirectToLogin />} />
           </>
         ) : (
           <>
@@ -46,6 +46,20 @@ function AppContent() {
       </Routes>
     </BrowserRouter>
   )
+}
+
+// 로그인 페이지로 리다이렉트하면서 원래 URL 저장
+function RedirectToLogin() {
+  const location = useLocation()
+  
+  // 현재 경로를 sessionStorage에 저장
+  useEffect(() => {
+    if (location.pathname !== '/login') {
+      sessionStorage.setItem('redirectUrl', location.pathname + location.search)
+    }
+  }, [location])
+
+  return <Navigate to="/login" replace />
 }
 
 function App() {

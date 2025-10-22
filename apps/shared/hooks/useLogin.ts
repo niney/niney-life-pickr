@@ -32,9 +32,6 @@ export const useLogin = (): LoginHookReturn => {
       const response = await apiService.login({ email, password });
 
       if (response.result) {
-        // 로그인 성공
-        Alert.success(AUTH_CONSTANTS.SUCCESS.successTitle, AUTH_CONSTANTS.SUCCESS.loginSuccess);
-
         // 사용자 정보 저장
         if (response.data?.user) {
           await storage.setUserInfo(response.data.user);

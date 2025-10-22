@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native'
+import { useNavigate } from 'react-router-dom'
 import { InputField, Button } from '@shared/components'
 import { useLogin } from '@shared/hooks'
 import { useTheme } from '@shared/contexts'
@@ -16,6 +17,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+  const navigate = useNavigate()
   const {
     email,
     setEmail,
@@ -29,10 +31,44 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
+  const autoLoginAttempted = useRef(false)
 
-  const handleLogin = () => {
-    handleLoginBase(onLoginSuccess)
+  const handleLogin = async () => {
+    handleLoginBase(async () => {
+      // 로그인 성공 시 원래 가려던 URL로 이동
+      const redirectUrl = sessionStorage.getItem('redirectUrl')
+      
+      if (redirectUrl) {
+        sessionStorage.removeItem('redirectUrl')
+        // onLoginSuccess를 먼저 호출하여 인증 상태 업데이트
+        if (onLoginSuccess) {
+          await onLoginSuccess()
+        }
+        // 약간의 딜레이 후 리다이렉트 (인증 상태 업데이트 보장)
+        setTimeout(() => {
+          navigate(redirectUrl, { replace: true })
+        }, 100)
+      } else {
+        if (onLoginSuccess) {
+          await onLoginSuccess()
+        }
+        navigate('/', { replace: true })
+      }
+    })
   }
+
+  // 자동 로그인 - 페이지 로드 시 한 번만 실행
+  useEffect(() => {
+    if (!autoLoginAttempted.current && email && password) {
+      autoLoginAttempted.current = true
+      // 약간의 딜레이 후 자동 로그인 (UI가 렌더링된 후)
+      const timer = setTimeout(() => {
+        handleLogin()
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="page-container" style={{ backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
