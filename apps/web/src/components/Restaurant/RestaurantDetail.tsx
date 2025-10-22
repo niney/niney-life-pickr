@@ -1421,9 +1421,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   reviewCard: {
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
   },
   reviewCardHeader: {
     flexDirection: 'row',
