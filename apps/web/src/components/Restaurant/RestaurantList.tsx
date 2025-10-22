@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import {
   ActivityIndicator,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -8,7 +9,7 @@ import {
   View
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faRotate } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faRotate, faTimes } from '@fortawesome/free-solid-svg-icons'
 import { useTheme, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData, type ReviewCrawlStatus } from '@shared'
 import { useLocation } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
@@ -60,6 +61,9 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   // 재크롤링 모달 상태
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null)
+  
+  // 카테고리 모달 상태
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false)
 
   // 카테고리 클릭 핸들러
   const handleCategoryClick = (category: string) => {
@@ -67,6 +71,11 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
       setSelectedCategory(null) // 같은 카테고리 클릭 시 필터 해제
     } else {
       setSelectedCategory(category)
+    }
+    
+    // 데스크탑에서는 선택 후 모달 닫기
+    if (!isMobile) {
+      setCategoryModalVisible(false)
     }
   }
 
@@ -128,18 +137,32 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
 
         {/* 카테고리 섹션 */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>카테고리</Text>
-            {categoriesLoading && <ActivityIndicator size="small" color={colors.primary} />}
-          </View>
+          <TouchableOpacity 
+            style={styles.sectionHeader}
+            onPress={() => !isMobile && categories.length > 0 && setCategoryModalVisible(true)}
+            activeOpacity={isMobile ? 1 : 0.7}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              카테고리 {selectedCategory && `· ${selectedCategory}`}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {categoriesLoading && <ActivityIndicator size="small" color={colors.primary} />}
+              {!isMobile && categories.length > 0 && (
+                <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.categoryBadgeText}>{categories.length}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
 
-          {categories.length > 0 ? (
+          {/* 모바일: 가로 스크롤 카테고리 */}
+          {isMobile && categories.length > 0 && (
             <div style={{ 
               display: 'flex', 
-              overflowX: isMobile ? 'auto' : 'visible',
+              overflowX: 'auto',
               gap: '10px',
-              flexWrap: isMobile ? 'nowrap' : 'wrap',
-              paddingBottom: isMobile ? '8px' : '0',
+              flexWrap: 'nowrap',
+              paddingBottom: '8px',
               WebkitOverflowScrolling: 'touch',
             }}>
               {categories.map((category: RestaurantCategory) => (
@@ -155,7 +178,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                         backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface, 
                         borderColor: selectedCategory === category.category ? colors.primary : colors.border,
                         borderWidth: selectedCategory === category.category ? 2 : 1,
-                        flexShrink: isMobile ? 0 : 1,
+                        flexShrink: 0,
                       }
                     ]}
                   >
@@ -170,9 +193,11 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                 </TouchableOpacity>
               ))}
             </div>
-          ) : !categoriesLoading ? (
+          )}
+          
+          {!categoriesLoading && categories.length === 0 && (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
-          ) : null}
+          )}
         </View>
 
         {/* 크롤링 진행 상황 */}
@@ -299,6 +324,89 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
           onConfirm={handleRecrawlConfirm}
           restaurantName={selectedRestaurant?.name || ''}
         />
+
+        {/* 카테고리 선택 모달 */}
+        <Modal
+          visible={categoryModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setCategoryModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>카테고리 선택</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setCategoryModalVisible(false)}
+                >
+                  <FontAwesomeIcon icon={faTimes} style={{ fontSize: 20, color: colors.text }} />
+                </TouchableOpacity>
+              </View>
+
+              <div style={{ 
+                padding: 16, 
+                maxHeight: 500, 
+                overflowY: 'auto',
+                overflowX: 'hidden',
+              }}>
+                {/* 전체 선택 옵션 */}
+                <TouchableOpacity
+                  style={[
+                    styles.modalCategoryItem,
+                    {
+                      backgroundColor: !selectedCategory 
+                        ? (theme === 'light' ? '#f0f7ff' : 'rgba(33, 150, 243, 0.15)')
+                        : 'transparent',
+                      borderColor: !selectedCategory ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => {
+                    setSelectedCategory(null)
+                    setCategoryModalVisible(false)
+                  }}
+                >
+                  <Text style={[
+                    styles.modalCategoryName,
+                    { color: !selectedCategory ? colors.primary : colors.text }
+                  ]}>
+                    전체
+                  </Text>
+                  <Text style={[styles.modalCategoryCount, { color: colors.textSecondary }]}>
+                    {total}개
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 카테고리 목록 */}
+                {categories.map((category: RestaurantCategory) => (
+                  <TouchableOpacity
+                    key={category.category}
+                    style={[
+                      styles.modalCategoryItem,
+                      {
+                        backgroundColor: selectedCategory === category.category
+                          ? (theme === 'light' ? '#f0f7ff' : 'rgba(33, 150, 243, 0.15)')
+                          : 'transparent',
+                        borderColor: selectedCategory === category.category ? colors.primary : colors.border,
+                      }
+                    ]}
+                    onPress={() => handleCategoryClick(category.category)}
+                  >
+                    <Text style={[
+                      styles.modalCategoryName,
+                      { color: selectedCategory === category.category ? colors.primary : colors.text }
+                    ]}>
+                      {category.category}
+                    </Text>
+                    <Text style={[styles.modalCategoryCount, { color: colors.textSecondary }]}>
+                      {category.count}개
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </div>
+            </View>
+          </View>
+        </Modal>
     </div>
   )
 }
@@ -455,6 +563,72 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCategoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  modalCategoryName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalCategoryCount: {
+    fontSize: 14,
   },
 })
 
