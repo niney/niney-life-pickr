@@ -53,37 +53,18 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       try {
         const activeJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId));
 
-        // 타입별로 최신 Job만 선택 (중복 방지)
-        const jobsByType = activeJobs.reduce((acc, job) => {
-          if (!acc[job.type] || new Date(job.created_at) > new Date(acc[job.type].created_at)) {
-            acc[job.type] = job;
-          }
-          return acc;
-        }, {} as Record<string, typeof activeJobs[0]>);
+        if (activeJobs.length === 0) {
+          // 활성 Job이 없으면 통합 no_active_job 이벤트 발행
+          socket.emit('restaurant:no_active_job', {
+            restaurantId: parseInt(restaurantId),
+            status: 'idle',
+            timestamp: Date.now()
+          });
 
-        // 활성 Job 타입 추적
-        const activeJobTypes = new Set(Object.keys(jobsByType));
-
-        // 활성 Job이 없는 타입에 대해 "진행 없음" 상태 전송
-        const allJobTypes = ['review_crawl', 'review_summary'];
-        allJobTypes.forEach((jobType) => {
-          if (!activeJobTypes.has(jobType)) {
-            const eventName = jobType === 'review_crawl'
-              ? 'review:no_active_job'
-              : 'review_summary:no_active_job';
-
-            socket.emit(eventName, {
-              restaurantId: parseInt(restaurantId),
-              type: jobType,
-              status: 'idle',
-              timestamp: Date.now()
-            });
-
-            console.log(`[Socket.io] Sent ${eventName} to ${socket.id} - No active job`);
-          }
-        });
-
-        console.log(`[Socket.io] Sent state to ${socket.id} - Active jobs: ${activeJobs.length}`);
+          console.log(`[Socket.io] Sent restaurant:no_active_job to ${socket.id} - No active jobs`);
+        } else {
+          console.log(`[Socket.io] Active jobs found for restaurant ${restaurantId}: ${activeJobs.length}`);
+        }
       } catch (error) {
         console.error(`[Socket.io] Error fetching active jobs for restaurant ${restaurantId}:`, error);
       }

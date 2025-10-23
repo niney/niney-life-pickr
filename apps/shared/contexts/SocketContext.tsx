@@ -184,6 +184,27 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       }
     })
 
+    // 레스토랑 활성 Job 없음 (메뉴/리뷰/요약 모두 통합)
+    socket.on('restaurant:no_active_job', (data: any) => {
+      console.log('[Socket.io] No Active Jobs for Restaurant:', data)
+      
+      // 메뉴 진행률 초기화
+      setMenuProgress(null)
+      
+      // 크롤링 진행률 초기화
+      setCrawlProgress(null)
+      setDbProgress(null)
+      setImageProgress(null)
+      lastCrawlSequenceRef.current = 0
+      lastDbSequenceRef.current = 0
+      lastImageSequenceRef.current = 0
+      
+      // 요약 진행률 초기화
+      setReviewSummaryStatus({ status: 'idle' })
+      setSummaryProgress(null)
+      lastSummarySequenceRef.current = 0
+    })
+
     // 크롤링 진행 상황 (웹 크롤링 단계, subscribe 시점 + 실시간 업데이트)
     socket.on('review:crawl_progress', (data: any) => {
       console.log('[Socket.io] Crawl Progress:', data)
@@ -301,17 +322,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       })
     })
 
-    // 크롤링 진행 없음 (subscribe 시점에 활성 Job이 없을 때)
-    socket.on('review:no_active_job', (data: any) => {
-      console.log('[Socket.io] No Active Crawl Job:', data)
-      setCrawlProgress(null)
-      setDbProgress(null)
-      setImageProgress(null)
-      lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
-      lastDbSequenceRef.current = 0 // ✅ Sequence 초기화
-      lastImageSequenceRef.current = 0 // ✅ Sequence 초기화
-    })
-
     // 크롤링 에러
     socket.on('review:error', (data: any) => {
       console.error('[Socket.io] Error:', data)
@@ -402,14 +412,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       }
     })
 
-    // 리뷰 요약 진행 없음 (subscribe 시점에 활성 Job이 없을 때)
-    socket.on('review_summary:no_active_job', (data: any) => {
-      console.log('[Socket.io] No Active Summary Job:', data)
-      setReviewSummaryStatus({ status: 'idle' })
-      setSummaryProgress(null)
-      lastSummarySequenceRef.current = 0 // ✅ Sequence 초기화
-    })
-
     // 리뷰 요약 에러
     socket.on('review_summary:error', (data: any) => {
       console.error('[Socket.io] Summary Error:', data)
@@ -437,13 +439,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     return () => {
       clearInterval(cleanupInterval)
       socket.off('restaurant:menu_progress')
+      socket.off('restaurant:no_active_job')
       socket.off('review:crawl_progress')
       socket.off('review:db_progress')
       socket.off('review:image_progress')
-      socket.off('review:no_active_job')
       socket.off('review:error')
       socket.off('review_summary:progress')
-      socket.off('review_summary:no_active_job')
       socket.off('review_summary:error')
     }
   }, [])
