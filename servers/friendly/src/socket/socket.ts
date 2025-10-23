@@ -53,41 +53,42 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       try {
         const activeJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId));
 
-        if (activeJobs.length === 0) {
-          // 활성 Job이 없으면 통합 no_active_job 이벤트 발행
-          socket.emit('restaurant:no_active_job', {
-            restaurantId: parseInt(restaurantId),
-            status: 'idle',
-            timestamp: Date.now()
-          });
+        // 활성 Job의 이벤트명 목록 수집
+        const activeEventNames: string[] = [];
 
-          console.log(`[Socket.io] Sent restaurant:no_active_job to ${socket.id} - No active jobs`);
-        } else {
-          // 활성 Job이 있으면 저장된 진행률을 클라이언트에 전송
-          for (const job of activeJobs) {
-            if (job.event_name && job.metadata) {
-              try {
-                const metadata = JSON.parse(job.metadata);
-                
-                // 저장된 이벤트 이름으로 진행률 전송
-                socket.emit(job.event_name, {
-                  jobId: job.id,
-                  type: job.type,
-                  restaurantId: job.restaurant_id,
-                  status: 'progress',
-                  ...metadata,
-                  timestamp: Date.now()
-                });
+        // 활성 Job이 있으면 저장된 진행률을 클라이언트에 전송
+        for (const job of activeJobs) {
+          if (job.event_name && job.metadata) {
+            try {
+              const metadata = JSON.parse(job.metadata);
+              
+              // 저장된 이벤트 이름으로 진행률 전송
+              socket.emit(job.event_name, {
+                jobId: job.id,
+                type: job.type,
+                restaurantId: job.restaurant_id,
+                status: 'progress',
+                ...metadata,
+                timestamp: Date.now()
+              });
 
-                console.log(`[Socket.io] Sent saved progress to ${socket.id} - Event: ${job.event_name}, Progress: ${metadata.percentage}%`);
-              } catch (error) {
-                console.error(`[Socket.io] Failed to parse job metadata for job ${job.id}:`, error);
-              }
+              activeEventNames.push(job.event_name);
+              console.log(`[Socket.io] Sent saved progress to ${socket.id} - Event: ${job.event_name}, Progress: ${metadata.percentage}%`);
+            } catch (error) {
+              console.error(`[Socket.io] Failed to parse job metadata for job ${job.id}:`, error);
             }
           }
-
-          console.log(`[Socket.io] Active jobs found for restaurant ${restaurantId}: ${activeJobs.length}`);
         }
+
+        // 현재 상태 정보 전송 (항상 전송)
+        socket.emit('restaurant:current_state', {
+          restaurantId: parseInt(restaurantId),
+          activeEventNames, // 현재 활성화된 이벤트 목록
+          hasActiveJobs: activeJobs.length > 0,
+          timestamp: Date.now()
+        });
+
+        console.log(`[Socket.io] Sent current state to ${socket.id} - Active jobs: ${activeJobs.length}, Events: [${activeEventNames.join(', ')}]`);
       } catch (error) {
         console.error(`[Socket.io] Error fetching active jobs for restaurant ${restaurantId}:`, error);
       }

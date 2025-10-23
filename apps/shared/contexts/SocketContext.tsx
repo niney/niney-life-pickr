@@ -184,25 +184,39 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       }
     })
 
-    // 레스토랑 활성 Job 없음 (메뉴/리뷰/요약 모두 통합)
-    socket.on('restaurant:no_active_job', (data: any) => {
-      console.log('[Socket.io] No Active Jobs for Restaurant:', data)
+    // 레스토랑 현재 상태 (활성 이벤트 목록)
+    socket.on('restaurant:current_state', (data: any) => {
+      console.log('[Socket.io] Current State:', data)
       
-      // 메뉴 진행률 초기화
-      setMenuProgress(null)
+      const activeEvents = new Set(data.activeEventNames || [])
       
-      // 크롤링 진행률 초기화
-      setCrawlProgress(null)
-      setDbProgress(null)
-      setImageProgress(null)
-      lastCrawlSequenceRef.current = 0
-      lastDbSequenceRef.current = 0
-      lastImageSequenceRef.current = 0
+      // 메뉴 크롤링: restaurant:menu_progress가 없으면 초기화
+      if (!activeEvents.has('restaurant:menu_progress')) {
+        setMenuProgress(null)
+      }
       
-      // 요약 진행률 초기화
-      setReviewSummaryStatus({ status: 'idle' })
-      setSummaryProgress(null)
-      lastSummarySequenceRef.current = 0
+      // 리뷰 크롤링: review:crawl_progress, review:db_progress, review:image_progress가 없으면 초기화
+      if (!activeEvents.has('review:crawl_progress')) {
+        setCrawlProgress(null)
+        lastCrawlSequenceRef.current = 0
+      }
+      if (!activeEvents.has('review:db_progress')) {
+        setDbProgress(null)
+        lastDbSequenceRef.current = 0
+      }
+      if (!activeEvents.has('review:image_progress')) {
+        setImageProgress(null)
+        lastImageSequenceRef.current = 0
+      }
+      
+      // 리뷰 요약: review_summary:progress가 없으면 초기화
+      if (!activeEvents.has('review_summary:progress')) {
+        setReviewSummaryStatus({ status: 'idle' })
+        setSummaryProgress(null)
+        lastSummarySequenceRef.current = 0
+      }
+      
+      console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}]`)
     })
 
     // 크롤링 진행 상황 (웹 크롤링 단계, subscribe 시점 + 실시간 업데이트)
@@ -439,7 +453,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     return () => {
       clearInterval(cleanupInterval)
       socket.off('restaurant:menu_progress')
-      socket.off('restaurant:no_active_job')
+      socket.off('restaurant:current_state')
       socket.off('review:crawl_progress')
       socket.off('review:db_progress')
       socket.off('review:image_progress')
