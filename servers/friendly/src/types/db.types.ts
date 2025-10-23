@@ -135,6 +135,7 @@ export interface JobDB {
   type: JobType;
   restaurant_id: number;
   status: JobStatus;
+  event_name: string | null;  // Socket 이벤트 이름 (예: 'review:crawl_progress')
   progress_current: number;
   progress_total: number;
   progress_percentage: number;

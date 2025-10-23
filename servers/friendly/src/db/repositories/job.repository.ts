@@ -75,15 +75,18 @@ class JobRepository {
    */
   async updateMetadata(
     jobId: string,
+    eventName: string,
     metadata: Record<string, any>
   ): Promise<void> {
     await db.run(`
       UPDATE jobs
       SET metadata = ?,
+          event_name = ?,
           updated_at = ?
       WHERE id = ?
     `, [
       JSON.stringify(metadata),
+      eventName || null,
       new Date().toISOString(),
       jobId
     ]);

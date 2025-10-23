@@ -14,6 +14,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { JobType } from '../types/db.types';
 
 export class JobService {
+  // ==================== Throttle 관리 ====================
+  
+  // 마지막 저장 시간 추적 (jobId별)
+  private lastSaveTimestamps: Map<string, number> = new Map();
+  private readonly SAVE_INTERVAL_MS = 5000; // 5초
+
   // ==================== Socket 이벤트 발행 ====================
 
   /**
@@ -35,12 +41,13 @@ export class JobService {
   }
 
   /**
-   * Socket 진행률 이벤트 발행 (커스텀 이벤트명)
-   * - 실시간 진행률 전송용 (DB 저장 없음)
+   * Socket 진행률 이벤트 발행 + 선택적 DB 저장 (Throttle)
+   * - 항상 Socket 이벤트 발행 (실시간)
+   * - 5초마다 한 번씩만 DB에 저장 (부하 감소)
    * - 크롤링/이미지 다운로드 등 커스텀 이벤트명이 필요한 경우 사용
    * - 내부적으로 Socket.IO 직접 호출 (표준 JobType 이벤트가 아니므로)
    */
-  emitProgressSocketEvent(
+  async emitProgressSocketEvent(
     jobId: string,
     restaurantId: number,
     eventName: string,
@@ -48,8 +55,11 @@ export class JobService {
       current: number;
       total: number;
       metadata?: Record<string, any>;
+    },
+    options?: {
+      saveToDb?: boolean; // 강제 저장 옵션 (기본: throttle)
     }
-  ): void {
+  ): Promise<void> {
     const percentage = Math.floor((progress.current / progress.total) * 100);
 
     const eventData: JobEventData = {
@@ -65,9 +75,38 @@ export class JobService {
       ...progress.metadata
     };
 
-    // 커스텀 이벤트명으로 Socket 발행
+    // 1. Socket 이벤트는 항상 발행 (실시간)
     const io = getSocketIO();
     io.to(`restaurant:${restaurantId}`).emit(eventName, eventData);
+
+    // 2. DB 저장 여부 결정 (Throttle)
+    const now = Date.now();
+    const lastSave = this.lastSaveTimestamps.get(jobId) || 0;
+    const shouldSave = options?.saveToDb || (now - lastSave >= this.SAVE_INTERVAL_MS);
+
+    if (shouldSave) {
+      this.lastSaveTimestamps.set(jobId, now);
+
+      // DB에 진행률 저장 (event_name + metadata 업데이트)
+      await jobRepository.updateMetadata(
+        jobId,
+        eventName, // 이벤트 이름
+        {
+          current: progress.current,
+          total: progress.total,
+          percentage,
+          lastUpdated: now,
+          ...progress.metadata
+        }
+      );
+
+      console.log(`[JobService] Progress saved to DB: ${jobId} (${percentage}%) - Event: ${eventName}`);
+    }
+
+    // 3. 완료 시 타임스탬프 삭제
+    if (percentage === 100) {
+      this.lastSaveTimestamps.delete(jobId);
+    }
   }
 
   // ==================== Job 생명주기 관리 ====================
@@ -233,9 +272,12 @@ export class JobService {
     // 3. DB 완료
     await jobRepository.complete(jobId, result);
 
+    // 4. Throttle 타임스탬프 정리
+    this.lastSaveTimestamps.delete(jobId);
+
     console.log(`[JobService] Job 완료 - ID: ${jobId}`);
 
-    // 4. Socket 이벤트 발행 (통일된 데이터 구조)
+    // 5. Socket 이벤트 발행 (통일된 데이터 구조)
     const eventData: JobEventData = {
       jobId,
       type: dbJob.type,
@@ -272,9 +314,12 @@ export class JobService {
     // 3. DB 실패
     await jobRepository.fail(jobId, errorMessage);
 
+    // 4. Throttle 타임스탬프 정리
+    this.lastSaveTimestamps.delete(jobId);
+
     console.error(`[JobService] Job 실패 - ID: ${jobId}, Error: ${errorMessage}`);
 
-    // 4. Socket 이벤트 발행 (통일된 데이터 구조)
+    // 5. Socket 이벤트 발행 (통일된 데이터 구조)
     const eventData: JobEventData = {
       jobId,
       type: dbJob.type,
@@ -311,9 +356,12 @@ export class JobService {
     // 3. DB 취소
     await jobRepository.cancel(jobId);
 
+    // 4. Throttle 타임스탬프 정리
+    this.lastSaveTimestamps.delete(jobId);
+
     console.log(`[JobService] Job 취소 - ID: ${jobId}`);
 
-    // 4. Socket 이벤트 발행 (통일된 데이터 구조)
+    // 5. Socket 이벤트 발행 (통일된 데이터 구조)
     const eventData: JobEventData = {
       jobId,
       type: dbJob.type,

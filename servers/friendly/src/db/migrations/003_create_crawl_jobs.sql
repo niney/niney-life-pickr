@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   -- 상태 관리
   status TEXT NOT NULL DEFAULT 'pending',          -- 'pending', 'active', 'completed', 'failed', 'cancelled'
   
+  -- Socket 이벤트 정보
+  event_name TEXT,                                 -- 현재 진행 중인 Socket 이벤트명 (예: 'review:crawl_progress')
+  
   -- 메타데이터 (Socket 통신 데이터를 JSON으로 저장)
   -- 예시: { "step": "menu", "progress": { "current": 50, "total": 100 }, "placeId": "123", ... }
   metadata TEXT,                                   -- JSON string

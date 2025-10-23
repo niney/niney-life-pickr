@@ -63,6 +63,29 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
 
           console.log(`[Socket.io] Sent restaurant:no_active_job to ${socket.id} - No active jobs`);
         } else {
+          // 활성 Job이 있으면 저장된 진행률을 클라이언트에 전송
+          for (const job of activeJobs) {
+            if (job.event_name && job.metadata) {
+              try {
+                const metadata = JSON.parse(job.metadata);
+                
+                // 저장된 이벤트 이름으로 진행률 전송
+                socket.emit(job.event_name, {
+                  jobId: job.id,
+                  type: job.type,
+                  restaurantId: job.restaurant_id,
+                  status: 'progress',
+                  ...metadata,
+                  timestamp: Date.now()
+                });
+
+                console.log(`[Socket.io] Sent saved progress to ${socket.id} - Event: ${job.event_name}, Progress: ${metadata.percentage}%`);
+              } catch (error) {
+                console.error(`[Socket.io] Failed to parse job metadata for job ${job.id}:`, error);
+              }
+            }
+          }
+
           console.log(`[Socket.io] Active jobs found for restaurant ${restaurantId}: ${activeJobs.length}`);
         }
       } catch (error) {

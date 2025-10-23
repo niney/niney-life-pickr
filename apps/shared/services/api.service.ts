@@ -420,17 +420,17 @@ class ApiService {
    * 음식점 목록 조회
    */
   async getRestaurants(
-    limit: number = 20, 
-    offset: number = 0, 
+    limit: number = 20,
+    offset: number = 0,
     category?: string
   ): Promise<ApiResponse<RestaurantListResponse>> {
     let url = `/api/restaurants?limit=${limit}&offset=${offset}`;
-    
+
     // 카테고리 필터 추가
     if (category) {
       url += `&category=${encodeURIComponent(category)}`;
     }
-    
+
     return this.request<RestaurantListResponse>(url, {
       method: 'GET',
     });
