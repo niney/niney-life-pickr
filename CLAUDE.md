@@ -38,6 +38,8 @@ cd apps/mobile && npm start
 - **[ARCHITECTURE](./docs/claude/00-core/ARCHITECTURE.md)** - 전체 아키텍처, 기술 스택, 프로젝트 구조
 - **[DATABASE](./docs/claude/00-core/DATABASE.md)** - DB 스키마, 마이그레이션, Repository 패턴
 - **[DEVELOPMENT](./docs/claude/00-core/DEVELOPMENT.md)** - 개발 워크플로우, 테스트, 커밋 컨벤션
+- **[PERFORMANCE](./docs/claude/00-core/PERFORMANCE.md)** - 성능 최적화 가이드 (Frontend, Backend, DB, Network)
+- **[TROUBLESHOOTING](./docs/claude/00-core/TROUBLESHOOTING.md)** - 문제 해결 가이드 (API, DB, Socket.io, Build)
 
 ### 🖥️ 01. Web (apps/web)
 - **[WEB-SETUP](./docs/claude/01-web/WEB-SETUP.md)** - Vite, React Native Web 설정
@@ -107,20 +109,21 @@ cd apps/mobile && npm start
 
 ## 🔧 Troubleshooting
 
-### 포트 충돌
+**전체 가이드**: [TROUBLESHOOTING](./docs/claude/00-core/TROUBLESHOOTING.md) - 31개 이슈 해결 방법
+
+### 빠른 참조
 ```bash
+# 포트 충돌
 cd servers/friendly && npm run kill && npm run dev
-```
 
-### Database 초기화
-```bash
+# Database 초기화
 cd servers/friendly && npm run db:reset
-```
 
-### Mobile API 연결
-- **Android Emulator**: `10.0.2.2:4000`
-- **iOS Simulator**: `localhost:4000`
-- **Physical Device**: `<local-ip>:4000`
+# Mobile API 연결
+# Android Emulator: 10.0.2.2:4000
+# iOS Simulator: localhost:4000
+# Physical Device: <local-ip>:4000
+```
 
 ---
 
