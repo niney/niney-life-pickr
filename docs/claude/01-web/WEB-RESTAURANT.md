@@ -1,6 +1,6 @@
 # WEB-RESTAURANT.md
 
-> **Last Updated**: 2025-10-23 21:45
+> **Last Updated**: 2025-10-24 (Major Refactoring - Component Separation)
 > **Purpose**: Restaurant component comprehensive documentation (list, detail, crawling, real-time updates)
 
 ---
@@ -56,8 +56,44 @@ apps/web/src/components/
 ├── Restaurant.tsx                  # Parent component with layout logic
 ├── Restaurant/
 │   ├── RestaurantList.tsx         # List with category filter and crawling
-│   ├── RestaurantDetail.tsx       # Detail with tabs (menu/review/statistics/map)
-│   └── RecrawlModal.tsx           # Recrawl options modal
+│   ├── RestaurantDetail.tsx       # Detail orchestration component (381 lines)
+│   ├── RecrawlModal.tsx           # Recrawl options modal
+│   ├── header/
+│   │   └── RestaurantDetailHeader.tsx
+│   ├── navigation/
+│   │   └── TabMenu.tsx
+│   ├── filters/
+│   │   ├── SentimentFilterButtons.tsx
+│   │   ├── SearchBar.tsx
+│   │   └── ReviewFilterBar.tsx
+│   ├── progress/
+│   │   ├── CrawlProgressCard.tsx
+│   │   └── SummaryProgressCard.tsx
+│   ├── tabs/
+│   │   ├── types.ts
+│   │   ├── MenuTab.tsx
+│   │   ├── ReviewTab.tsx
+│   │   ├── StatisticsTab.tsx
+│   │   ├── MapTab.tsx
+│   │   ├── StatisticsSummaryCard.tsx
+│   │   ├── TopMenuList.tsx
+│   │   └── MenuStatItem.tsx
+│   ├── review/
+│   │   ├── types.ts
+│   │   ├── ReviewHeader.tsx
+│   │   ├── ReviewImages.tsx
+│   │   ├── AISummarySection.tsx
+│   │   └── ReviewCard.tsx
+│   ├── modals/
+│   │   └── ResummaryModal.tsx
+│   ├── hooks/
+│   │   ├── useMenuStatistics.ts
+│   │   ├── useResummary.ts
+│   │   └── useKeywordToggle.ts
+│   ├── utils/
+│   │   ├── starRating.tsx
+│   │   └── openNaverMap.ts
+│   └── index.ts                   # Barrel exports
 └── hooks/
     ├── useRestaurant.ts           # List state management
     └── useRestaurantDetail.ts     # Detail state management
@@ -454,70 +490,389 @@ const handleRecrawlConfirm = async (options: {
 
 ## 5. RestaurantDetail Component
 
-### 5.1 File Location
+### 5.1 Overview
+
+**Major Refactoring (2025-10-24)**: The RestaurantDetail component has been refactored from a monolithic 1,968-line file into a modular architecture with **27 specialized components**, reducing the main file to **381 lines (80% reduction)**.
 
 **Location**: `apps/web/src/components/Restaurant/RestaurantDetail.tsx`
 
-### 5.2 Responsibilities
+### 5.2 Refactoring Benefits
 
-1. **Tab Navigation**: Menu, Review, Statistics, Map tabs
-2. **Menu Display**: Menu items with prices
-3. **Review Display**: Reviews with infinite scroll, filters, search
-4. **AI Summary**: Display and regenerate review summaries
-5. **Real-time Updates**: Socket.io for crawling/summarization progress
-6. **Statistics**: Menu mention frequency analysis
+- **Maintainability**: Each component has a single, clear responsibility
+- **Reusability**: Components can be used independently in other parts of the app
+- **Testability**: Individual components can be tested in isolation
+- **Type Safety**: Dedicated type files for complex interfaces
+- **Performance**: Easier to optimize individual components
 
-### 5.3 Component Structure
+### 5.3 Component Architecture
 
+**Main Orchestration Component** (`RestaurantDetail.tsx` - 381 lines):
+- Manages state and data fetching via hooks
+- Handles Socket.io real-time updates
+- Orchestrates child components
+- Manages scroll and infinite scroll logic
+
+**27 Specialized Components** organized by function:
 ```
-RestaurantDetail
-├── Header (Mobile)
-│   ├── Back Button
-│   └── Restaurant Name
-├── Tab Bar
-│   ├── Menu Tab
-│   ├── Review Tab
-│   ├── Statistics Tab
-│   └── Map Tab
-└── Tab Content
-    ├── Menu Panel
-    ├── Review Panel (infinite scroll + filters)
-    ├── Statistics Panel
-    └── Map Panel
+Restaurant/
+├── header/
+│   └── RestaurantDetailHeader.tsx         # Back button, name, counts
+├── navigation/
+│   └── TabMenu.tsx                        # Tab navigation (menu/review/stats/map)
+├── filters/
+│   ├── SentimentFilterButtons.tsx         # Filter buttons (all/positive/negative/neutral)
+│   ├── SearchBar.tsx                      # Search input
+│   └── ReviewFilterBar.tsx                # Combined filter + search
+├── progress/
+│   ├── CrawlProgressCard.tsx              # Real-time crawl progress
+│   └── SummaryProgressCard.tsx            # Real-time AI summary progress
+├── tabs/
+│   ├── types.ts                           # Shared types (MenuStatistics, etc.)
+│   ├── MenuTab.tsx                        # Menu display tab
+│   ├── ReviewTab.tsx                      # Review display with infinite scroll
+│   ├── StatisticsTab.tsx                  # Menu statistics tab
+│   └── MapTab.tsx                         # Naver map tab
+├── review/
+│   ├── types.ts                           # Review component types
+│   ├── ReviewHeader.tsx                   # User, date, resummary button
+│   ├── ReviewImages.tsx                   # Image grid display
+│   ├── AISummarySection.tsx               # Complete AI summary display
+│   └── ReviewCard.tsx                     # Complete review card
+├── modals/
+│   └── ResummaryModal.tsx                 # AI model selection modal
+├── hooks/
+│   ├── useMenuStatistics.ts               # Menu stats data fetching
+│   ├── useResummary.ts                    # Resummary modal logic
+│   └── useKeywordToggle.ts                # Keyword expand/collapse state
+└── utils/
+    ├── starRating.tsx                     # Star rating renderer
+    └── openNaverMap.ts                    # Naver map app-first opener
 ```
 
-### 5.4 Tab System
+### 5.4 Main Component Structure
+
+**RestaurantDetail.tsx** (orchestration layer):
 
 ```typescript
-type TabType = 'menu' | 'review' | 'statistics' | 'map'
-const [activeTab, setActiveTab] = useState<TabType>('menu')
+import React, { useEffect, useRef, useCallback, useState, useEffectEvent } from 'react'
+import { View, StyleSheet, ActivityIndicator } from 'react-native'
+import { useTheme, useSocket } from '@shared/contexts'
+import { THEME_COLORS } from '@shared/constants'
+import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
 
-const handleTabChange = (tab: TabType) => {
-  setActiveTab(tab)
-  if (scrollContainerRef.current) {
-    scrollContainerRef.current.scrollTop = 0  // Reset scroll on tab change
-  }
+// Component imports
+import RestaurantDetailHeader from './header/RestaurantDetailHeader'
+import TabMenu from './navigation/TabMenu'
+import ReviewFilterBar from './filters/ReviewFilterBar'
+import CrawlProgressCard from './progress/CrawlProgressCard'
+import SummaryProgressCard from './progress/SummaryProgressCard'
+import MenuTab from './tabs/MenuTab'
+import ReviewTab from './tabs/ReviewTab'
+import StatisticsTab from './tabs/StatisticsTab'
+import MapTab from './tabs/MapTab'
+import ResummaryModal from './modals/ResummaryModal'
+
+// Custom hooks
+import { useMenuStatistics } from './hooks/useMenuStatistics'
+import { useResummary } from './hooks/useResummary'
+import { useKeywordToggle } from './hooks/useKeywordToggle'
+
+// Utils
+import { openNaverMap } from './utils/openNaverMap'
+
+const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
+  // Data from hooks
+  const {
+    id, restaurant, restaurantLoading,
+    reviews, reviewsLoading, reviewsTotal, hasMoreReviews,
+    loadMoreReviews, fetchReviews,
+    sentimentFilter, changeSentimentFilter,
+    searchText, setSearchText, changeSearchText,
+    menus, menusLoading, fetchMenus,
+    handleBackToList,
+  } = useRestaurantDetail()
+
+  const { expandedKeywords, toggleKeywords } = useKeywordToggle()
+  const { menuStatistics, statisticsLoading, fetchMenuStatistics } = useMenuStatistics()
+  const {
+    resummaryModalVisible, selectedModel, resummaryLoading,
+    availableModels, openResummaryModal, closeResummaryModal,
+    setSelectedModel, handleResummarize,
+  } = useResummary()
+
+  // Socket.io real-time updates
+  const { menuProgress, crawlProgress, dbProgress, imageProgress,
+          reviewSummaryStatus, summaryProgress } = useSocket()
+
+  // Render orchestration
+  return (
+    <div>
+      <RestaurantDetailHeader {...} />
+
+      {isCrawling && <CrawlProgressCard {...} />}
+      {isSummarizing && <SummaryProgressCard {...} />}
+
+      <TabMenu activeTab={activeTab} onTabChange={handleTabChange} {...} />
+
+      {activeTab === 'review' && <ReviewFilterBar {...} />}
+
+      <div>
+        {activeTab === 'menu' && <MenuTab {...} />}
+        {activeTab === 'review' && <ReviewTab {...} />}
+        {activeTab === 'statistics' && <StatisticsTab {...} />}
+        {activeTab === 'map' && <MapTab {...} />}
+      </div>
+
+      <ResummaryModal {...} />
+    </div>
+  )
 }
 ```
 
-**Tab Rendering**:
-```typescript
-<View style={styles.tabBar}>
-  {['menu', 'review', 'statistics', 'map'].map((tab) => (
-    <TouchableOpacity
-      key={tab}
-      style={[styles.tab, activeTab === tab && styles.activeTab]}
-      onPress={() => handleTabChange(tab)}
-    >
-      <Text>{TAB_LABELS[tab]}</Text>
-    </TouchableOpacity>
-  ))}
-</View>
+### 5.5 Component Details
 
-{activeTab === 'menu' && <MenuPanel />}
-{activeTab === 'review' && <ReviewPanel />}
-{activeTab === 'statistics' && <StatisticsPanel />}
-{activeTab === 'map' && <MapPanel />}
+#### 5.5.1 Header Component
+
+**RestaurantDetailHeader.tsx**:
+```typescript
+interface RestaurantDetailHeaderProps {
+  restaurantName: string
+  menuCount: number
+  reviewCount: number
+  onBack: () => void
+  isMobile?: boolean
+}
+
+const RestaurantDetailHeader: React.FC<RestaurantDetailHeaderProps> = ({
+  restaurantName, menuCount, reviewCount, onBack, isMobile
+}) => {
+  return (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={onBack}>
+        <FontAwesomeIcon icon={faArrowLeft} />
+      </TouchableOpacity>
+      <View>
+        <Text style={styles.title}>{restaurantName}</Text>
+        <Text style={styles.subtitle}>메뉴 {menuCount}개 · 리뷰 {reviewCount}개</Text>
+      </View>
+    </View>
+  )
+}
+```
+
+#### 5.5.2 Tab Navigation
+
+**TabMenu.tsx**:
+```typescript
+export type TabType = 'menu' | 'review' | 'statistics' | 'map'
+
+interface TabMenuProps {
+  activeTab: TabType
+  onTabChange: (tab: TabType) => void
+  menuCount: number
+  reviewCount: number
+}
+
+const TabMenu: React.FC<TabMenuProps> = ({
+  activeTab, onTabChange, menuCount, reviewCount
+}) => {
+  const tabs: { key: TabType; label: string; count?: number }[] = [
+    { key: 'menu', label: '메뉴', count: menuCount },
+    { key: 'review', label: '리뷰', count: reviewCount },
+    { key: 'statistics', label: '통계' },
+    { key: 'map', label: '지도' },
+  ]
+
+  return (
+    <View style={styles.tabBar}>
+      {tabs.map(tab => (
+        <TouchableOpacity
+          key={tab.key}
+          style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+          onPress={() => onTabChange(tab.key)}
+        >
+          <Text>{tab.label} {tab.count && `(${tab.count})`}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  )
+}
+```
+
+#### 5.5.3 Review Filter & Search
+
+**ReviewFilterBar.tsx** (combines sentiment filter + search):
+```typescript
+interface ReviewFilterBarProps {
+  sentimentFilter: SentimentType
+  onFilterChange: (restaurantId: number, filter: SentimentType) => void
+  searchText: string
+  onSearchTextChange: (text: string) => void
+  onSearch: (restaurantId: number, searchText: string) => void
+  restaurantId: string
+}
+
+const ReviewFilterBar: React.FC<ReviewFilterBarProps> = ({
+  sentimentFilter, onFilterChange, searchText,
+  onSearchTextChange, onSearch, restaurantId
+}) => {
+  return (
+    <View style={styles.container}>
+      <SentimentFilterButtons
+        selectedFilter={sentimentFilter}
+        onFilterChange={(filter) => {
+          const id = parseInt(restaurantId, 10)
+          if (!isNaN(id)) onFilterChange(id, filter)
+        }}
+      />
+      <SearchBar
+        searchText={searchText}
+        onSearchTextChange={onSearchTextChange}
+        onSearch={() => {
+          const id = parseInt(restaurantId, 10)
+          if (!isNaN(id)) onSearch(id, searchText)
+        }}
+      />
+    </View>
+  )
+}
+```
+
+**SentimentFilterButtons.tsx**:
+```typescript
+export type SentimentType = 'all' | 'positive' | 'negative' | 'neutral'
+
+const SentimentFilterButtons: React.FC<Props> = ({
+  selectedFilter, onFilterChange
+}) => {
+  const filters: { key: SentimentType; label: string; color: string }[] = [
+    { key: 'all', label: '전체', color: colors.primary },
+    { key: 'positive', label: '😊 긍정', color: '#4caf50' },
+    { key: 'negative', label: '😞 부정', color: '#f44336' },
+    { key: 'neutral', label: '😐 중립', color: '#ff9800' },
+  ]
+
+  return (
+    <View style={styles.container}>
+      {filters.map(filter => (
+        <TouchableOpacity
+          key={filter.key}
+          style={[
+            styles.button,
+            { backgroundColor: selectedFilter === filter.key ? filter.color : colors.surface }
+          ]}
+          onPress={() => onFilterChange(filter.key)}
+        >
+          <Text>{filter.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  )
+}
+```
+
+#### 5.5.4 Tab Components
+
+**MenuTab.tsx** (simple menu display):
+```typescript
+interface MenuTabProps {
+  menus: MenuItem[]
+  menusLoading: boolean
+  isMobile?: boolean
+}
+
+const MenuTab: React.FC<MenuTabProps> = ({ menus, menusLoading, isMobile }) => {
+  if (menusLoading) return <ActivityIndicator />
+  if (menus.length === 0) return <Text>메뉴 정보가 없습니다</Text>
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))',
+      gap: '16px',
+    }}>
+      {menus.map(menu => (
+        <View key={menu.id} style={styles.menuCard}>
+          {menu.image && <img src={menu.image} style={styles.menuImage} />}
+          <Text style={styles.menuName}>{menu.name}</Text>
+          <Text style={styles.menuPrice}>{menu.price}</Text>
+        </View>
+      ))}
+    </div>
+  )
+}
+```
+
+**ReviewTab.tsx** (reviews with infinite scroll):
+```typescript
+interface ReviewTabProps {
+  reviews: ReviewData[]
+  reviewsLoading: boolean
+  reviewsTotal: number
+  hasMoreReviews: boolean
+  expandedKeywords: Set<number>
+  isMobile?: boolean
+  onLoadMore: () => void
+  onResummary: (reviewId: number) => void
+  onToggleKeywords: (reviewId: number) => void
+  loadMoreTriggerRef?: React.RefObject<HTMLDivElement | null>
+}
+
+const ReviewTab: React.FC<ReviewTabProps> = ({
+  reviews, reviewsLoading, reviewsTotal, hasMoreReviews,
+  expandedKeywords, isMobile, onLoadMore, onResummary,
+  onToggleKeywords, loadMoreTriggerRef
+}) => {
+  // Loading state
+  if (reviewsLoading && reviews.length === 0) {
+    return <ActivityIndicator />
+  }
+
+  // Empty state
+  if (reviews.length === 0) {
+    return <Text>등록된 리뷰가 없습니다</Text>
+  }
+
+  return (
+    <>
+      {/* Review grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(450px, 1fr))',
+        gap: '16px',
+      }}>
+        {reviews.map(review => (
+          <ReviewCard
+            key={review.id}
+            review={review}
+            expandedKeywords={expandedKeywords}
+            onResummary={onResummary}
+            onToggleKeywords={onToggleKeywords}
+          />
+        ))}
+      </div>
+
+      {/* Load more button */}
+      {!reviewsLoading && hasMoreReviews && (
+        <button onClick={onLoadMore}>
+          리뷰 더 보기 ({reviewsTotal - reviews.length}개 남음)
+        </button>
+      )}
+
+      {/* Infinite scroll trigger (mobile) */}
+      {isMobile && hasMoreReviews && loadMoreTriggerRef && (
+        <div ref={loadMoreTriggerRef}>
+          {reviewsLoading && <ActivityIndicator />}
+        </div>
+      )}
+
+      {/* All loaded message */}
+      {!hasMoreReviews && (
+        <Text>모든 리뷰를 불러왔습니다 ({reviewsTotal}개)</Text>
+      )}
+    </>
+  )
+}
 ```
 
 ### 5.5 Menu Tab
@@ -1039,5 +1394,17 @@ const handleCrawl = async () => {
 
 ---
 
-**Document Version**: 1.0.0
-**Covers Files**: `Restaurant.tsx`, `RestaurantList.tsx`, `RestaurantDetail.tsx`, `useRestaurant.ts`, `useRestaurantDetail.ts`
+**Document Version**: 2.0.0 (Major Refactoring Update)
+**Covers Files**:
+- Main: `Restaurant.tsx`, `RestaurantList.tsx`, `RestaurantDetail.tsx` (381 lines)
+- Components: 27 specialized components in `Restaurant/` directory
+- Hooks: `useRestaurant.ts`, `useRestaurantDetail.ts`, `useMenuStatistics.ts`, `useResummary.ts`, `useKeywordToggle.ts`
+- Utils: `starRating.tsx`, `openNaverMap.ts`
+
+**Major Changes (2025-10-24)**:
+- ✅ Refactored RestaurantDetail from 1,968 lines to 381 lines (80% reduction)
+- ✅ Created 27 modular, reusable components
+- ✅ Separated concerns: header, navigation, filters, tabs, reviews, modals, hooks, utils
+- ✅ Improved maintainability, testability, and reusability
+- ✅ Full TypeScript type safety with dedicated type files
+- ✅ Restored sentiment filter and search functionality from shared useReviews hook
