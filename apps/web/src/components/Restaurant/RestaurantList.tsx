@@ -6,11 +6,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  type GestureResponderEvent
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
-import { useTheme, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData } from '@shared'
+import { useTheme, THEME_COLORS, apiService, Alert, ProgressIndicator, type RestaurantCategory, type RestaurantData } from '@shared'
 import { useLocation } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
 
@@ -88,7 +89,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   }
 
   // 재크롤링 버튼 클릭
-  const handleRecrawlClick = (restaurant: RestaurantData, event: React.MouseEvent) => {
+  const handleRecrawlClick = (restaurant: RestaurantData, event: GestureResponderEvent) => {
     event.stopPropagation() // 카드 클릭 이벤트 방지
     setSelectedRestaurant(restaurant)
     setRecrawlModalVisible(true)
@@ -112,7 +113,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   }
 
   // 삭제 버튼 클릭
-  const handleDeleteClick = (restaurant: RestaurantData, event: React.MouseEvent) => {
+  const handleDeleteClick = (restaurant: RestaurantData, event: GestureResponderEvent) => {
     event.stopPropagation() // 카드 클릭 이벤트 방지
     setRestaurantToDelete(restaurant)
     setDeleteDialogVisible(true)
@@ -246,62 +247,35 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
               <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링 진행 상황</Text>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
-            
+
             {menuProgress && menuProgress.total > 0 && (
-              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {menuProgress.current} / {menuProgress.total}
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[styles.progressBarFill, { width: `${menuProgress.percentage}%`, backgroundColor: '#4caf50' }]}
-                  />
-                </View>
-                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-                  {menuProgress.percentage}%
-                </Text>
-              </View>
+              <ProgressIndicator
+                label="메뉴 수집"
+                current={menuProgress.current}
+                total={menuProgress.total}
+                percentage={menuProgress.percentage}
+                color="#4caf50"
+              />
             )}
 
             {crawlProgress && crawlProgress.total > 0 && (
-              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>리뷰 수집</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {crawlProgress.current} / {crawlProgress.total}
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%`, backgroundColor: '#2196f3' }]}
-                  />
-                </View>
-                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-                  {crawlProgress.percentage}%
-                </Text>
-              </View>
+              <ProgressIndicator
+                label="리뷰 수집"
+                current={crawlProgress.current}
+                total={crawlProgress.total}
+                percentage={crawlProgress.percentage}
+                color="#2196f3"
+              />
             )}
 
             {dbProgress && dbProgress.total > 0 && (
-              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {dbProgress.current} / {dbProgress.total}
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[styles.progressBarFill, { width: `${dbProgress.percentage}%`, backgroundColor: colors.primary }]}
-                  />
-                </View>
-                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-                  {dbProgress.percentage}%
-                </Text>
-              </View>
+              <ProgressIndicator
+                label="DB 저장"
+                current={dbProgress.current}
+                total={dbProgress.total}
+                percentage={dbProgress.percentage}
+                color={colors.primary}
+              />
             )}
           </View>
         )}
@@ -352,13 +326,13 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                       <View style={{ flexDirection: 'row', gap: 8 }}>
                         <TouchableOpacity
                           style={[styles.actionButton, { backgroundColor: colors.border }]}
-                          onPress={(e: any) => handleRecrawlClick(restaurant, e)}
+                          onPress={(e) => handleRecrawlClick(restaurant, e)}
                         >
                           <FontAwesomeIcon icon={faRotate} style={{ fontSize: 14, color: colors.text }} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.actionButton, { backgroundColor: '#ff4444' }]}
-                          onPress={(e: any) => handleDeleteClick(restaurant, e)}
+                          onPress={(e) => handleDeleteClick(restaurant, e)}
                         >
                           <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14, color: '#fff' }} />
                         </TouchableOpacity>
@@ -571,40 +545,6 @@ const styles = StyleSheet.create({
   },
   categoryCount: {
     fontSize: 13,
-  },
-  progressCard: {
-    padding: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressPercentage: {
-    fontSize: 13,
-    textAlign: 'right',
   },
   statusCard: {
     padding: 14,

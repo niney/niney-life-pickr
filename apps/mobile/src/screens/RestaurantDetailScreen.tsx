@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,7 +26,8 @@ import {
   useReviews,
   useMenus,
   getDefaultApiUrl,
-  Alert
+  Alert,
+  ProgressIndicator
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
@@ -131,6 +132,31 @@ const RestaurantDetailScreen: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<string>('gpt-oss:20b-cloud');
   const [resummaryLoading, setResummaryLoading] = useState(false);
 
+  // 모델 선택 동적 스타일 생성 함수
+  const getModelOptionStyle = useCallback((modelValue: string) => ({
+    backgroundColor: selectedModel === modelValue ? colors.primary : (theme === 'light' ? '#f5f5f5' : colors.background),
+    borderColor: selectedModel === modelValue ? colors.primary : colors.border
+  }), [selectedModel, colors, theme]);
+
+  const getModelTextStyle = useCallback((modelValue: string) => ({
+    color: selectedModel === modelValue ? '#fff' : colors.text
+  }), [selectedModel, colors]);
+
+  const getRadioBorderStyle = useCallback((modelValue: string) => ({
+    borderColor: selectedModel === modelValue ? '#fff' : colors.border
+  }), [selectedModel, colors]);
+
+  // 감정별 색상 함수
+  const getSentimentColor = useCallback((sentiment: string) => {
+    if (sentiment === 'positive') return '#4caf50';
+    if (sentiment === 'negative') return '#f44336';
+    return '#ff9800'; // neutral
+  }, []);
+
+  const getSentimentBadgeStyle = useCallback((sentiment: string) => ({
+    backgroundColor: getSentimentColor(sentiment)
+  }), [getSentimentColor]);
+
   // 사용 가능한 AI 모델 목록
   const availableModels = [
     { value: 'gpt-oss:20b-cloud', label: 'GPT OSS 20B (Cloud)' },
@@ -167,6 +193,48 @@ const RestaurantDetailScreen: React.FC = () => {
     menusLoading,
     fetchMenus,
   } = useMenus();
+
+  // 동적 스타일 객체 (테마와 상태에 따라 변경)
+  const dynamicStyles = useMemo(() => ({
+    cardBackground: {
+      backgroundColor: theme === 'light' ? '#fff' : colors.surface,
+    },
+    surfaceBackground: {
+      backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface,
+    },
+    filterButtonAll: {
+      backgroundColor: sentimentFilter === 'all' ? colors.primary : (theme === 'light' ? '#f5f5f5' : colors.surface),
+      borderColor: sentimentFilter === 'all' ? colors.primary : colors.border,
+    },
+    filterButtonPositive: {
+      backgroundColor: sentimentFilter === 'positive' ? '#4caf50' : (theme === 'light' ? '#f5f5f5' : colors.surface),
+      borderColor: sentimentFilter === 'positive' ? '#4caf50' : colors.border,
+    },
+    filterButtonNegative: {
+      backgroundColor: sentimentFilter === 'negative' ? '#f44336' : (theme === 'light' ? '#f5f5f5' : colors.surface),
+      borderColor: sentimentFilter === 'negative' ? '#f44336' : colors.border,
+    },
+    filterButtonNeutral: {
+      backgroundColor: sentimentFilter === 'neutral' ? '#ff9800' : (theme === 'light' ? '#f5f5f5' : colors.surface),
+      borderColor: sentimentFilter === 'neutral' ? '#ff9800' : colors.border,
+    },
+    filterTextAll: {
+      color: sentimentFilter === 'all' ? '#fff' : colors.text,
+    },
+    filterTextPositive: {
+      color: sentimentFilter === 'positive' ? '#fff' : colors.text,
+    },
+    filterTextNegative: {
+      color: sentimentFilter === 'negative' ? '#fff' : colors.text,
+    },
+    filterTextNeutral: {
+      color: sentimentFilter === 'neutral' ? '#fff' : colors.text,
+    },
+    summaryBorder: {
+      backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e',
+      borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44',
+    },
+  }), [theme, colors, sentimentFilter]);
 
   // 메뉴 통계 조회 함수
   const fetchMenuStatistics = useCallback(async () => {
@@ -393,9 +461,7 @@ const RestaurantDetailScreen: React.FC = () => {
       closeResummaryModal();
     } catch (error) {
       console.error('❌ 재요약 실패:', error);
-      // React Native에서는 Alert 사용
-      const { Alert } = require('react-native');
-      Alert.alert('오류', '재요약에 실패했습니다. 다시 시도해주세요.');
+      Alert.error('오류', '재요약에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setResummaryLoading(false);
     }
@@ -447,7 +513,7 @@ const RestaurantDetailScreen: React.FC = () => {
           icon={icon}
           size={16}
           color={color}
-          style={{ marginRight: 2 }}
+          style={styles.marginRight2}
         />
       );
     });
@@ -513,7 +579,7 @@ const RestaurantDetailScreen: React.FC = () => {
         }}>
           {/* 레스토랑 정보 헤더 */}
           <View style={styles.restaurantInfoContainer}>
-            <View style={[styles.restaurantInfoCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.restaurantInfoCard, dynamicStyles.cardBackground, { borderColor: colors.border }]}>
               <Text style={[styles.restaurantName, { color: colors.text }]}>{restaurant.name}</Text>
               {restaurant.category && (
                 <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>
@@ -534,97 +600,49 @@ const RestaurantDetailScreen: React.FC = () => {
           {/* 크롤링 진행 상태 */}
           {isCrawling && (
             <View style={styles.crawlProgressContainer}>
-              <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.crawlProgressCard, dynamicStyles.cardBackground, { borderColor: colors.border }]}>
                 <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
                   🔄 크롤링 중...
                 </Text>
 
                 {menuProgress && menuProgress.total > 0 && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressInfo}>
-                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
-                      <Text style={[styles.progressText, { color: colors.text }]}>
-                        {menuProgress.current} / {menuProgress.total} ({menuProgress.percentage}%)
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            backgroundColor: '#4caf50',
-                            width: `${menuProgress.percentage}%`
-                          }
-                        ]}
-                      />
-                    </View>
-                  </View>
+                  <ProgressIndicator
+                    label="메뉴 수집"
+                    current={menuProgress.current}
+                    total={menuProgress.total}
+                    percentage={menuProgress.percentage}
+                    color="#4caf50"
+                  />
                 )}
 
                 {crawlProgress && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressInfo}>
-                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
-                      <Text style={[styles.progressText, { color: colors.text }]}>
-                        {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            backgroundColor: '#2196f3',
-                            width: `${crawlProgress.percentage}%`
-                          }
-                        ]}
-                      />
-                    </View>
-                  </View>
+                  <ProgressIndicator
+                    label="크롤링 진행"
+                    current={crawlProgress.current}
+                    total={crawlProgress.total}
+                    percentage={crawlProgress.percentage}
+                    color="#2196f3"
+                  />
                 )}
 
                 {imageProgress && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressInfo}>
-                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>이미지 처리</Text>
-                      <Text style={[styles.progressText, { color: colors.text }]}>
-                        {imageProgress.current} / {imageProgress.total} ({imageProgress.percentage}%)
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            backgroundColor: '#ff9800',
-                            width: `${imageProgress.percentage}%`
-                          }
-                        ]}
-                      />
-                    </View>
-                  </View>
+                  <ProgressIndicator
+                    label="이미지 처리"
+                    current={imageProgress.current}
+                    total={imageProgress.total}
+                    percentage={imageProgress.percentage}
+                    color="#ff9800"
+                  />
                 )}
 
                 {dbProgress && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressInfo}>
-                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-                      <Text style={[styles.progressText, { color: colors.text }]}>
-                        {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            backgroundColor: colors.primary,
-                            width: `${dbProgress.percentage}%`
-                          }
-                        ]}
-                      />
-                    </View>
-                  </View>
+                  <ProgressIndicator
+                    label="DB 저장"
+                    current={dbProgress.current}
+                    total={dbProgress.total}
+                    percentage={dbProgress.percentage}
+                    color={colors.primary}
+                  />
                 )}
               </View>
             </View>
@@ -633,41 +651,31 @@ const RestaurantDetailScreen: React.FC = () => {
           {/* 리뷰 요약 진행 상태 */}
           {(reviewSummaryStatus.status === 'active' || summaryProgress) && (
             <View style={styles.crawlProgressContainer}>
-              <View style={[styles.crawlProgressCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.crawlProgressCard, dynamicStyles.cardBackground, { borderColor: colors.border }]}>
                 <Text style={[styles.crawlProgressTitle, { color: colors.text }]}>
                   🤖 AI 리뷰 요약 중...
                 </Text>
 
                 {summaryProgress && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressInfo}>
-                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>요약 진행</Text>
-                      <Text style={[styles.progressText, { color: colors.text }]}>
-                        {summaryProgress.current} / {summaryProgress.total} ({summaryProgress.percentage}%)
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            backgroundColor: '#9c27b0',
-                            width: `${summaryProgress.percentage}%`
-                          }
-                        ]}
-                      />
-                    </View>
+                  <>
+                    <ProgressIndicator
+                      label="요약 진행"
+                      current={summaryProgress.current}
+                      total={summaryProgress.total}
+                      percentage={summaryProgress.percentage}
+                      color="#9c27b0"
+                    />
                     <View style={styles.progressStats}>
-                      <Text style={[styles.progressStat, { color: '#4caf50' }]}>
+                      <Text style={[styles.progressStat, styles.successColor]}>
                         ✓ 완료: {summaryProgress.completed}
                       </Text>
                       {summaryProgress.failed > 0 && (
-                        <Text style={[styles.progressStat, { color: '#f44336' }]}>
+                        <Text style={[styles.progressStat, styles.errorColor]}>
                           ✗ 실패: {summaryProgress.failed}
                         </Text>
                       )}
                     </View>
-                  </View>
+                  </>
                 )}
               </View>
             </View>
@@ -675,7 +683,7 @@ const RestaurantDetailScreen: React.FC = () => {
         </View>
 
         {/* 탭 메뉴 - Sticky 고정 */}
-        <View style={{ backgroundColor: colors.background, paddingHorizontal: 16, paddingBottom: 7 }}>
+        <View style={[styles.paddingHorizontal16Bottom7, { backgroundColor: colors.background }]}>
           <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
             <TouchableOpacity
               style={styles.tabButton}
@@ -753,14 +761,11 @@ const RestaurantDetailScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.filterButton,
-                    {
-                      backgroundColor: sentimentFilter === 'all' ? colors.primary : (theme === 'light' ? '#f5f5f5' : colors.surface),
-                      borderColor: sentimentFilter === 'all' ? colors.primary : colors.border
-                    }
+                    dynamicStyles.filterButtonAll
                   ]}
                   onPress={() => changeSentimentFilter(restaurantId, 'all')}
                 >
-                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'all' ? '#fff' : colors.text }]}>
+                  <Text style={[styles.filterButtonText, dynamicStyles.filterTextAll]}>
                     전체
                   </Text>
                 </TouchableOpacity>
@@ -768,14 +773,11 @@ const RestaurantDetailScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.filterButton,
-                    {
-                      backgroundColor: sentimentFilter === 'positive' ? '#4caf50' : (theme === 'light' ? '#f5f5f5' : colors.surface),
-                      borderColor: sentimentFilter === 'positive' ? '#4caf50' : colors.border
-                    }
+                    dynamicStyles.filterButtonPositive
                   ]}
                   onPress={() => changeSentimentFilter(restaurantId, 'positive')}
                 >
-                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'positive' ? '#fff' : colors.text }]}>
+                  <Text style={[styles.filterButtonText, dynamicStyles.filterTextPositive]}>
                     😊 긍정
                   </Text>
                 </TouchableOpacity>
@@ -783,14 +785,11 @@ const RestaurantDetailScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.filterButton,
-                    {
-                      backgroundColor: sentimentFilter === 'negative' ? '#f44336' : (theme === 'light' ? '#f5f5f5' : colors.surface),
-                      borderColor: sentimentFilter === 'negative' ? '#f44336' : colors.border
-                    }
+                    dynamicStyles.filterButtonNegative
                   ]}
                   onPress={() => changeSentimentFilter(restaurantId, 'negative')}
                 >
-                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'negative' ? '#fff' : colors.text }]}>
+                  <Text style={[styles.filterButtonText, dynamicStyles.filterTextNegative]}>
                     😞 부정
                   </Text>
                 </TouchableOpacity>
@@ -798,14 +797,11 @@ const RestaurantDetailScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.filterButton,
-                    {
-                      backgroundColor: sentimentFilter === 'neutral' ? '#ff9800' : (theme === 'light' ? '#f5f5f5' : colors.surface),
-                      borderColor: sentimentFilter === 'neutral' ? '#ff9800' : colors.border
-                    }
+                    dynamicStyles.filterButtonNeutral
                   ]}
                   onPress={() => changeSentimentFilter(restaurantId, 'neutral')}
                 >
-                  <Text style={[styles.filterButtonText, { color: sentimentFilter === 'neutral' ? '#fff' : colors.text }]}>
+                  <Text style={[styles.filterButtonText, dynamicStyles.filterTextNeutral]}>
                     😐 중립
                   </Text>
                 </TouchableOpacity>
@@ -813,8 +809,8 @@ const RestaurantDetailScreen: React.FC = () => {
 
               {/* 검색 UI */}
               <View style={styles.searchContainer}>
-                <View style={[styles.searchInputWrapper, { backgroundColor: theme === 'light' ? '#f5f5f5' : colors.surface, borderColor: colors.border }]}>
-                  <FontAwesomeIcon icon={faSearch as IconProp} size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                <View style={[styles.searchInputWrapper, dynamicStyles.surfaceBackground, { borderColor: colors.border }]}>
+                  <FontAwesomeIcon icon={faSearch as IconProp} size={16} color={colors.textSecondary} style={styles.marginRight8} />
                   <TextInput
                     style={[styles.searchInput, { color: colors.text }]}
                     placeholder="리뷰 내용 검색..."
@@ -830,7 +826,7 @@ const RestaurantDetailScreen: React.FC = () => {
                         setSearchText('');
                         changeSearchText(restaurantId, '');
                       }}
-                      style={{ padding: 4 }}
+                      style={styles.padding4}
                     >
                       <FontAwesomeIcon icon={faTimes as IconProp} size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
@@ -849,7 +845,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
         {/* 메뉴 탭 */}
         {activeTab === 'menu' && (
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={styles.paddingHorizontal16}>
             {menusLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -868,7 +864,7 @@ const RestaurantDetailScreen: React.FC = () => {
                       <View style={styles.menuCardContent}>
                         <View style={styles.menuInfo}>
                           <Text style={[styles.menuName, { color: colors.text }]} numberOfLines={2}>{menu.name}</Text>
-                          <Text style={[styles.menuPrice, { color: colors.primary, marginTop: 4 }]}>{menu.price}</Text>
+                          <Text style={[styles.menuPrice, styles.marginTop4, { color: colors.primary }]}>{menu.price}</Text>
                           {menu.description && (
                             <Text style={[styles.menuDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                               {menu.description}
@@ -897,7 +893,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
         {/* 리뷰 탭 */}
         {activeTab === 'review' && (
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={styles.paddingHorizontal16}>
             {reviewsLoading && reviews.length === 0 ? (
               // 스켈레톤 UI - 3개의 빈 박스
               <View style={styles.reviewsList}>
@@ -913,16 +909,16 @@ const RestaurantDetailScreen: React.FC = () => {
                     <View style={styles.reviewCardContent}>
                       {/* 헤더 스켈레톤 */}
                       <View style={styles.reviewCardHeader}>
-                        <View style={{ flex: 1 }}>
+                        <View style={styles.flex1}>
                           <View style={[styles.skeletonLine, styles.skeletonShort, { backgroundColor: colors.border }]} />
-                          <View style={[styles.skeletonLine, styles.skeletonTiny, { backgroundColor: colors.border, marginTop: 4 }]} />
+                          <View style={[styles.skeletonLine, styles.skeletonTiny, styles.marginTop4, { backgroundColor: colors.border }]} />
                         </View>
                       </View>
 
                       {/* 텍스트 스켈레톤 */}
-                      <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 12 }]} />
-                      <View style={[styles.skeletonLine, styles.skeletonFull, { backgroundColor: colors.border, marginTop: 8 }]} />
-                      <View style={[styles.skeletonLine, styles.skeletonMedium, { backgroundColor: colors.border, marginTop: 8 }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonFull, styles.marginTop12, { backgroundColor: colors.border }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonFull, styles.marginTop8, { backgroundColor: colors.border }]} />
+                      <View style={[styles.skeletonLine, styles.skeletonMedium, styles.marginTop8, { backgroundColor: colors.border }]} />
                     </View>
                   </View>
                 ))}
@@ -939,7 +935,7 @@ const RestaurantDetailScreen: React.FC = () => {
                   >
                     <View style={styles.reviewCardContent}>
                       <View style={styles.reviewCardHeader}>
-                        <View style={{ flex: 1 }}>
+                        <View style={styles.flex1}>
                           <Text style={[styles.reviewUserName, { color: colors.text }]}>{review.userName || '익명'}</Text>
                           {review.visitInfo.visitDate && (
                             <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
@@ -1011,14 +1007,11 @@ const RestaurantDetailScreen: React.FC = () => {
 
                       {/* AI 요약 데이터 표시 */}
                       {review.summary ? (
-                        <View style={[styles.summaryContainer, { backgroundColor: theme === 'light' ? '#f5f5ff' : '#1a1a2e', borderColor: theme === 'light' ? '#e0e0ff' : '#2d2d44' }]}>
+                        <View style={[styles.summaryContainer, dynamicStyles.summaryBorder]}>
                           <View style={styles.summaryHeader}>
                             <Text style={styles.summaryTitle}>🤖 AI 요약</Text>
                             <View style={styles.sentimentBadge}>
-                              <Text style={[styles.sentimentText, {
-                                color: review.summary.sentiment === 'positive' ? '#4caf50' :
-                                  review.summary.sentiment === 'negative' ? '#f44336' : '#ff9800'
-                              }]}>
+                              <Text style={[styles.sentimentText, { color: getSentimentColor(review.summary.sentiment) }]}>
                                 {review.summary.sentiment === 'positive' ? '😊 긍정' :
                                   review.summary.sentiment === 'negative' ? '😞 부정' : '😐 중립'}
                               </Text>
@@ -1112,7 +1105,7 @@ const RestaurantDetailScreen: React.FC = () => {
                                   return (
                                     <View key={idx} style={[styles.menuItemBadge, { backgroundColor: bgColor, borderColor }]}>
                                       <Text style={[styles.menuItemText, { color: textColor }]}>
-                                        <Text style={{ fontSize: 13 }}>{config.emoji}</Text> {menuItem.name}
+                                        <Text style={styles.fontSize13}>{config.emoji}</Text> {menuItem.name}
                                         {menuItem.reason && ` (${menuItem.reason})`}
                                       </Text>
                                     </View>
@@ -1151,8 +1144,8 @@ const RestaurantDetailScreen: React.FC = () => {
                       {review.emotionKeywords.length > 0 && (
                         <View style={styles.keywordsContainer}>
                           {review.emotionKeywords.map((keyword: string, idx: number) => (
-                            <View key={idx} style={[styles.emotionKeyword, { backgroundColor: '#e3f2fd' }]}>
-                              <Text style={[styles.keywordText, { color: '#1976d2' }]}>{keyword}</Text>
+                            <View key={idx} style={[styles.emotionKeyword, styles.emotionKeywordBg]}>
+                              <Text style={[styles.keywordText, styles.emotionKeywordColor]}>{keyword}</Text>
                             </View>
                           ))}
                         </View>
@@ -1199,7 +1192,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
         {/* 통계 탭 */}
         {activeTab === 'statistics' && (
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={styles.paddingHorizontal16}>
             {statisticsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
@@ -1232,7 +1225,7 @@ const RestaurantDetailScreen: React.FC = () => {
                     <View style={styles.topMenusList}>
                       {menuStatistics.topPositiveMenus.map((menu: any, index: number) => (
                         <View key={index} style={styles.topMenuItem}>
-                          <View style={[styles.topMenuRank, { backgroundColor: '#4caf50' }]}>
+                          <View style={[styles.topMenuRank, styles.successBadgeBg]}>
                             <Text style={styles.topMenuRankText}>{index + 1}</Text>
                           </View>
                           <View style={styles.topMenuInfo}>
@@ -1240,7 +1233,7 @@ const RestaurantDetailScreen: React.FC = () => {
                             <Text style={[styles.topMenuStats, { color: colors.textSecondary }]}>
                               긍정률 {menu.positiveRate}% • {menu.mentions}회 언급
                             </Text>
-                            <Text style={[styles.topMenuStats, { color: colors.textSecondary, fontSize: 11, marginTop: 2 }]}>
+                            <Text style={[styles.topMenuStats, styles.marginTop2, styles.fontSize11, { color: colors.textSecondary }]}>
                               😊 {menu.positive} · 😞 {menu.negative} · 😐 {menu.neutral}
                             </Text>
                           </View>
@@ -1257,7 +1250,7 @@ const RestaurantDetailScreen: React.FC = () => {
                     <View style={styles.topMenusList}>
                       {menuStatistics.topNegativeMenus.map((menu: any, index: number) => (
                         <View key={index} style={styles.topMenuItem}>
-                          <View style={[styles.topMenuRank, { backgroundColor: '#f44336' }]}>
+                          <View style={[styles.topMenuRank, styles.errorBadgeBg]}>
                             <Text style={styles.topMenuRankText}>{index + 1}</Text>
                           </View>
                           <View style={styles.topMenuInfo}>
@@ -1265,7 +1258,7 @@ const RestaurantDetailScreen: React.FC = () => {
                             <Text style={[styles.topMenuStats, { color: colors.textSecondary }]}>
                               부정률 {menu.negativeRate}% • {menu.mentions}회 언급
                             </Text>
-                            <Text style={[styles.topMenuStats, { color: colors.textSecondary, fontSize: 11, marginTop: 2 }]}>
+                            <Text style={[styles.topMenuStats, styles.marginTop2, styles.fontSize11, { color: colors.textSecondary }]}>
                               😊 {menu.positive} · 😞 {menu.negative} · 😐 {menu.neutral}
                             </Text>
                           </View>
@@ -1292,7 +1285,7 @@ const RestaurantDetailScreen: React.FC = () => {
                             <Text style={[styles.menuStatName, { color: colors.text }]}>{menu.menuName}</Text>
                             <View style={[
                               styles.menuStatBadge,
-                              { backgroundColor: menu.sentiment === 'positive' ? '#4caf50' : menu.sentiment === 'negative' ? '#f44336' : '#ff9800' }
+                              getSentimentBadgeStyle(menu.sentiment)
                             ]}>
                               <Text style={styles.menuStatBadgeText}>
                                 {menu.sentiment === 'positive' ? '😊 긍정' : menu.sentiment === 'negative' ? '😞 부정' : '😐 중립'}
@@ -1303,15 +1296,15 @@ const RestaurantDetailScreen: React.FC = () => {
                           <View style={styles.menuStatCounts}>
                             <View style={styles.menuStatCount}>
                               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>긍정</Text>
-                              <Text style={{ color: '#4caf50', fontWeight: '600' }}>{menu.positive}</Text>
+                              <Text style={styles.successTextBold}>{menu.positive}</Text>
                             </View>
                             <View style={styles.menuStatCount}>
                               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>부정</Text>
-                              <Text style={{ color: '#f44336', fontWeight: '600' }}>{menu.negative}</Text>
+                              <Text style={styles.errorTextBold}>{menu.negative}</Text>
                             </View>
                             <View style={styles.menuStatCount}>
                               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>중립</Text>
-                              <Text style={{ color: '#ff9800', fontWeight: '600' }}>{menu.neutral}</Text>
+                              <Text style={styles.warningTextBold}>{menu.neutral}</Text>
                             </View>
                             <View style={styles.menuStatCount}>
                               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>긍정률</Text>
@@ -1321,7 +1314,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
                           {allReasons.length > 0 && (
                             <View style={styles.menuStatReasons}>
-                              <Text style={[styles.summaryLabel, { color: colors.textSecondary, marginBottom: 4 }]}>주요 이유:</Text>
+                              <Text style={[styles.summaryLabel, styles.marginBottom4, { color: colors.textSecondary }]}>주요 이유:</Text>
                               {allReasons.map((reason: string, idx: number) => (
                                 <Text key={idx} style={[styles.menuStatReason, { color: colors.text }]}>
                                   • {reason}
@@ -1345,7 +1338,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
         {/* 네이버맵 탭 */}
         {activeTab === 'map' && (
-          <View style={{ paddingHorizontal: 16 }}>
+          <View style={styles.paddingHorizontal16}>
             {restaurant?.place_id ? (
               <View style={styles.mapButtonContainer}>
                 <Text style={[styles.mapDescription, { color: colors.textSecondary }]}>
@@ -1399,19 +1392,16 @@ const RestaurantDetailScreen: React.FC = () => {
                   key={model.value}
                   style={[
                     styles.modelOption,
-                    {
-                      backgroundColor: selectedModel === model.value ? colors.primary : (theme === 'light' ? '#f5f5f5' : colors.background),
-                      borderColor: selectedModel === model.value ? colors.primary : colors.border
-                    }
+                    getModelOptionStyle(model.value)
                   ]}
                   onPress={() => setSelectedModel(model.value)}
                 >
-                  <View style={[styles.radioButton, { borderColor: selectedModel === model.value ? '#fff' : colors.border }]}>
+                  <View style={[styles.radioButton, getRadioBorderStyle(model.value)]}>
                     {selectedModel === model.value && (
-                      <View style={[styles.radioButtonInner, { backgroundColor: '#fff' }]} />
+                      <View style={[styles.radioButtonInner, styles.whiteBg]} />
                     )}
                   </View>
-                  <Text style={[styles.modelLabel, { color: selectedModel === model.value ? '#fff' : colors.text }]}>
+                  <Text style={[styles.modelLabel, getModelTextStyle(model.value)]}>
                     {model.label}
                   </Text>
                 </TouchableOpacity>
@@ -1576,30 +1566,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 12,
-  },
-  progressSection: {
-    marginBottom: 12,
-  },
-  progressInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
   },
   progressStats: {
     flexDirection: 'row',
@@ -2150,6 +2116,94 @@ const styles = StyleSheet.create({
   searchButtonText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#fff',
+  },
+  // 공통 spacing 스타일
+  marginRight2: {
+    marginRight: 2,
+  },
+  marginRight8: {
+    marginRight: 8,
+  },
+  marginTop2: {
+    marginTop: 2,
+  },
+  marginTop4: {
+    marginTop: 4,
+  },
+  marginTop8: {
+    marginTop: 8,
+  },
+  marginTop12: {
+    marginTop: 12,
+  },
+  marginBottom4: {
+    marginBottom: 4,
+  },
+  padding4: {
+    padding: 4,
+  },
+  paddingHorizontal16: {
+    paddingHorizontal: 16,
+  },
+  paddingHorizontal16Bottom7: {
+    paddingHorizontal: 16,
+    paddingBottom: 7,
+  },
+  flex1: {
+    flex: 1,
+  },
+  whiteBackground: {
+    backgroundColor: '#fff',
+  },
+  // 통계 색상 스타일
+  successTextBold: {
+    color: '#4caf50',
+    fontWeight: '600',
+  },
+  errorTextBold: {
+    color: '#f44336',
+    fontWeight: '600',
+  },
+  warningTextBold: {
+    color: '#ff9800',
+    fontWeight: '600',
+  },
+  fontSize11: {
+    fontSize: 11,
+  },
+  fontSize13: {
+    fontSize: 13,
+  },
+  // Emotion keyword styles
+  emotionKeywordBg: {
+    backgroundColor: '#e3f2fd',
+  },
+  emotionKeywordColor: {
+    color: '#1976d2',
+  },
+  // Badge background colors
+  successBadgeBg: {
+    backgroundColor: '#4caf50',
+  },
+  errorBadgeBg: {
+    backgroundColor: '#f44336',
+  },
+  warningBadgeBg: {
+    backgroundColor: '#ff9800',
+  },
+  // Progress stats colors
+  successColor: {
+    color: '#4caf50',
+  },
+  errorColor: {
+    color: '#f44336',
+  },
+  // Modal styles
+  whiteBg: {
+    backgroundColor: '#fff',
+  },
+  whiteText: {
     color: '#fff',
   },
 });

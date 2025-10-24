@@ -6,6 +6,7 @@ import { faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { getDefaultApiUrl, type ReviewData } from '@shared/services'
+import { ProgressIndicator } from '@shared/components'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
 
 interface RestaurantDetailProps {
@@ -13,6 +14,41 @@ interface RestaurantDetailProps {
 }
 
 type TabType = 'menu' | 'review' | 'statistics' | 'map'
+
+interface MenuStatistics {
+  totalReviews: number
+  analyzedReviews: number
+  topPositiveMenus: Array<{
+    menuName: string
+    positiveRate: number
+    mentions: number
+    positive: number
+    negative: number
+    neutral: number
+  }>
+  topNegativeMenus: Array<{
+    menuName: string
+    negativeRate: number
+    mentions: number
+    positive: number
+    negative: number
+    neutral: number
+  }>
+  menuStatistics: Array<{
+    menuName: string
+    sentiment: 'positive' | 'negative' | 'neutral'
+    positiveRate: number
+    mentions: number
+    positive: number
+    negative: number
+    neutral: number
+    totalMentions: number
+    topReasons: {
+      positive: string[]
+      negative: string[]
+    }
+  }>
+}
 
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false }) => {
   const { theme } = useTheme()
@@ -60,7 +96,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   ]
 
   // 메뉴 통계 상태
-  const [menuStatistics, setMenuStatistics] = useState<any>(null)
+  const [menuStatistics, setMenuStatistics] = useState<MenuStatistics | null>(null)
   const [statisticsLoading, setStatisticsLoading] = useState(false)
 
   // 독립적으로 데이터 로드
@@ -163,6 +199,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         leaveRestaurantRoom(id)
       }
     }
+    // useEffectEvent를 사용한 콜백들은 의존성에 포함하지 않음
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   // 통계 탭 활성화 시 데이터 로드
@@ -404,91 +442,43 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           </Text>
 
           {menuProgress && menuProgress.total > 0 && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressInfo}>
-                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
-                <Text style={[styles.progressText, { color: colors.text }]}>
-                  {menuProgress.current} / {menuProgress.total} ({menuProgress.percentage}%)
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: '#4caf50',
-                      width: `${menuProgress.percentage}%`
-                    }
-                  ]}
-                />
-              </View>
-            </View>
+            <ProgressIndicator
+              label="메뉴 수집"
+              current={menuProgress.current}
+              total={menuProgress.total}
+              percentage={menuProgress.percentage}
+              color="#4caf50"
+            />
           )}
 
           {crawlProgress && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressInfo}>
-                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>크롤링 진행</Text>
-                <Text style={[styles.progressText, { color: colors.text }]}>
-                  {crawlProgress.current} / {crawlProgress.total} ({crawlProgress.percentage}%)
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: '#2196f3',
-                      width: `${crawlProgress.percentage}%`
-                    }
-                  ]}
-                />
-              </View>
-            </View>
+            <ProgressIndicator
+              label="크롤링 진행"
+              current={crawlProgress.current}
+              total={crawlProgress.total}
+              percentage={crawlProgress.percentage}
+              color="#2196f3"
+            />
           )}
 
           {imageProgress && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressInfo}>
-                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>이미지 처리</Text>
-                <Text style={[styles.progressText, { color: colors.text }]}>
-                  {imageProgress.current} / {imageProgress.total} ({imageProgress.percentage}%)
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: '#ff9800',
-                      width: `${imageProgress.percentage}%`
-                    }
-                  ]}
-                />
-              </View>
-            </View>
+            <ProgressIndicator
+              label="이미지 처리"
+              current={imageProgress.current}
+              total={imageProgress.total}
+              percentage={imageProgress.percentage}
+              color="#ff9800"
+            />
           )}
 
           {dbProgress && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressInfo}>
-                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-                <Text style={[styles.progressText, { color: colors.text }]}>
-                  {dbProgress.current} / {dbProgress.total} ({dbProgress.percentage}%)
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: colors.primary,
-                      width: `${dbProgress.percentage}%`
-                    }
-                  ]}
-                />
-              </View>
-            </View>
+            <ProgressIndicator
+              label="DB 저장"
+              current={dbProgress.current}
+              total={dbProgress.total}
+              percentage={dbProgress.percentage}
+              color={colors.primary}
+            />
           )}
         </View>
       )}
@@ -501,24 +491,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           </Text>
 
           {summaryProgress && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressInfo}>
-                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>요약 진행</Text>
-                <Text style={[styles.progressText, { color: colors.text }]}>
-                  {summaryProgress.current} / {summaryProgress.total} ({summaryProgress.percentage}%)
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: '#9c27b0',
-                      width: `${summaryProgress.percentage}%`
-                    }
-                  ]}
-                />
-              </View>
+            <>
+              <ProgressIndicator
+                label="요약 진행"
+                current={summaryProgress.current}
+                total={summaryProgress.total}
+                percentage={summaryProgress.percentage}
+                color="#9c27b0"
+              />
               <View style={styles.progressStats}>
                 <Text style={[styles.progressStat, { color: '#4caf50' }]}>
                   ✓ 완료: {summaryProgress.completed}
@@ -529,7 +509,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   </Text>
                 )}
               </View>
-            </View>
+            </>
           )}
         </View>
       )}
@@ -1170,7 +1150,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
                     <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>😊 추천 메뉴 (긍정률 높음)</Text>
                     <View style={styles.topMenusList}>
-                      {menuStatistics.topPositiveMenus.map((menu: any, index: number) => (
+                      {menuStatistics.topPositiveMenus.map((menu, index) => (
                         <View key={index} style={[styles.topMenuItem, { backgroundColor: '#e8f5e9', borderColor: '#4caf50' }]}>
                           <Text style={[styles.topMenuRank, { color: '#2e7d32' }]}>#{index + 1}</Text>
                           <View style={styles.topMenuInfo}>
@@ -1193,7 +1173,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                   <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
                     <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>😞 주의할 메뉴 (부정률 높음)</Text>
                     <View style={styles.topMenusList}>
-                      {menuStatistics.topNegativeMenus.map((menu: any, index: number) => (
+                      {menuStatistics.topNegativeMenus.map((menu, index) => (
                         <View key={index} style={[styles.topMenuItem, { backgroundColor: '#ffebee', borderColor: '#f44336' }]}>
                           <Text style={[styles.topMenuRank, { color: '#c62828' }]}>#{index + 1}</Text>
                           <View style={styles.topMenuInfo}>
@@ -1215,7 +1195,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
                 <View style={[styles.statisticsCard, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.statisticsCardTitle, { color: colors.text }]}>📋 전체 메뉴 통계</Text>
                   <View style={styles.allMenusList}>
-                    {menuStatistics.menuStatistics.map((stat: any, index: number) => {
+                    {menuStatistics.menuStatistics.map((stat, index) => {
                       const sentimentColor = stat.sentiment === 'positive' ? '#4caf50' : stat.sentiment === 'negative' ? '#f44336' : '#ff9800'
                       const sentimentBg = stat.sentiment === 'positive' ? '#e8f5e9' : stat.sentiment === 'negative' ? '#ffebee' : '#fff3e0'
 
@@ -1544,32 +1524,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
     marginBottom: 16,
-  },
-  progressSection: {
-    marginBottom: 12,
-  },
-  progressInfo: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden' as const,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
   },
   progressStats: {
     flexDirection: 'row',
