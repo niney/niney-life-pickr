@@ -32,6 +32,7 @@ export const useMenus = () => {
     menus,
     menusLoading,
     fetchMenus,
+    setMenus,
     clearMenus,
   }
 }
