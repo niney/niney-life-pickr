@@ -1,6 +1,6 @@
 # Architecture & Project Overview
 
-> **Last Updated**: 2025-10-23
+> **Last Updated**: 2025-10-26
 > **Purpose**: 프로젝트 전체 아키텍처, 기술 스택, 디렉토리 구조 설명
 
 ---
@@ -479,39 +479,168 @@ niney-life-pickr/
 ### 4.1 YAML Configuration
 
 #### 4.1.1 Configuration Files
-- **Location**: `config/` directory
-- **Files**:
-  - `base.yml` - Default configuration
-  - `test.yml` - Test environment overrides
-  - `production.yml` - Production overrides
+
+**Location**: `config/` directory
+
+**Files**:
+- `base.yml` - Base configuration for all environments
+- `base.example.yml` - Example template for new developers
+- `test.yml` - Test environment overrides
+- `production.yml` - Production environment overrides
+
+**Structure Example** (`config/base.yml`):
+```yaml
+api:
+  url: "http://192.168.0.10:4000"  # Web용
+  timeout: 30000
+  retries: 3
+  mobile:
+    android: "http://10.0.2.2:4000"       # Android 에뮬레이터
+    ios: "http://192.168.0.10:4000"       # iOS 시뮬레이터/실기기
+
+server:
+  web:
+    host: "0.0.0.0"
+    port: 3000
+  friendly:
+    host: "0.0.0.0"
+    port: 4000
+```
 
 #### 4.1.2 Loading Strategy
-- Based on `NODE_ENV` environment variable
-- Cascade: base.yml → {env}.yml → environment variables
-- Environment variables override YAML settings
 
-#### 4.1.3 Usage
-- Web: Vite configuration (vite.config.ts)
-- Friendly: Server configuration (server.ts)
+**Cascade Order**:
+1. Load `base.yml` (always)
+2. If `NODE_ENV !== 'development'`, merge `{env}.yml` (e.g., `production.yml`)
+3. Environment variables override YAML settings
 
-### 4.2 Key Settings
+**Deep Merge Behavior**:
+- Production values override base values
+- Nested objects are merged recursively
+- Arrays are replaced (not merged)
 
-#### 4.2.1 Ports
+#### 4.1.3 Usage by Platform
+
+| Platform | Tool | Config Loading |
+|----------|------|----------------|
+| **Web** | Vite | `apps/web/vite.config.ts` |
+| **Mobile** | Babel | `apps/mobile/babel.config.js` |
+| **Friendly** | Fastify | `servers/friendly/src/server.ts` |
+| **Smart** | FastAPI | `servers/smart/` (future) |
+
+### 4.2 Platform-Specific Configuration
+
+#### 4.2.1 File Extension Pattern
+
+**Shared Module**: `apps/shared/services/`
+```
+api.service.ts         # Main API service
+api.config.web.ts      # Web-specific (import.meta support)
+api.config.ts          # Mobile-specific (YAML-based)
+```
+
+**Auto-Selection Mechanism**:
+
+**Web (Vite)**:
+- `resolve.extensions: ['.web.ts', '.ts', ...]`
+- Prefers `.web.ts` over `.ts`
+- Result: Selects `api.config.web.ts`
+
+**Mobile (Metro)**:
+- Default platform extensions: `.native.ts`, `.ios.ts`, `.android.ts`
+- Ignores `.web.ts` files
+- Result: Selects `api.config.ts`
+
+#### 4.2.2 Web Configuration Flow
+
+```
+YAML (config/base.yml, production.yml)
+  ↓
+vite.config.ts (loadConfig function)
+  ↓
+define: { 'import.meta.env.VITE_API_URL': ... }
+  ↓
+api.config.web.ts reads import.meta.env.VITE_API_URL
+  ↓
+Browser runtime
+```
+
+**Key Code** (`apps/web/vite.config.ts`):
+```typescript
+const loadedConfig = loadConfig();  // Loads YAML
+const apiConfig = loadedConfig.api || {};
+
+export default defineConfig({
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify(apiConfig.url),
+  },
+});
+```
+
+#### 4.2.3 Mobile Configuration Flow
+
+```
+YAML (config/base.yml, production.yml)
+  ↓
+babel.config.js (loadConfig function)
+  ↓
+process.env.API_MOBILE_ANDROID = ...
+process.env.API_MOBILE_IOS = ...
+  ↓
+babel-plugin-transform-inline-environment-variables
+  ↓
+api.config.ts (compile-time string replacement)
+  ↓
+Native app runtime
+```
+
+**Key Code** (`apps/mobile/babel.config.js`):
+```javascript
+const loadedConfig = loadConfig();  // Loads YAML
+const apiConfig = loadedConfig.api || {};
+
+// Inject environment variables
+process.env.API_MOBILE_ANDROID = apiConfig.mobile?.android;
+process.env.API_MOBILE_IOS = apiConfig.mobile?.ios;
+
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: ['babel-plugin-transform-inline-environment-variables'],
+};
+```
+
+#### 4.2.4 API URL Configuration by Platform
+
+| Platform | Development (base.yml) | Production (production.yml) |
+|----------|------------------------|----------------------------|
+| **Web** | `http://{hostname}:4000` (auto-detect) | `https://nlpfriendly.easypcb.co.kr` |
+| **Android** | `http://10.0.2.2:4000` | `https://nlpfriendly.easypcb.co.kr` |
+| **iOS** | `http://192.168.0.10:4000` | `https://nlpfriendly.easypcb.co.kr` |
+
+**Android Emulator**:
+- `10.0.2.2` maps to host machine's `localhost`
+- Allows emulator to access backend on host
+
+**iOS Simulator/Device**:
+- Must use actual LAN IP address
+- Update `config/base.yml` to match your network
+
+### 4.3 Key Settings
+
+#### 4.3.1 Ports
 - **Web**: 3000 (default)
 - **Friendly**: 4000 (default)
 - **Smart**: 5000 (default)
 
-#### 4.2.2 Network Configuration
-- **HOST**: `0.0.0.0` (for mobile device access)
+#### 4.3.2 Network Configuration
+- **HOST**: `0.0.0.0` (allows mobile device access)
 - **CORS**: Enabled for cross-origin requests
+- **Timeout**: 30s (dev), 60s (prod)
 
-#### 4.2.3 Mobile Access
-- **Android Emulator**: `10.0.2.2:4000` (for accessing Friendly server)
-- **iOS Simulator**: `localhost:4000`
+### 4.4 Environment Variables
 
-### 4.3 Environment Variables
+#### 4.4.1 Server Environment Variables
 
-Common environment variables:
 ```bash
 # Server
 NODE_ENV=development|test|production
@@ -519,10 +648,50 @@ PORT=4000
 
 # Database
 DATABASE_PATH=./data/niney.db
-
-# API
-API_URL=http://localhost:4000
 ```
+
+#### 4.4.2 Build-Time Environment Variables
+
+**Web (Vite)**:
+- `VITE_API_URL` - Injected from YAML at build time
+
+**Mobile (Babel)**:
+- `API_MOBILE_ANDROID` - Android API URL
+- `API_MOBILE_IOS` - iOS API URL
+- `NODE_ENV` - Build environment
+
+**TypeScript Support** (`apps/mobile/env.d.ts`):
+```typescript
+declare namespace NodeJS {
+  interface ProcessEnv {
+    API_MOBILE_ANDROID?: string;
+    API_MOBILE_IOS?: string;
+    NODE_ENV?: 'development' | 'production' | 'test';
+  }
+}
+```
+
+### 4.5 Build Scripts
+
+#### Web
+```bash
+cd apps/web
+npm run dev      # Development (base.yml)
+npm run build    # Production (production.yml)
+```
+
+#### Mobile
+```bash
+cd apps/mobile
+npm run android:dev   # Development (base.yml)
+npm run android:prod  # Production (production.yml)
+npm run ios:dev       # Development (base.yml)
+npm run ios:prod      # Production (production.yml)
+```
+
+**See Also**:
+- **[MOBILE-SETUP.md](../02-mobile/MOBILE-SETUP.md)**: Detailed build script documentation
+- **[SHARED-SERVICES.md](../03-shared/SHARED-SERVICES.md)**: API configuration details
 
 ---
 

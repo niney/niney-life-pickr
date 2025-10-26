@@ -4,7 +4,11 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:dev": "NODE_ENV=development react-native run-android",
+    "android:prod": "NODE_ENV=production react-native run-android --mode release",
     "ios": "react-native run-ios",
+    "ios:dev": "NODE_ENV=development react-native run-ios",
+    "ios:prod": "NODE_ENV=production react-native run-ios --mode Release",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
@@ -46,8 +50,10 @@
     "@types/jest": "^29.5.13",
     "@types/react": "^19.1.1",
     "@types/react-test-renderer": "^19.1.0",
+    "babel-plugin-transform-inline-environment-variables": "^0.4.4",
     "eslint": "^8.19.0",
     "jest": "^29.6.3",
+    "js-yaml": "^4.1.0",
     "prettier": "2.8.8",
     "react-test-renderer": "19.1.0",
     "typescript": "^5.8.3"

@@ -29,9 +29,13 @@ pwa:
   registerType: "prompt"  # Ask user before updating in production
 
 api:
-  url: "https://nlpfriendly.easypcb.co.kr"  # Production API URL
+  url: "https://nlpfriendly.easypcb.co.kr"  # Web용 Production API URL
   timeout: 60000
   retries: 5
+  # Mobile 플랫폼별 API URL (Production)
+  mobile:
+    android: "https://nlpfriendly.easypcb.co.kr"  # Android
+    ios: "https://nlpfriendly.easypcb.co.kr"      # iOS
 
 performance:
   preload: true

@@ -1,6 +1,6 @@
 # SHARED-SERVICES.md
 
-> **Last Updated**: 2025-10-23 22:45
+> **Last Updated**: 2025-10-26
 > **Purpose**: API service layer for backend communication (authentication, crawling, restaurants, reviews)
 
 ---
@@ -59,76 +59,159 @@ import { apiService } from 'shared/services';
 
 ## 2. API Configuration
 
-### 2.1 getDefaultApiUrl()
+### 2.1 Platform-Specific File Structure
 
-Automatically determines the correct API URL based on platform and environment.
+The API configuration uses **platform-specific file extensions** to handle different environments:
 
-**Function**: `apps/shared/services/api.service.ts:17-42`
+**File Structure**: `apps/shared/services/`
+```
+apps/shared/services/
+├── api.service.ts         # Main API service class
+├── api.config.web.ts      # Web configuration (import.meta support)
+├── api.config.ts          # Mobile configuration (YAML-based)
+└── index.ts               # Barrel exports
+```
+
+**Auto-Selection Mechanism**:
+- **Web (Vite)**: Selects `api.config.web.ts` (via `resolve.extensions: ['.web.ts', '.ts']`)
+- **Mobile (Metro)**: Selects `api.config.ts` (ignores `.web.ts`)
+
+### 2.2 Web Configuration (api.config.web.ts)
+
+**File**: `apps/shared/services/api.config.web.ts`
 
 ```typescript
 const API_PORT = 4000;
 
 export const getDefaultApiUrl = (): string => {
-  // Web 환경인 경우
-  if (Platform.OS === 'web') {
-    // Vite 빌드 시 YAML에서 주입된 값 사용 (Production)
-    if (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'production' && import.meta.env?.VITE_API_URL) {
-      return import.meta.env.VITE_API_URL;
-    }
-
-    // 웹 환경: 현재 브라우저의 호스트 사용 (localhost, IP, 도메인 자동 감지)
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol;
-      const hostname = window.location.hostname;
-      return `${protocol}//${hostname}:${API_PORT}`;
-    }
+  // Vite 빌드 시 YAML에서 주입된 값 사용 (Production)
+  if (import.meta.env?.MODE === 'production' && import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
 
-  // Mobile: 플랫폼별 기본값
-  if (Platform.OS === 'android') {
-    return `http://10.0.2.2:${API_PORT}`;
+  // Development: 현재 브라우저의 호스트 사용 (localhost, IP, 도메인 자동 감지)
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:${API_PORT}`;
   }
 
-  // iOS 및 기타 (개발자 IP에 맞게 수정 필요)
-  return `http://192.168.0.12:${API_PORT}`;
+  // Fallback
+  return `http://localhost:${API_PORT}`;
+};
+```
+
+**Features**:
+- Uses `import.meta.env` (Vite-specific)
+- Auto-detects hostname from `window.location`
+- Production URL injected from `config/production.yml`
+
+**Vite Config** (`apps/web/vite.config.ts`):
+```typescript
+define: {
+  'import.meta.env.VITE_API_URL': JSON.stringify(apiConfig.url),
 }
 ```
 
-### 2.2 Platform-Specific URLs
+### 2.3 Mobile Configuration (api.config.ts)
 
-| Platform | URL | Note |
-|----------|-----|------|
-| **Web (Dev)** | `http://localhost:4000` | Auto-detected from `window.location.hostname` |
-| **Web (Prod)** | `https://api.niney-life-pickr.com` | Injected by Vite from `config/production.yml` |
-| **Android** | `http://10.0.2.2:4000` | Emulator→Host mapping |
-| **iOS** | `http://192.168.0.12:4000` | Developer machine IP (update as needed) |
+**File**: `apps/shared/services/api.config.ts`
 
-### 2.3 Web URL Configuration
+```typescript
+import { Platform } from 'react-native';
 
-**Development**:
-- Uses `window.location.hostname` (works with `localhost`, LAN IP, ngrok)
-- Port hardcoded as `4000`
+export const getDefaultApiUrl = (): string => {
+  // Babel이 컴파일 타임에 YAML에서 로드한 환경변수를 문자열로 치환
+  if (Platform.OS === 'android' && process.env.API_MOBILE_ANDROID) {
+    return process.env.API_MOBILE_ANDROID;
+  }
 
-**Production**:
-- Vite reads from `config/production.yml` at build time
-- Injects as `import.meta.env.VITE_API_URL`
+  if (Platform.OS === 'ios' && process.env.API_MOBILE_IOS) {
+    return process.env.API_MOBILE_IOS;
+  }
 
-**Config File** (`config/production.yml`):
-```yaml
-api:
-  url: https://api.niney-life-pickr.com
+  // Fallback
+  return 'https://nlpfriendly.easypcb.co.kr';
+};
 ```
 
-### 2.4 Mobile URL Configuration
+**Features**:
+- Uses `process.env.API_MOBILE_*` (injected by Babel)
+- Platform-specific URLs (Android/iOS)
+- No `import.meta` (Metro-compatible)
+
+**Babel Config** (`apps/mobile/babel.config.js`):
+```javascript
+// YAML config 로드 (Web의 vite.config.ts와 동일한 방식)
+const loadedConfig = loadConfig();
+const apiConfig = loadedConfig.api || {};
+
+// 환경변수로 주입 (babel-plugin-transform-inline-environment-variables가 치환)
+process.env.API_MOBILE_ANDROID = apiConfig.mobile?.android || 'http://10.0.2.2:4000';
+process.env.API_MOBILE_IOS = apiConfig.mobile?.ios || 'http://localhost:4000';
+
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: ['babel-plugin-transform-inline-environment-variables'],
+};
+```
+
+**YAML Config** (`config/base.yml`):
+```yaml
+api:
+  url: "http://192.168.0.10:4000"  # Web용
+  mobile:
+    android: "http://10.0.2.2:4000"       # Android 에뮬레이터
+    ios: "http://192.168.0.10:4000"       # iOS 시뮬레이터/실기기
+```
+
+**YAML Config** (`config/production.yml`):
+```yaml
+api:
+  url: "https://nlpfriendly.easypcb.co.kr"
+  mobile:
+    android: "https://nlpfriendly.easypcb.co.kr"
+    ios: "https://nlpfriendly.easypcb.co.kr"
+```
+
+### 2.4 Platform-Specific URLs
+
+| Platform | Development (base.yml) | Production (production.yml) |
+|----------|------------------------|----------------------------|
+| **Web** | `http://{hostname}:4000` (auto-detect) | `https://nlpfriendly.easypcb.co.kr` |
+| **Android** | `http://10.0.2.2:4000` | `https://nlpfriendly.easypcb.co.kr` |
+| **iOS** | `http://192.168.0.10:4000` | `https://nlpfriendly.easypcb.co.kr` |
 
 **Android Emulator**:
 - `10.0.2.2` is special IP that maps to host machine's `localhost`
 - Allows emulator to access backend running on host
 
 **iOS Simulator/Device**:
-- Must use actual IP address of development machine
-- **Important**: Update `192.168.0.12` to match your machine's IP
-- Find your IP: `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
+- Development: Use LAN IP address of development machine
+- **Important**: Update `192.168.0.10` in `config/base.yml` to match your machine's IP
+- Find your IP: `ipconfig getifaddr en0` (Mac) or `ipconfig` (Windows)
+
+### 2.5 Build Scripts (Mobile)
+
+**Development Build** (uses `config/base.yml`):
+```bash
+cd apps/mobile
+npm run android:dev  # NODE_ENV=development
+npm run ios:dev      # NODE_ENV=development
+```
+
+**Production Build** (uses `config/production.yml`):
+```bash
+npm run android:prod  # NODE_ENV=production
+npm run ios:prod      # NODE_ENV=production
+```
+
+**How it Works**:
+1. `babel.config.js` reads `NODE_ENV`
+2. Loads `base.yml` (always) + `production.yml` (if NODE_ENV=production)
+3. Injects `process.env.API_MOBILE_ANDROID` and `process.env.API_MOBILE_IOS`
+4. `babel-plugin-transform-inline-environment-variables` replaces at compile-time
+5. `api.config.ts` uses the replaced strings
 
 ---
 

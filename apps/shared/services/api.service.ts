@@ -2,44 +2,7 @@
  * API Service for backend communication
  */
 
-import { Platform } from 'react-native';
-
-// API 기본 설정
-// Web: Vite가 빌드 시점에 config/*.yml에서 읽어서 주입
-// - Development: config/base.yml의 api.url (http://localhost:4000)
-// - Production: config/production.yml의 api.url (https://api.niney-life-pickr.com)
-//
-// Mobile: 플랫폼별 하드코딩 (React Native는 빌드 타임 주입 불가)
-// - Android: 10.0.2.2:4000 (에뮬레이터 → 호스트 localhost)
-// - iOS: 192.168.0.12:4000 (물리 기기, 개발자 IP에 맞게 수정 필요)
-const API_PORT = 4000;
-
-export const getDefaultApiUrl = (): string => {
-  // Web 환경인 경우
-  if (Platform.OS === 'web') {
-    // Vite 빌드 시 YAML에서 주입된 값 사용 (Production)
-    // @ts-ignore - Vite injects this at build time
-    if (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'production' && import.meta.env?.VITE_API_URL) {
-      // @ts-ignore
-      return import.meta.env.VITE_API_URL;
-    }
-
-    // 웹 환경: 현재 브라우저의 호스트 사용 (localhost, IP, 도메인 자동 감지)
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol;
-      const hostname = window.location.hostname;
-      return `${protocol}//${hostname}:${API_PORT}`;
-    }
-  }
-
-  // Mobile: 플랫폼별 기본값
-  if (Platform.OS === 'android') {
-    return `http://10.0.2.2:${API_PORT}`;
-  }
-
-  // iOS 및 기타 (개발자 IP에 맞게 수정 필요)
-  return `http://192.168.0.12:${API_PORT}`;
-}
+import { getDefaultApiUrl } from './api.config';
 
 const API_BASE_URL = getDefaultApiUrl();
 

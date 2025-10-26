@@ -1,5 +1,6 @@
 // API Service exports
-export { apiService, getDefaultApiUrl } from './api.service';
+export { apiService } from './api.service';
+export { getDefaultApiUrl } from './api.config';
 export type {
   ApiResponse,
   User,

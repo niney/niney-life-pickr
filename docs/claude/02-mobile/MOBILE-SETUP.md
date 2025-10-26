@@ -1,7 +1,7 @@
 # MOBILE-SETUP.md
 
-> **Last Updated**: 2025-10-23 21:55
-> **Purpose**: React Native mobile app setup, Metro bundler, and configuration
+> **Last Updated**: 2025-10-26
+> **Purpose**: React Native mobile app setup, Metro bundler, Babel, and configuration
 
 ---
 
@@ -135,6 +135,136 @@ nodeModulesPaths: [
 
 **Purpose**: Use mobile app's own node_modules for dependencies
 
+### 2.4 Babel Configuration
+
+#### File Location
+
+**Location**: `apps/mobile/babel.config.js`
+
+#### Purpose
+
+Babel configuration handles:
+1. **YAML Config Loading**: Reads environment-specific config files
+2. **Environment Variable Injection**: Injects API URLs into `process.env`
+3. **Compile-Time Replacement**: Transforms `process.env.API_MOBILE_*` to literal strings
+
+#### Configuration Structure
+
+```javascript
+const yaml = require('js-yaml');
+const fs = require('fs');
+const path = require('path');
+
+// Config 로드 함수 (Web의 vite.config.ts와 동일한 방식)
+function loadConfig() {
+  try {
+    const configDir = path.resolve(__dirname, '../../config');
+    const basePath = path.join(configDir, 'base.yml');
+
+    // base.yml 로드
+    const baseFile = fs.readFileSync(basePath, 'utf8');
+    const baseConfig = yaml.load(baseFile);
+
+    // NODE_ENV에 따라 추가 config 로드 (production.yml, test.yml 등)
+    const env = process.env.NODE_ENV || 'development';
+    const envPath = path.join(configDir, `${env}.yml`);
+
+    if (env !== 'development' && fs.existsSync(envPath)) {
+      const envFile = fs.readFileSync(envPath, 'utf8');
+      const envConfig = yaml.load(envFile);
+
+      // Deep merge: envConfig가 baseConfig를 override
+      return deepMerge(baseConfig, envConfig);
+    }
+
+    return baseConfig;
+  } catch (error) {
+    console.warn('Config file not found, using default values');
+    return {
+      api: {
+        mobile: {
+          android: 'http://10.0.2.2:4000',
+          ios: 'http://localhost:4000',
+        },
+      },
+    };
+  }
+}
+
+// YAML config 로드
+const loadedConfig = loadConfig();
+const apiConfig = loadedConfig.api || {};
+
+// 환경변수로 주입 (babel-plugin-transform-inline-environment-variables가 치환)
+process.env.API_MOBILE_ANDROID = apiConfig.mobile?.android || 'http://10.0.2.2:4000';
+process.env.API_MOBILE_IOS = apiConfig.mobile?.ios || 'http://localhost:4000';
+
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: [
+    // 환경변수를 컴파일 타임에 문자열로 치환
+    'babel-plugin-transform-inline-environment-variables',
+  ],
+};
+```
+
+#### Key Concepts
+
+**1. YAML Loading**:
+- Mirrors Web's `vite.config.ts` approach
+- Loads `config/base.yml` by default
+- Merges `config/production.yml` when `NODE_ENV=production`
+
+**2. Environment Variable Injection**:
+```javascript
+process.env.API_MOBILE_ANDROID = apiConfig.mobile?.android;
+process.env.API_MOBILE_IOS = apiConfig.mobile?.ios;
+```
+
+**3. Compile-Time Replacement**:
+- `babel-plugin-transform-inline-environment-variables` plugin
+- Replaces `process.env.API_MOBILE_*` with literal strings
+- Happens during Metro bundling (no runtime overhead)
+
+**Example**:
+```typescript
+// Source (api.config.ts)
+if (Platform.OS === 'android' && process.env.API_MOBILE_ANDROID) {
+  return process.env.API_MOBILE_ANDROID;
+}
+
+// Compiled (after Babel)
+if (Platform.OS === 'android' && "http://10.0.2.2:4000") {
+  return "http://10.0.2.2:4000";
+}
+```
+
+#### Required Dependencies
+
+```bash
+npm install --save-dev js-yaml babel-plugin-transform-inline-environment-variables
+```
+
+**Packages**:
+- `js-yaml`: Parse YAML config files
+- `babel-plugin-transform-inline-environment-variables`: Replace env vars at compile-time
+
+#### Type Definitions
+
+**File**: `apps/mobile/env.d.ts`
+
+```typescript
+declare namespace NodeJS {
+  interface ProcessEnv {
+    API_MOBILE_ANDROID?: string;
+    API_MOBILE_IOS?: string;
+    NODE_ENV?: 'development' | 'production' | 'test';
+  }
+}
+```
+
+**Purpose**: TypeScript autocomplete for `process.env.API_MOBILE_*`
+
 ---
 
 ## 3. TypeScript Configuration
@@ -263,7 +393,11 @@ import { Button } from 'shared/components'
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
+    "android:dev": "NODE_ENV=development react-native run-android",
+    "android:prod": "NODE_ENV=production react-native run-android --mode release",
     "ios": "react-native run-ios",
+    "ios:dev": "NODE_ENV=development react-native run-ios",
+    "ios:prod": "NODE_ENV=production react-native run-ios --mode Release",
     "lint": "eslint .",
     "test": "jest",
     "test:e2e": "maestro test .maestro",
@@ -314,7 +448,63 @@ npm run ios
 - Xcode installed
 - CocoaPods installed
 
-#### Lint
+### 5.3 Environment-Specific Builds
+
+#### Development Build (base.yml)
+
+**Android**:
+```bash
+npm run android:dev
+```
+
+**iOS**:
+```bash
+npm run ios:dev
+```
+
+**Behavior**:
+- Sets `NODE_ENV=development`
+- `babel.config.js` loads `config/base.yml`
+- Uses `api.mobile.android` and `api.mobile.ios` from base config
+- Example URLs:
+  - Android: `http://10.0.2.2:4000`
+  - iOS: `http://192.168.0.10:4000` (LAN IP)
+
+#### Production Build (production.yml)
+
+**Android**:
+```bash
+npm run android:prod
+```
+
+**iOS**:
+```bash
+npm run ios:prod
+```
+
+**Behavior**:
+- Sets `NODE_ENV=production`
+- `babel.config.js` merges `config/base.yml` + `config/production.yml`
+- Builds release mode using `--mode` flag:
+  - Android: `--mode release` (lowercase)
+  - iOS: `--mode Release` (uppercase R)
+- Uses production API URLs:
+  - Android: `https://nlpfriendly.easypcb.co.kr`
+  - iOS: `https://nlpfriendly.easypcb.co.kr`
+- Optimizations: Minification, ProGuard (Android), Release scheme (iOS)
+
+#### Build Comparison
+
+| Aspect | Development | Production |
+|--------|-------------|------------|
+| **Config** | base.yml only | base.yml + production.yml |
+| **Build Type** | Debug | Release |
+| **API URL** | Local/LAN IP | Production server |
+| **Optimization** | None | Minification, ProGuard |
+| **Source Maps** | Yes | No |
+| **Performance** | Slower | Faster |
+
+### 5.4 Lint
 ```bash
 npm run lint
 ```
