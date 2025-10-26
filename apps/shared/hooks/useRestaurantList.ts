@@ -35,7 +35,7 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     }
   }
 
-  const fetchRestaurants = async (limit: number = 100, offset: number = 0) => {
+  const fetchRestaurants = async (limit: number = 1000, offset: number = 0) => {
     setRestaurantsLoading(true)
     try {
       const response = await apiService.getRestaurants(

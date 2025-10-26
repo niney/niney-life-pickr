@@ -116,7 +116,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           description: '페이지당 항목 수 (기본: 20)',
           default: 20,
           minimum: 1,
-          maximum: 100
+          maximum: 1000
         })),
         offset: Type.Optional(Type.Number({
           description: '시작 위치 (기본: 0)',

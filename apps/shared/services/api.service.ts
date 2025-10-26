@@ -420,7 +420,7 @@ class ApiService {
    * 음식점 목록 조회
    */
   async getRestaurants(
-    limit: number = 20,
+    limit: number = 1000,
     offset: number = 0,
     category?: string
   ): Promise<ApiResponse<RestaurantListResponse>> {

@@ -35,8 +35,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
     >
       {/* 헤더 */}
       <ReviewHeader
-        userName={review.userName}
-        visitDate={review.visitInfo.visitDate}
+        userName={review.userName ?? '익명'}
+        visitDate={review.visitInfo.visitDate ?? undefined}
         onResummary={() => onResummary(review.id)}
       />
 
