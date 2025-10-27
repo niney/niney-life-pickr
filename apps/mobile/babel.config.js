@@ -75,5 +75,7 @@ module.exports = {
   plugins: [
     // 환경변수를 컴파일 타임에 문자열로 치환
     'babel-plugin-transform-inline-environment-variables',
+    // Reanimated plugin은 반드시 마지막에 위치해야 함
+    'react-native-reanimated/plugin',
   ],
 };

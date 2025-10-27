@@ -1,7 +1,7 @@
 # MOBILE-RESTAURANT-LIST.md
 
-> **Last Updated**: 2025-10-23 22:15
-> **Purpose**: Mobile Restaurant List screen with crawling, filtering, and Socket.io integration
+> **Last Updated**: 2025-10-28 09:45
+> **Purpose**: Mobile Restaurant List screen with crawling, filtering, Socket.io integration, and swipe gestures
 
 ---
 
@@ -31,12 +31,14 @@ The Restaurant List screen is the main interface for viewing, searching, and man
 - **URL Search**: Add new restaurants by URL or Place ID
 - **Category Filter**: Horizontal scroll list with count badges
 - **Real-time Progress**: Socket.io-powered progress bars (menu, review, DB)
-- **Restaurant Cards**: List with recrawl and delete actions
+- **Restaurant Cards**: List with swipe gestures for actions
+- **Swipe Actions**: Left swipe reveals recrawl and delete buttons with smooth animations
 - **Pull to Refresh**: Reload categories and restaurants
 - **Navigation**: Navigate to detail screen with proper focus handling
 - **Recrawl Modal**: Options for recrawling (menus, reviews, summary)
 - **Delete Confirmation**: Alert-based confirmation dialog
 - **Theme Support**: Full light/dark theme integration
+- **Reanimated Gestures**: Smooth swipe animations using react-native-reanimated
 
 ### Component Layout
 ```
@@ -84,6 +86,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, {
+  useAnimatedStyle,
+  interpolate,
+  Extrapolate,
+  SharedValue,
+} from 'react-native-reanimated';
 import {
   useTheme,
   useSocket,
@@ -101,8 +110,15 @@ import RecrawlModal from '../components/RecrawlModal';
 - **useRestaurantList**: Shared hook for data management (categories, restaurants)
 - **useSocket**: Socket.io for real-time progress updates
 - **useNavigation**: React Navigation for screen transitions
+- **Swipeable**: Reanimated swipeable component for gesture-based actions
+- **Animated**: Reanimated for smooth animations (translateX, opacity)
 - **RecrawlModal**: Custom modal component for recrawl options
 - **Alert**: Cross-platform alert utility
+
+**Required Packages**:
+- `react-native-gesture-handler` (^2.29.0)
+- `react-native-reanimated` (^4.1.3)
+- `react-native-worklets` (^0.6.1) - Required peer dependency for reanimated
 
 ---
 
@@ -440,9 +456,29 @@ categoryCardDark: {
 
 ---
 
-## 7. Restaurant List
+## 7. Restaurant List with Swipeable Actions
 
-### 7.1 Restaurant List Section
+### 7.1 RestaurantListItem Component
+
+Restaurants are rendered using a separate `RestaurantListItem` component to encapsulate swipe gesture logic and animations.
+
+```typescript
+interface RestaurantListItemProps {
+  restaurant: RestaurantData;
+  theme: 'light' | 'dark';
+  colors: typeof THEME_COLORS.light;
+  onPress: (restaurant: RestaurantData) => void;
+  onRecrawl: (restaurant: RestaurantData) => void;
+  onDelete: (restaurant: RestaurantData) => void;
+}
+```
+
+**Why Separate Component?**:
+- Isolates swipe gesture logic
+- Enables per-item animation state
+- Cleaner main component
+
+### 7.2 Restaurant List Section
 
 ```typescript
 <View style={styles.section}>
@@ -513,13 +549,100 @@ categoryCardDark: {
 </View>
 ```
 
-**Layout**: Horizontal row with info (left) and actions (right)
+**Layout**: Swipeable wrapper with restaurant info
 
-**Actions**:
-- **Recrawl** (↻): Gray background, opens RecrawlModal
-- **Delete** (🗑️): Red background, shows confirmation dialog
+**Actions** (revealed by left swipe):
+- **Recrawl** (↻): Purple background (#5856D6), opens RecrawlModal
+- **Delete** (×): Red background (#FF3B30), shows confirmation dialog
 
 **Text Truncation**: `numberOfLines={1}` prevents overflow
+
+### 7.3 Swipeable Actions with Animations
+
+```typescript
+const renderRightActions = (
+  progress: SharedValue<number>,
+  dragX: SharedValue<number>
+) => {
+  // Recrawl button animation
+  const recrawlAnimStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      dragX.value,
+      [-144, 0],
+      [0, 144],
+      Extrapolate.CLAMP
+    );
+
+    const opacity = interpolate(
+      dragX.value,
+      [-144, -100, 0],
+      [1, 0.8, 0],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      transform: [{ translateX }],
+      opacity,
+    };
+  });
+
+  // Delete button animation (similar pattern)
+  const deleteAnimStyle = useAnimatedStyle(() => {
+    // ...
+  });
+
+  return (
+    <View style={styles.swipeActionsContainer}>
+      <Animated.View style={[styles.swipeActionWrapper, recrawlAnimStyle]}>
+        <TouchableOpacity
+          style={[styles.swipeActionButton, styles.recrawlActionButton]}
+          onPress={() => onRecrawl(restaurant)}
+        >
+          <Text style={styles.swipeActionIcon}>↻</Text>
+          <Text style={styles.swipeActionText}>재크롤</Text>
+        </TouchableOpacity>
+      </Animated.View>
+      <Animated.View style={[styles.swipeActionWrapper, deleteAnimStyle]}>
+        <TouchableOpacity
+          style={[styles.swipeActionButton, styles.deleteActionButton]}
+          onPress={() => onDelete(restaurant)}
+        >
+          <Text style={styles.swipeActionIcon}>×</Text>
+          <Text style={styles.swipeActionText}>삭제</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+};
+```
+
+**Animation Properties**:
+- **translateX**: Buttons slide in from the right edge
+  - `dragX: -144 → 0` maps to `translateX: 0 → 144`
+  - Recrawl button: Full range (144px)
+  - Delete button: Half range (72px) for staggered effect
+- **opacity**: Buttons fade in smoothly
+  - `dragX: -144` → `opacity: 1` (fully visible)
+  - `dragX: -100` → `opacity: 0.8` (slightly faded)
+  - `dragX: 0` → `opacity: 0` (hidden)
+
+**Swipeable Props**:
+```typescript
+<Swipeable
+  renderRightActions={renderRightActions}
+  overshootRight={false}
+  friction={2}
+  rightThreshold={40}
+>
+```
+
+- `overshootRight={false}`: Prevents bouncing beyond actions
+- `friction={2}`: Smooth drag resistance
+- `rightThreshold={40}`: Minimum swipe distance to reveal actions
+
+**Color Scheme (iOS Human Interface Guidelines)**:
+- **Recrawl**: `#5856D6` (iOS System Purple) - Neutral action
+- **Delete**: `#FF3B30` (iOS System Red) - Destructive action
 
 ### 7.3 Restaurant Card Styling
 
@@ -652,19 +775,18 @@ const {
 
 ---
 
-## 10. Recrawl and Delete
+## 10. Recrawl and Delete (Swipe Actions)
 
-### 10.1 Recrawl Click Handler
+### 10.1 Recrawl Handler
 
 ```typescript
-const handleRecrawlClick = (restaurant: RestaurantData, event: any) => {
-  event.stopPropagation(); // Prevent card click
+const handleRecrawlClick = (restaurant: RestaurantData) => {
   setSelectedRestaurant(restaurant);
   setRecrawlModalVisible(true);
 };
 ```
 
-**event.stopPropagation()**: Prevents triggering parent `TouchableOpacity` (card press)
+**Note**: No `event.stopPropagation()` needed - swipe actions are separate from card press
 
 ### 10.2 Recrawl Confirm
 
@@ -697,11 +819,10 @@ const handleRecrawlConfirm = async (options: {
 
 **Alert Feedback**: Shows success/error message
 
-### 10.3 Delete Click Handler
+### 10.3 Delete Handler
 
 ```typescript
-const handleDeleteClick = (restaurant: RestaurantData, event: any) => {
-  event.stopPropagation();
+const handleDeleteClick = (restaurant: RestaurantData) => {
 
   Alert.confirm(
     '레스토랑 삭제',
@@ -913,5 +1034,61 @@ const onRefresh = useCallback(async () => {
 
 ---
 
-**Document Version**: 1.0.0
-**Covers Files**: `RestaurantListScreen.tsx`, `RecrawlModal.tsx`, Socket.io integration
+## Appendix: Setup for Reanimated Swipeable
+
+### Installation
+
+```bash
+npm install react-native-reanimated react-native-worklets
+```
+
+### Babel Configuration
+
+Add Reanimated plugin (must be last):
+
+```javascript
+// babel.config.js
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: [
+    // Other plugins...
+    'react-native-reanimated/plugin', // MUST be last
+  ],
+};
+```
+
+### App Wrapper
+
+Wrap app with `GestureHandlerRootView`:
+
+```typescript
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+function App() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Your app content */}
+    </GestureHandlerRootView>
+  );
+}
+```
+
+### iOS Setup
+
+```bash
+cd ios && pod install
+```
+
+**Note**: If you encounter `RNWorklets` pod error, run:
+```bash
+cd ios
+rm -rf Pods Podfile.lock
+pod deintegrate
+pod install
+```
+
+---
+
+**Document Version**: 2.0.0
+**Covers Files**: `RestaurantListScreen.tsx`, `RestaurantListItem` component, `RecrawlModal.tsx`, Reanimated Swipeable, Socket.io integration
+**Major Updates**: Added Swipeable gestures, Reanimated animations, separate component architecture

@@ -12,6 +12,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, {
+  useAnimatedStyle,
+  interpolate,
+  Extrapolate,
+  SharedValue,
+} from 'react-native-reanimated';
 import {
   useTheme,
   useSocket,
@@ -25,6 +32,131 @@ import type { RestaurantStackParamList } from '../navigation/types';
 import RecrawlModal from '../components/RecrawlModal';
 
 type NavigationProp = NativeStackNavigationProp<RestaurantStackParamList, 'RestaurantList'>;
+
+// 레스토랑 아이템 컴포넌트 (애니메이션을 위해 분리)
+interface RestaurantListItemProps {
+  restaurant: RestaurantData;
+  theme: 'light' | 'dark';
+  colors: typeof THEME_COLORS.light;
+  onPress: (restaurant: RestaurantData) => void;
+  onRecrawl: (restaurant: RestaurantData) => void;
+  onDelete: (restaurant: RestaurantData) => void;
+}
+
+const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
+  restaurant,
+  theme,
+  colors,
+  onPress,
+  onRecrawl,
+  onDelete,
+}) => {
+  const renderRightActions = (
+    progress: SharedValue<number>,
+    dragX: SharedValue<number>
+  ) => {
+    // 재크롤 버튼 애니메이션
+    const recrawlAnimStyle = useAnimatedStyle(() => {
+      const translateX = interpolate(
+        dragX.value,
+        [-144, 0],
+        [0, 144],
+        Extrapolate.CLAMP
+      );
+
+      const opacity = interpolate(
+        dragX.value,
+        [-144, -100, 0],
+        [1, 0.8, 0],
+        Extrapolate.CLAMP
+      );
+
+      return {
+        transform: [{ translateX }],
+        opacity,
+      };
+    });
+
+    // 삭제 버튼 애니메이션
+    const deleteAnimStyle = useAnimatedStyle(() => {
+      const translateX = interpolate(
+        dragX.value,
+        [-144, 0],
+        [0, 72],
+        Extrapolate.CLAMP
+      );
+
+      const opacity = interpolate(
+        dragX.value,
+        [-144, -100, 0],
+        [1, 0.8, 0],
+        Extrapolate.CLAMP
+      );
+
+      return {
+        transform: [{ translateX }],
+        opacity,
+      };
+    });
+
+    return (
+      <View style={styles.swipeActionsContainer}>
+        <Animated.View style={[styles.swipeActionWrapper, recrawlAnimStyle]}>
+          <TouchableOpacity
+            style={[styles.swipeActionButton, styles.recrawlActionButton]}
+            onPress={() => onRecrawl(restaurant)}
+          >
+            <Text style={styles.swipeActionIcon}>↻</Text>
+            <Text style={styles.swipeActionText}>재크롤</Text>
+          </TouchableOpacity>
+        </Animated.View>
+        <Animated.View style={[styles.swipeActionWrapper, deleteAnimStyle]}>
+          <TouchableOpacity
+            style={[styles.swipeActionButton, styles.deleteActionButton]}
+            onPress={() => onDelete(restaurant)}
+          >
+            <Text style={styles.swipeActionIcon}>×</Text>
+            <Text style={styles.swipeActionText}>삭제</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  return (
+    <Swipeable
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={2}
+      rightThreshold={40}
+    >
+      <TouchableOpacity
+        style={[
+          styles.restaurantCardContainer,
+          theme === 'dark' ? styles.restaurantCardDark : styles.restaurantCardLight,
+        ]}
+        onPress={() => onPress(restaurant)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.restaurantCardContent}>
+          <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
+            {restaurant.name}
+          </Text>
+          {restaurant.category && (
+            <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+              {restaurant.category}
+            </Text>
+          )}
+          {restaurant.address && (
+            <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+              {restaurant.address}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
+  );
+};
 
 const RestaurantListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -161,8 +293,7 @@ const RestaurantListScreen: React.FC = () => {
     waitForFocus(0);
   };
 
-  const handleRecrawlClick = (restaurant: RestaurantData, event: any) => {
-    event.stopPropagation();
+  const handleRecrawlClick = (restaurant: RestaurantData) => {
     setSelectedRestaurant(restaurant);
     setRecrawlModalVisible(true);
   };
@@ -183,9 +314,7 @@ const RestaurantListScreen: React.FC = () => {
     }
   };
 
-  const handleDeleteClick = (restaurant: RestaurantData, event: any) => {
-    event.stopPropagation();
-
+  const handleDeleteClick = (restaurant: RestaurantData) => {
     Alert.confirm(
       '레스토랑 삭제',
       `${restaurant.name}을(를) 삭제하시겠습니까?\n모든 메뉴, 리뷰, 이미지가 함께 삭제되며 복구할 수 없습니다.`,
@@ -374,47 +503,15 @@ const RestaurantListScreen: React.FC = () => {
           {restaurants.length > 0 ? (
             <View style={styles.restaurantsList}>
               {restaurants.map((restaurant) => (
-                <TouchableOpacity
+                <RestaurantListItem
                   key={restaurant.id}
-                  style={[
-                    styles.restaurantCardContainer,
-                    theme === 'dark' ? styles.restaurantCardDark : styles.restaurantCardLight,
-                  ]}
-                  onPress={() => handleRestaurantPress(restaurant)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.restaurantCardContentWrapper}>
-                    <View style={styles.restaurantCardContent}>
-                      <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
-                        {restaurant.name}
-                      </Text>
-                      {restaurant.category && (
-                        <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
-                          {restaurant.category}
-                        </Text>
-                      )}
-                      {restaurant.address && (
-                        <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
-                          {restaurant.address}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: colors.border }]}
-                        onPress={(e: any) => handleRecrawlClick(restaurant, e)}
-                      >
-                        <Text style={[styles.actionIcon, { color: colors.text }]}>↻</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: '#ff4444' }]}
-                        onPress={(e: any) => handleDeleteClick(restaurant, e)}
-                      >
-                        <Text style={[styles.actionIcon, { color: '#fff' }]}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                  restaurant={restaurant}
+                  theme={theme}
+                  colors={colors}
+                  onPress={handleRestaurantPress}
+                  onRecrawl={handleRecrawlClick}
+                  onDelete={handleDeleteClick}
+                />
               ))}
             </View>
           ) : !restaurantsLoading ? (
@@ -533,39 +630,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   restaurantCardContent: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  restaurantCardContentWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 4,
   },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  swipeActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  swipeActionWrapper: {
+    width: 72,
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
   },
-  actionIcon: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  recrawlButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  swipeActionButton: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
-    flexShrink: 0,
   },
-  recrawlIcon: {
-    fontSize: 20,
+  recrawlActionButton: {
+    backgroundColor: '#5856D6',
+  },
+  deleteActionButton: {
+    backgroundColor: '#FF3B30',
+  },
+  swipeActionIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+    color: '#fff',
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
+    marginTop: 4,
   },
   restaurantName: {
     fontSize: 16,

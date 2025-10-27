@@ -7,6 +7,7 @@
 import { StatusBar, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider, SocketProvider, useTheme } from 'shared/contexts';
 import LoginScreen from './src/screens/LoginScreen';
 import BottomTabNavigator from './src/navigation/BottomTabNavigator';
@@ -14,13 +15,15 @@ import { useAuth } from 'shared/hooks';
 
 function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <SocketProvider>
-          <AppContent />
-        </SocketProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.gestureHandler}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <SocketProvider>
+            <AppContent />
+          </SocketProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -59,6 +62,9 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
+  gestureHandler: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
