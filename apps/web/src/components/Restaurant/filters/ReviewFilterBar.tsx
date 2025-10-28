@@ -39,6 +39,14 @@ const ReviewFilterBar: React.FC<ReviewFilterBarProps> = ({
     }
   }
 
+  const handleClear = () => {
+    const id = parseInt(restaurantId, 10)
+    if (!isNaN(id)) {
+      onSearchTextChange('')
+      onSearch(id, '')
+    }
+  }
+
   return (
     <View
       style={[
@@ -54,6 +62,7 @@ const ReviewFilterBar: React.FC<ReviewFilterBarProps> = ({
         searchText={searchText}
         onSearchTextChange={onSearchTextChange}
         onSearch={handleSearch}
+        onClear={handleClear}
       />
     </View>
   )

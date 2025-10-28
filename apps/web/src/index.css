@@ -73,6 +73,7 @@ a {
   border-radius: 8px;
   border-width: 1px;
   border-style: solid;
+  min-height: 40px;  /* X 버튼 표시 시 높이 변동 방지 */
 }
 
 .search-input-wrapper.light {

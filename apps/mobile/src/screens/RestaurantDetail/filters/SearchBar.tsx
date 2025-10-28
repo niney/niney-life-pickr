@@ -49,18 +49,22 @@ const SearchBar: React.FC<SearchBarProps> = ({
           onSubmitEditing={onSearch}
           returnKeyType="search"
         />
-        {searchText && searchText.length > 0 && (
-          <TouchableOpacity
-            onPress={onClear}
-            style={styles.clearButton}
-          >
-            <FontAwesomeIcon
-              icon={faTimes as IconProp}
-              size={16}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={onClear}
+          style={[
+            styles.clearButton,
+            {
+              opacity: searchText && searchText.length > 0 ? 1 : 0,
+            }
+          ]}
+          disabled={!(searchText && searchText.length > 0)}
+        >
+          <FontAwesomeIcon
+            icon={faTimes as IconProp}
+            size={16}
+            color={colors.textSecondary}
+          />
+        </TouchableOpacity>
       </View>
       <TouchableOpacity
         style={[styles.searchButton, dynamicStyles.searchButton]}
@@ -86,6 +90,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
+    minHeight: 40,
   },
   searchIcon: {
     marginRight: 8,

@@ -9,12 +9,14 @@ interface SearchBarProps {
   searchText: string
   onSearchTextChange: (text: string) => void
   onSearch: () => void
+  onClear?: () => void  // X 버튼 클릭 시 호출 (검색어 초기화 + 자동 검색)
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
   searchText,
   onSearchTextChange,
   onSearch,
+  onClear,
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
@@ -49,17 +51,26 @@ const SearchBar: React.FC<SearchBarProps> = ({
             padding: 0,
           }}
         />
-        {searchText && searchText.length > 0 && (
-          <TouchableOpacity
-            onPress={() => {
+        <div
+          onClick={() => {
+            if (onClear) {
+              onClear()
+            } else {
               onSearchTextChange('')
-              onSearch()
-            }}
-            style={{ padding: 4 }}
-          >
-            <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
-          </TouchableOpacity>
-        )}
+            }
+          }}
+          style={{
+            padding: 4,
+            opacity: searchText && searchText.length > 0 ? 1 : 0,
+            pointerEvents: searchText && searchText.length > 0 ? 'auto' : 'none',
+            transition: 'opacity 0.2s ease-in-out',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
+        </div>
       </div>
       <TouchableOpacity
         style={[styles.searchButton, { backgroundColor: colors.primary }]}
