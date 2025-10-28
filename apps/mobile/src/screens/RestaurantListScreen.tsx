@@ -33,6 +33,80 @@ import RecrawlModal from '../components/RecrawlModal';
 
 type NavigationProp = NativeStackNavigationProp<RestaurantStackParamList, 'RestaurantList'>;
 
+// 스와이프 액션 콘텐츠 컴포넌트 (Hook을 올바르게 사용)
+interface SwipeActionsContentProps {
+  dragX: SharedValue<number>;
+  onRecrawl: () => void;
+  onDelete: () => void;
+}
+
+const SwipeActionsContent: React.FC<SwipeActionsContentProps> = ({ dragX, onRecrawl, onDelete }) => {
+  const recrawlAnimStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      dragX.value,
+      [-144, 0],
+      [0, 144],
+      Extrapolate.CLAMP
+    );
+
+    const opacity = interpolate(
+      dragX.value,
+      [-144, -100, 0],
+      [1, 0.8, 0],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      transform: [{ translateX }],
+      opacity,
+    };
+  });
+
+  const deleteAnimStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      dragX.value,
+      [-144, 0],
+      [0, 72],
+      Extrapolate.CLAMP
+    );
+
+    const opacity = interpolate(
+      dragX.value,
+      [-144, -100, 0],
+      [1, 0.8, 0],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      transform: [{ translateX }],
+      opacity,
+    };
+  });
+
+  return (
+    <View style={styles.swipeActionsContainer}>
+      <Animated.View style={[styles.swipeActionWrapper, recrawlAnimStyle]}>
+        <TouchableOpacity
+          style={[styles.swipeActionButton, styles.recrawlActionButton]}
+          onPress={onRecrawl}
+        >
+          <Text style={styles.swipeActionIcon}>↻</Text>
+          <Text style={styles.swipeActionText}>재크롤</Text>
+        </TouchableOpacity>
+      </Animated.View>
+      <Animated.View style={[styles.swipeActionWrapper, deleteAnimStyle]}>
+        <TouchableOpacity
+          style={[styles.swipeActionButton, styles.deleteActionButton]}
+          onPress={onDelete}
+        >
+          <Text style={styles.swipeActionIcon}>×</Text>
+          <Text style={styles.swipeActionText}>삭제</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+};
+
 // 레스토랑 아이템 컴포넌트 (애니메이션을 위해 분리)
 interface RestaurantListItemProps {
   restaurant: RestaurantData;
@@ -55,71 +129,12 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
     progress: SharedValue<number>,
     dragX: SharedValue<number>
   ) => {
-    // 재크롤 버튼 애니메이션
-    const recrawlAnimStyle = useAnimatedStyle(() => {
-      const translateX = interpolate(
-        dragX.value,
-        [-144, 0],
-        [0, 144],
-        Extrapolate.CLAMP
-      );
-
-      const opacity = interpolate(
-        dragX.value,
-        [-144, -100, 0],
-        [1, 0.8, 0],
-        Extrapolate.CLAMP
-      );
-
-      return {
-        transform: [{ translateX }],
-        opacity,
-      };
-    });
-
-    // 삭제 버튼 애니메이션
-    const deleteAnimStyle = useAnimatedStyle(() => {
-      const translateX = interpolate(
-        dragX.value,
-        [-144, 0],
-        [0, 72],
-        Extrapolate.CLAMP
-      );
-
-      const opacity = interpolate(
-        dragX.value,
-        [-144, -100, 0],
-        [1, 0.8, 0],
-        Extrapolate.CLAMP
-      );
-
-      return {
-        transform: [{ translateX }],
-        opacity,
-      };
-    });
-
     return (
-      <View style={styles.swipeActionsContainer}>
-        <Animated.View style={[styles.swipeActionWrapper, recrawlAnimStyle]}>
-          <TouchableOpacity
-            style={[styles.swipeActionButton, styles.recrawlActionButton]}
-            onPress={() => onRecrawl(restaurant)}
-          >
-            <Text style={styles.swipeActionIcon}>↻</Text>
-            <Text style={styles.swipeActionText}>재크롤</Text>
-          </TouchableOpacity>
-        </Animated.View>
-        <Animated.View style={[styles.swipeActionWrapper, deleteAnimStyle]}>
-          <TouchableOpacity
-            style={[styles.swipeActionButton, styles.deleteActionButton]}
-            onPress={() => onDelete(restaurant)}
-          >
-            <Text style={styles.swipeActionIcon}>×</Text>
-            <Text style={styles.swipeActionText}>삭제</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+      <SwipeActionsContent
+        dragX={dragX}
+        onRecrawl={() => onRecrawl(restaurant)}
+        onDelete={() => onDelete(restaurant)}
+      />
     );
   };
 
@@ -203,6 +218,67 @@ const RestaurantListScreen: React.FC = () => {
     [colors.text]
   );
 
+  const restaurantSearchWrapperStyle = React.useMemo(
+    () => ({ position: 'relative' as const, flex: 1 }),
+    []
+  );
+
+  const restaurantSearchInputStyle = React.useMemo(
+    () => [
+      styles.restaurantSearchInput,
+      {
+        borderColor: colors.border,
+        color: colors.text,
+        backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
+      },
+    ],
+    [colors.border, colors.text, colors.surface, theme]
+  );
+
+  const clearButtonTextStyle = React.useMemo(
+    () => ({ fontSize: 16 as const, color: colors.textSecondary }),
+    [colors.textSecondary]
+  );
+
+  const categorySelectedStyle = React.useMemo(
+    () => ({
+      borderColor: colors.primary,
+      borderWidth: 2 as const,
+    }),
+    [colors.primary]
+  );
+
+  const progressCardStyle = React.useMemo(
+    () => [
+      styles.progressCard,
+      {
+        backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
+        borderColor: colors.border,
+      },
+    ],
+    [theme, colors.surface, colors.border]
+  );
+
+  const progressBarBackgroundStyle = React.useMemo(
+    () => ({ backgroundColor: colors.border }),
+    [colors.border]
+  );
+
+  const menuProgressBarFillStyle = React.useMemo(
+    () => ({ backgroundColor: '#4caf50' as const }),
+    []
+  );
+
+  const reviewProgressBarFillStyle = React.useMemo(
+    () => ({ backgroundColor: '#2196f3' as const }),
+    []
+  );
+
+  const dbProgressBarFillStyle = React.useMemo(
+    () => ({ backgroundColor: colors.primary }),
+    [colors.primary]
+  );
+
   // shared 훅 사용 (플랫폼 독립적)
   const {
     url,
@@ -215,6 +291,8 @@ const RestaurantListScreen: React.FC = () => {
     total,
     selectedCategory,
     setSelectedCategory,
+    searchName,
+    setSearchName,
     handleCrawl: sharedHandleCrawl,
     fetchRestaurants,
     fetchCategories,
@@ -358,7 +436,7 @@ const RestaurantListScreen: React.FC = () => {
           />
         }
       >
-        {/* 검색 입력 */}
+        {/* 크롤링 URL 입력 */}
         <View style={styles.searchContainer}>
           <TextInput
             style={inputStyle}
@@ -379,6 +457,28 @@ const RestaurantListScreen: React.FC = () => {
               <Text style={searchButtonTextStyle}>추가</Text>
             )}
           </TouchableOpacity>
+        </View>
+
+        {/* 레스토랑 이름 검색 */}
+        <View style={styles.restaurantSearchContainer}>
+          <View style={restaurantSearchWrapperStyle}>
+            <TextInput
+              style={restaurantSearchInputStyle}
+              placeholder="레스토랑 이름 검색..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchName}
+              onChangeText={setSearchName}
+              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+            />
+            {searchName.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchName('')}
+                style={styles.clearButton}
+              >
+                <Text style={clearButtonTextStyle}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* 카테고리 섹션 */}
@@ -403,10 +503,7 @@ const RestaurantListScreen: React.FC = () => {
                     style={[
                       styles.categoryCardContainer,
                       theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
-                      selectedCategory === category.category && {
-                        borderColor: colors.primary,
-                        borderWidth: 2,
-                      }
+                      selectedCategory === category.category && categorySelectedStyle
                     ]}
                   >
                     <View style={styles.categoryCardContent}>
@@ -436,16 +533,16 @@ const RestaurantListScreen: React.FC = () => {
             </View>
 
             {menuProgress && menuProgress.total > 0 && (
-              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#ffffff' : colors.surface, borderColor: colors.border }]}>
+              <View style={progressCardStyle}>
                 <View style={styles.progressHeader}>
                   <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
                   <Text style={[styles.progressValue, { color: colors.text }]}>
                     {menuProgress.current} / {menuProgress.total}
                   </Text>
                 </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View style={[styles.progressBar, progressBarBackgroundStyle]}>
                   <View
-                    style={[styles.progressBarFill, { width: `${menuProgress.percentage}%`, backgroundColor: '#4caf50' }]}
+                    style={[styles.progressBarFill, { width: `${menuProgress.percentage}%` }, menuProgressBarFillStyle]}
                   />
                 </View>
                 <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
@@ -455,16 +552,16 @@ const RestaurantListScreen: React.FC = () => {
             )}
 
             {crawlProgress && crawlProgress.total > 0 && (
-              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#ffffff' : colors.surface, borderColor: colors.border }]}>
+              <View style={progressCardStyle}>
                 <View style={styles.progressHeader}>
                   <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>리뷰 수집</Text>
                   <Text style={[styles.progressValue, { color: colors.text }]}>
                     {crawlProgress.current} / {crawlProgress.total}
                   </Text>
                 </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View style={[styles.progressBar, progressBarBackgroundStyle]}>
                   <View
-                    style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%`, backgroundColor: '#2196f3' }]}
+                    style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%` }, reviewProgressBarFillStyle]}
                   />
                 </View>
                 <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
@@ -474,16 +571,16 @@ const RestaurantListScreen: React.FC = () => {
             )}
 
             {dbProgress && dbProgress.total > 0 && (
-              <View style={[styles.progressCard, { backgroundColor: theme === 'light' ? '#ffffff' : colors.surface, borderColor: colors.border }]}>
+              <View style={progressCardStyle}>
                 <View style={styles.progressHeader}>
                   <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
                   <Text style={[styles.progressValue, { color: colors.text }]}>
                     {dbProgress.current} / {dbProgress.total}
                   </Text>
                 </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View style={[styles.progressBar, progressBarBackgroundStyle]}>
                   <View
-                    style={[styles.progressBarFill, { width: `${dbProgress.percentage}%`, backgroundColor: colors.primary }]}
+                    style={[styles.progressBarFill, { width: `${dbProgress.percentage}%` }, dbProgressBarFillStyle]}
                   />
                 </View>
                 <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
@@ -544,7 +641,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   input: {
     flex: 1,
@@ -564,6 +661,23 @@ const styles = StyleSheet.create({
   searchButtonText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  restaurantSearchContainer: {
+    marginBottom: 16,
+  },
+  restaurantSearchInput: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingRight: 40,
+    fontSize: 15,
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    padding: 4,
   },
   section: {
     marginBottom: 24,

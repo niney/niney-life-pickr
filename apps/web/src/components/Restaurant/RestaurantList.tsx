@@ -26,6 +26,8 @@ interface RestaurantListProps {
   total: number
   selectedCategory: string | null
   setSelectedCategory: (category: string | null) => void
+  searchName: string
+  setSearchName: (searchName: string) => void
   menuProgress: { current: number; total: number; percentage: number } | null
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
@@ -47,6 +49,8 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   total,
   selectedCategory,
   setSelectedCategory,
+  searchName,
+  setSearchName,
   menuProgress,
   crawlProgress,
   dbProgress,
@@ -153,7 +157,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         padding: 20,
       }}
     >
-        {/* 검색 영역 */}
+        {/* 크롤링 URL 입력 영역 */}
         <View style={styles.searchSection}>
           <TextInput
             style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: theme === 'light' ? '#fff' : colors.surface }]}
@@ -173,6 +177,27 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
               <FontAwesomeIcon icon={faPlus} style={{ fontSize: 20, color: '#fff' }} />
             )}
           </TouchableOpacity>
+        </View>
+
+        {/* 레스토랑 이름 검색 영역 */}
+        <View style={styles.restaurantSearchSection}>
+          <View style={{ position: 'relative', flex: 1 }}>
+            <TextInput
+              style={[styles.restaurantSearchInput, { borderColor: colors.border, color: colors.text, backgroundColor: theme === 'light' ? '#fff' : colors.surface }]}
+              placeholder="레스토랑 이름 검색..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchName}
+              onChangeText={setSearchName}
+            />
+            {searchName.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchName('')}
+                style={styles.clearButton}
+              >
+                <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* 카테고리 섹션 */}
@@ -497,7 +522,7 @@ const styles = StyleSheet.create({
   searchSection: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   input: {
     flex: 1,
@@ -513,6 +538,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  restaurantSearchSection: {
+    marginBottom: 24,
+  },
+  restaurantSearchInput: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingRight: 40,
+    fontSize: 15,
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 12,
+    top: 14,
+    padding: 4,
   },
   section: {
     marginBottom: 32,

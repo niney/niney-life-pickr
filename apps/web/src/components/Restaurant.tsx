@@ -7,31 +7,36 @@ import Header from './Header'
 import Drawer from './Drawer'
 import RestaurantList from './Restaurant/RestaurantList'
 import RestaurantDetail from './Restaurant/RestaurantDetail'
+import type { RestaurantData, RestaurantCategory, ProgressData } from '@shared'
 
 interface RestaurantProps {
   onLogout: () => Promise<void>
 }
 
-// 데스크탑 레이아웃 컴포넌트 (라우팅 컨텍스트 내부)
-const DesktopLayout: React.FC<{
+interface DesktopLayoutProps {
   url: string
   setUrl: (url: string) => void
   loading: boolean
-  categories: any[]
+  categories: RestaurantCategory[]
   categoriesLoading: boolean
-  restaurants: any[]
+  restaurants: RestaurantData[]
   restaurantsLoading: boolean
   total: number
   selectedCategory: string | null
   setSelectedCategory: (category: string | null) => void
-  menuProgress: any
-  crawlProgress: any
-  dbProgress: any
+  searchName: string
+  setSearchName: (searchName: string) => void
+  menuProgress: ProgressData | null
+  crawlProgress: ProgressData | null
+  dbProgress: ProgressData | null
   handleCrawl: () => Promise<void>
-  handleRestaurantClick: (restaurant: any) => void
-  fetchRestaurants: (limit?: number, offset?: number) => Promise<any>
+  handleRestaurantClick: (restaurant: RestaurantData) => void
+  fetchRestaurants: (limit?: number, offset?: number) => Promise<RestaurantData[]>
   fetchCategories: () => Promise<void>
-}> = (props) => {
+}
+
+// 데스크탑 레이아웃 컴포넌트 (라우팅 컨텍스트 내부)
+const DesktopLayout: React.FC<DesktopLayoutProps> = (props) => {
   return (
     <>
       <RestaurantList {...props} isMobile={false} />
@@ -90,6 +95,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     total,
     selectedCategory,
     setSelectedCategory,
+    searchName,
+    setSearchName,
     handleCrawl,
     handleRestaurantClick,
     fetchRestaurants,
@@ -139,6 +146,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   total={total}
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
+                  searchName={searchName}
+                  setSearchName={setSearchName}
                   menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
@@ -169,6 +178,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   total={total}
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
+                  searchName={searchName}
+                  setSearchName={setSearchName}
                   menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}

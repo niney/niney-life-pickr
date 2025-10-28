@@ -385,13 +385,19 @@ class ApiService {
   async getRestaurants(
     limit: number = 1000,
     offset: number = 0,
-    category?: string
+    category?: string,
+    searchName?: string
   ): Promise<ApiResponse<RestaurantListResponse>> {
     let url = `/api/restaurants?limit=${limit}&offset=${offset}`;
 
     // 카테고리 필터 추가
     if (category) {
       url += `&category=${encodeURIComponent(category)}`;
+    }
+
+    // 이름 검색 필터 추가
+    if (searchName && searchName.trim()) {
+      url += `&searchName=${encodeURIComponent(searchName.trim())}`;
     }
 
     return this.request<RestaurantListResponse>(url, {
