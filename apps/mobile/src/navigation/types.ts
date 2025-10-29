@@ -13,9 +13,10 @@ export type RootTabParamList = {
 
 // Restaurant Stack Navigator 타입
 export type RestaurantStackParamList = {
-  RestaurantList: undefined;
+  RestaurantList: { searchAddress?: string } | undefined;
   RestaurantDetail: {
     restaurantId: number;
     restaurant: RestaurantData;
   };
+  RestaurantMap: undefined;
 };

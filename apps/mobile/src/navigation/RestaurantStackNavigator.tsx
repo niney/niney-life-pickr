@@ -4,6 +4,7 @@ import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import RestaurantListScreen from '../screens/RestaurantListScreen';
 import RestaurantDetailScreen from '../screens/RestaurantDetailScreen';
+import RestaurantMapScreen from '../screens/RestaurantMapScreen';
 import type { RestaurantStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RestaurantStackParamList>();
@@ -41,6 +42,15 @@ const RestaurantStackNavigator: React.FC = () => {
           headerShown: true,
           headerBackTitle: '뒤로',
         })}
+      />
+      <Stack.Screen
+        name="RestaurantMap"
+        component={RestaurantMapScreen}
+        options={{
+          title: '서울 지도',
+          headerShown: true,
+          headerBackTitle: '뒤로',
+        }}
       />
     </Stack.Navigator>
   );

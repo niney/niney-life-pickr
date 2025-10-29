@@ -1,7 +1,15 @@
 /**
- * TypeScript 타입 정의: 환경변수
+ * TypeScript 타입 정의: 환경변수 및 모듈
  * babel.config.js에서 YAML config를 로드하여 주입한 환경변수
  */
+
+// SVG imports (react-native-svg-transformer)
+declare module '*.svg' {
+  import React from 'react';
+  import { SvgProps } from 'react-native-svg';
+  const content: React.FC<SvgProps>;
+  export default content;
+}
 
 declare namespace NodeJS {
   interface ProcessEnv {

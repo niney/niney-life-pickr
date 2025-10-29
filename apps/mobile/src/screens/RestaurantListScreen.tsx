@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
@@ -30,6 +30,9 @@ import {
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 import RecrawlModal from '../components/RecrawlModal';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import type { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { faMap } from '@fortawesome/free-solid-svg-icons';
 
 type NavigationProp = NativeStackNavigationProp<RestaurantStackParamList, 'RestaurantList'>;
 
@@ -175,6 +178,7 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
 
 const RestaurantListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<RestaurantStackParamList, 'RestaurantList'>>();
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
   const { menuProgress, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket();
@@ -309,6 +313,13 @@ const RestaurantListScreen: React.FC = () => {
       }
     },
   });
+
+  // 지도에서 구 선택 시 주소 검색 파라미터 처리
+  React.useEffect(() => {
+    if (route.params?.searchAddress) {
+      setSearchAddress(route.params.searchAddress);
+    }
+  }, [route.params?.searchAddress]);
 
   // 카테고리 클릭 핸들러
   const handleCategoryClick = (category: string) => {
@@ -504,6 +515,23 @@ const RestaurantListScreen: React.FC = () => {
             )}
           </View>
         </View>
+
+        {/* 서울 지도 보기 버튼 */}
+        <TouchableOpacity
+          style={[
+            styles.mapButton,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={() => navigation.navigate('RestaurantMap')}
+        >
+          <FontAwesomeIcon icon={faMap as IconProp} color={colors.primary} size={16} />
+          <Text style={[styles.mapButtonText, { color: colors.text }]}>
+            서울 지도 보기
+          </Text>
+        </TouchableOpacity>
 
         {/* 카테고리 섹션 */}
         <View style={styles.section}>
@@ -702,6 +730,20 @@ const styles = StyleSheet.create({
     right: 12,
     top: 12,
     padding: 4,
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 8,
+  },
+  mapButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,

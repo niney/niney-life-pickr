@@ -25,7 +25,12 @@ const config = {
     // 상위 폴더들을 watch 대상에 추가
     path.resolve(__dirname, '../shared'),
   ],
+  transformer: {
+    babelTransformerPath: require.resolve('react-native-svg-transformer'),
+  },
   resolver: {
+    assetExts: defaultConfig.resolver.assetExts.filter(ext => ext !== 'svg'),
+    sourceExts: [...defaultConfig.resolver.sourceExts, 'svg'],
     extraNodeModules: {
       'shared': path.resolve(__dirname, '../shared'),
     },

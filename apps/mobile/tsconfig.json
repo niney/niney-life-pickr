@@ -7,6 +7,6 @@
       "shared/*": ["../shared/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts", "env.d.ts"],
   "exclude": ["**/node_modules", "**/Pods"]
 }
