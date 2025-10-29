@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { useRestaurant } from '../hooks/useRestaurant'
@@ -75,6 +75,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const [showSeoulMap, setShowSeoulMap] = useState(false)
   const colors = THEME_COLORS[theme]
   const location = useLocation()
+  const navigate = useNavigate()
 
   // 반응형 체크
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -125,7 +126,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   // 크롤링 시작 핸들러 (socket 콜백 설정)
   const handleCrawlWithSocket = async () => {
     resetCrawlStatus()
-    
+
     // 크롤링 완료/에러 시 콜백 설정
     setRestaurantCallbacks({
       onReviewCrawlCompleted: async () => {
@@ -139,8 +140,22 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
         await fetchCategories()
       }
     })
-    
+
     await handleCrawl()
+  }
+
+  // 레스토랑 클릭 핸들러 (지도가 켜져 있으면 끄기)
+  const handleRestaurantClickWithMapClose = (restaurant: RestaurantData) => {
+    if (showSeoulMap) {
+      setShowSeoulMap(false)
+    }
+    handleRestaurantClick(restaurant)
+  }
+
+  // 모바일 지도에서 구 클릭 핸들러 (주소 검색 + 목록으로 이동)
+  const handleMobileMapClick = (districtName: string) => {
+    setSearchAddress(districtName)
+    navigate('/restaurant')
   }
 
   return (
@@ -148,7 +163,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
       <Header onMenuPress={() => setDrawerVisible(true)} />
 
       <div className={`restaurant-content ${isMobile ? 'mobile' : 'desktop'}`}>
-        {/* 모바일: List 또는 Detail 중 하나만 표시 */}
+        {/* 모바일: List 또는 Detail 또는 Map 중 하나만 표시 */}
         {isMobile ? (
           <Routes>
             <Route
@@ -180,6 +195,16 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                 />
               )}
             />
+            <Route
+              path="map"
+              element={
+                <SeoulMapView
+                  onDistrictClick={handleMobileMapClick}
+                  isMobile={isMobile}
+                  onBack={() => navigate('/restaurant')}
+                />
+              }
+            />
             <Route path=":id" element={<RestaurantDetail isMobile={isMobile} />} />
           </Routes>
         ) : (
@@ -207,7 +232,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
                   handleCrawl={handleCrawlWithSocket}
-                  handleRestaurantClick={handleRestaurantClick}
+                  handleRestaurantClick={handleRestaurantClickWithMapClose}
                   fetchRestaurants={fetchRestaurants}
                   fetchCategories={fetchCategories}
                   showSeoulMap={showSeoulMap}

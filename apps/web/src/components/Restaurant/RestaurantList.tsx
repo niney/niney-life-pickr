@@ -12,7 +12,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMap, faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTheme, THEME_COLORS, apiService, Alert, ProgressIndicator, type RestaurantCategory, type RestaurantData } from '@shared'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
 
 interface RestaurantListProps {
@@ -71,6 +71,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const location = useLocation()
+  const navigate = useNavigate()
 
   // URL에서 restaurant id 추출 (/restaurant/:id)
   const restaurantId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
@@ -180,6 +181,25 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
             />
             <Text style={[styles.mapButtonText, { color: showSeoulMap ? '#fff' : colors.text }]}>
               {showSeoulMap ? '레스토랑 목록으로' : '서울 지도 보기'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 모바일 전용: 서울 지도 보기 버튼 */}
+        {isMobile && (
+          <TouchableOpacity
+            style={[styles.mapButton, {
+              backgroundColor: colors.surface,
+              borderColor: colors.border
+            }]}
+            onPress={() => navigate('/restaurant/map')}
+          >
+            <FontAwesomeIcon
+              icon={faMap}
+              style={{ fontSize: 16, color: colors.text, marginRight: 8 }}
+            />
+            <Text style={[styles.mapButtonText, { color: colors.text }]}>
+              서울 지도 보기
             </Text>
           </TouchableOpacity>
         )}

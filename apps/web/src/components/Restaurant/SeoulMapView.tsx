@@ -1,13 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { TouchableOpacity, Text } from 'react-native'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import SeoulMapSvg from '../../assets/name_mark_map-seoul.svg'
 
 interface SeoulMapViewProps {
   onDistrictClick?: (districtName: string) => void
+  isMobile?: boolean
+  onBack?: () => void
 }
 
-const SeoulMapView: React.FC<SeoulMapViewProps> = ({ onDistrictClick }) => {
+const SeoulMapView: React.FC<SeoulMapViewProps> = ({
+  onDistrictClick,
+  isMobile = false,
+  onBack
+}) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const svgContainerRef = useRef<HTMLDivElement>(null)
@@ -58,7 +67,7 @@ const SeoulMapView: React.FC<SeoulMapViewProps> = ({ onDistrictClick }) => {
     }
 
     const textElements = nameGroup.querySelectorAll('g[id^="TEXT"]')
-    const expandSize = 20 // 클릭 영역 확장 크기
+    const expandSize = isMobile ? 30 : 20 // 모바일에서 더 큰 클릭 영역
 
     textElements.forEach((textElement) => {
       try {
@@ -158,13 +167,43 @@ const SeoulMapView: React.FC<SeoulMapViewProps> = ({ onDistrictClick }) => {
         overflow: 'hidden',
         width: '100%',
         height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
+      {/* 모바일 전용: 헤더 */}
+      {isMobile && onBack && (
+        <div
+          style={{
+            padding: 16,
+            borderBottom: `1px solid ${colors.border}`,
+            backgroundColor: colors.background,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 18, color: colors.text }} />
+            <Text style={{ fontSize: 16, color: colors.text, fontWeight: '600' }}>
+              목록으로
+            </Text>
+          </TouchableOpacity>
+        </div>
+      )}
+
       <div
         ref={svgContainerRef}
         style={{
           width: '100%',
           height: '100%',
+          flex: 1,
         }}
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
