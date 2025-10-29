@@ -10,7 +10,7 @@ import {
   type GestureResponderEvent
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faMap, faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTheme, THEME_COLORS, apiService, Alert, ProgressIndicator, type RestaurantCategory, type RestaurantData } from '@shared'
 import { useLocation } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
@@ -38,6 +38,8 @@ interface RestaurantListProps {
   fetchRestaurants: (limit?: number, offset?: number) => Promise<void | RestaurantData[]>
   fetchCategories: () => Promise<void>
   isMobile?: boolean
+  showSeoulMap?: boolean
+  setShowSeoulMap?: (show: boolean) => void
 }
 
 const RestaurantList: React.FC<RestaurantListProps> = ({
@@ -63,6 +65,8 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   fetchRestaurants,
   fetchCategories,
   isMobile = false,
+  showSeoulMap = false,
+  setShowSeoulMap,
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
@@ -153,7 +157,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   }
 
   return (
-    <div 
+    <div
       className={isMobile ? '' : 'restaurant-scroll-area'}
       style={{
         backgroundColor: colors.background,
@@ -161,6 +165,25 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         padding: 20,
       }}
     >
+        {/* 데스크탑 전용: 서울 지도 보기 버튼 */}
+        {!isMobile && setShowSeoulMap && (
+          <TouchableOpacity
+            style={[styles.mapButton, {
+              backgroundColor: showSeoulMap ? colors.primary : colors.surface,
+              borderColor: colors.border
+            }]}
+            onPress={() => setShowSeoulMap(!showSeoulMap)}
+          >
+            <FontAwesomeIcon
+              icon={faMap}
+              style={{ fontSize: 16, color: showSeoulMap ? '#fff' : colors.text, marginRight: 8 }}
+            />
+            <Text style={[styles.mapButtonText, { color: showSeoulMap ? '#fff' : colors.text }]}>
+              {showSeoulMap ? '레스토랑 목록으로' : '서울 지도 보기'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* 크롤링 URL 입력 영역 */}
         <View style={styles.searchSection}>
           <TextInput
@@ -543,6 +566,19 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  mapButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   searchSection: {
     flexDirection: 'row',

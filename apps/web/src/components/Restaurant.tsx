@@ -7,6 +7,7 @@ import Header from './Header'
 import Drawer from './Drawer'
 import RestaurantList from './Restaurant/RestaurantList'
 import RestaurantDetail from './Restaurant/RestaurantDetail'
+import SeoulMapView from './Restaurant/SeoulMapView'
 import type { RestaurantData, RestaurantCategory, ProgressData } from '@shared'
 
 interface RestaurantProps {
@@ -35,16 +36,29 @@ interface DesktopLayoutProps {
   handleRestaurantClick: (restaurant: RestaurantData) => void
   fetchRestaurants: (limit?: number, offset?: number) => Promise<RestaurantData[]>
   fetchCategories: () => Promise<void>
+  showSeoulMap: boolean
+  setShowSeoulMap: (show: boolean) => void
 }
 
 // 데스크탑 레이아웃 컴포넌트 (라우팅 컨텍스트 내부)
 const DesktopLayout: React.FC<DesktopLayoutProps> = (props) => {
+  const { showSeoulMap, setSearchAddress } = props
+
+  // 지도에서 구 클릭 시 주소 검색에 반영
+  const handleDistrictClick = (districtName: string) => {
+    setSearchAddress(districtName)
+  }
+
   return (
     <>
       <RestaurantList {...props} isMobile={false} />
-      <Routes>
-        <Route path=":id" element={<RestaurantDetail isMobile={false} />} />
-      </Routes>
+      {showSeoulMap ? (
+        <SeoulMapView onDistrictClick={handleDistrictClick} />
+      ) : (
+        <Routes>
+          <Route path=":id" element={<RestaurantDetail isMobile={false} />} />
+        </Routes>
+      )}
     </>
   )
 }
@@ -52,15 +66,16 @@ const DesktopLayout: React.FC<DesktopLayoutProps> = (props) => {
 const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   // 공통 state와 로직
   const restaurantState = useRestaurant()
-  
+
   // Socket 연결 (전역 단일 연결)
   const { menuProgress, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
-  
+
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
+  const [showSeoulMap, setShowSeoulMap] = useState(false)
   const colors = THEME_COLORS[theme]
   const location = useLocation()
-  
+
   // 반응형 체크
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
@@ -195,6 +210,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   handleRestaurantClick={handleRestaurantClick}
                   fetchRestaurants={fetchRestaurants}
                   fetchCategories={fetchCategories}
+                  showSeoulMap={showSeoulMap}
+                  setShowSeoulMap={setShowSeoulMap}
                 />
               )}
             />
