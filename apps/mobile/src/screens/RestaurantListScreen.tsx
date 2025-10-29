@@ -293,6 +293,8 @@ const RestaurantListScreen: React.FC = () => {
     setSelectedCategory,
     searchName,
     setSearchName,
+    searchAddress,
+    setSearchAddress,
     handleCrawl: sharedHandleCrawl,
     fetchRestaurants,
     fetchCategories,
@@ -481,6 +483,28 @@ const RestaurantListScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* 레스토랑 주소 검색 */}
+        <View style={styles.restaurantSearchContainer}>
+          <View style={restaurantSearchWrapperStyle}>
+            <TextInput
+              style={restaurantSearchInputStyle}
+              placeholder="레스토랑 주소 검색..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchAddress}
+              onChangeText={setSearchAddress}
+              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+            />
+            {searchAddress.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchAddress('')}
+                style={styles.clearButton}
+              >
+                <Text style={clearButtonTextStyle}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         {/* 카테고리 섹션 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -645,7 +669,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 48,
+    height: 40,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 16,
@@ -653,7 +677,7 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     paddingHorizontal: 20,
-    height: 48,
+    height: 40,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -663,10 +687,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   restaurantSearchContainer: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   restaurantSearchInput: {
-    height: 44,
+    height: 40,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 16,

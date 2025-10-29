@@ -130,6 +130,11 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           description: '음식점 이름 검색 (부분 일치)',
           minLength: 1,
           maxLength: 100
+        })),
+        searchAddress: Type.Optional(Type.String({
+          description: '음식점 주소 검색 (부분 일치)',
+          minLength: 1,
+          maxLength: 200
         }))
       }),
       response: {
@@ -153,17 +158,18 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    const { limit = 20, offset = 0, category, searchName } = request.query as {
+    const { limit = 20, offset = 0, category, searchName, searchAddress } = request.query as {
       limit?: number;
       offset?: number;
       category?: string;
       searchName?: string;
+      searchAddress?: string;
     };
 
     try {
       const [restaurants, total] = await Promise.all([
-        restaurantRepository.findAll(limit, offset, category, searchName),
-        restaurantRepository.count(category, searchName)
+        restaurantRepository.findAll(limit, offset, category, searchName, searchAddress),
+        restaurantRepository.count(category, searchName, searchAddress)
       ]);
 
       return ResponseHelper.success(

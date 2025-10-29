@@ -21,6 +21,7 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
   const [total, setTotal] = useState(0)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchName, setSearchName] = useState('')
+  const [searchAddress, setSearchAddress] = useState('')
 
   const fetchCategories = async () => {
     setCategoriesLoading(true)
@@ -43,7 +44,8 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
         limit,
         offset,
         selectedCategory || undefined,
-        searchName || undefined
+        searchName || undefined,
+        searchAddress || undefined
       )
       if (response.result && response.data) {
         setRestaurants(response.data.restaurants)
@@ -124,6 +126,15 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     return () => clearTimeout(timer)
   }, [searchName])
 
+  // 주소 검색어 변경 시 디바운스 적용하여 레스토랑 재조회
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchRestaurants()
+    }, 300) // 300ms 디바운스
+
+    return () => clearTimeout(timer)
+  }, [searchAddress])
+
   return {
     url,
     setUrl,
@@ -137,6 +148,8 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     setSelectedCategory,
     searchName,
     setSearchName,
+    searchAddress,
+    setSearchAddress,
     handleCrawl,
     fetchRestaurants,
     fetchCategories,

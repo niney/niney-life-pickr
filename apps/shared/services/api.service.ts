@@ -386,7 +386,8 @@ class ApiService {
     limit: number = 1000,
     offset: number = 0,
     category?: string,
-    searchName?: string
+    searchName?: string,
+    searchAddress?: string
   ): Promise<ApiResponse<RestaurantListResponse>> {
     let url = `/api/restaurants?limit=${limit}&offset=${offset}`;
 
@@ -398,6 +399,11 @@ class ApiService {
     // 이름 검색 필터 추가
     if (searchName && searchName.trim()) {
       url += `&searchName=${encodeURIComponent(searchName.trim())}`;
+    }
+
+    // 주소 검색 필터 추가
+    if (searchAddress && searchAddress.trim()) {
+      url += `&searchAddress=${encodeURIComponent(searchAddress.trim())}`;
     }
 
     return this.request<RestaurantListResponse>(url, {

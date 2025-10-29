@@ -191,9 +191,9 @@ export class RestaurantRepository {
   }
 
   /**
-   * 음식점 목록 조회 (페이지네이션 + 카테고리 필터 + 이름 검색)
+   * 음식점 목록 조회 (페이지네이션 + 카테고리 필터 + 이름 검색 + 주소 검색)
    */
-  async findAll(limit: number = 20, offset: number = 0, category?: string, searchName?: string): Promise<RestaurantDB[]> {
+  async findAll(limit: number = 20, offset: number = 0, category?: string, searchName?: string, searchAddress?: string): Promise<RestaurantDB[]> {
     let query = 'SELECT * FROM restaurants';
     const params: any[] = [];
     const conditions: string[] = [];
@@ -210,6 +210,12 @@ export class RestaurantRepository {
       params.push(`%${searchName.trim()}%`);
     }
 
+    // 주소 검색 필터링
+    if (searchAddress && searchAddress.trim()) {
+      conditions.push('address LIKE ?');
+      params.push(`%${searchAddress.trim()}%`);
+    }
+
     // WHERE 절 적용
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
@@ -222,9 +228,9 @@ export class RestaurantRepository {
   }
 
   /**
-   * 음식점 총 개수 (카테고리 필터 + 이름 검색 지원)
+   * 음식점 총 개수 (카테고리 필터 + 이름 검색 + 주소 검색 지원)
    */
-  async count(category?: string, searchName?: string): Promise<number> {
+  async count(category?: string, searchName?: string, searchAddress?: string): Promise<number> {
     let query = 'SELECT COUNT(*) as count FROM restaurants';
     const params: any[] = [];
     const conditions: string[] = [];
@@ -239,6 +245,12 @@ export class RestaurantRepository {
     if (searchName && searchName.trim()) {
       conditions.push('name LIKE ?');
       params.push(`%${searchName.trim()}%`);
+    }
+
+    // 주소 검색 필터링
+    if (searchAddress && searchAddress.trim()) {
+      conditions.push('address LIKE ?');
+      params.push(`%${searchAddress.trim()}%`);
     }
 
     // WHERE 절 적용

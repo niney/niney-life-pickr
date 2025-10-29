@@ -26,6 +26,8 @@ interface DesktopLayoutProps {
   setSelectedCategory: (category: string | null) => void
   searchName: string
   setSearchName: (searchName: string) => void
+  searchAddress: string
+  setSearchAddress: (searchAddress: string) => void
   menuProgress: ProgressData | null
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
@@ -97,6 +99,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     setSelectedCategory,
     searchName,
     setSearchName,
+    searchAddress,
+    setSearchAddress,
     handleCrawl,
     handleRestaurantClick,
     fetchRestaurants,
@@ -148,6 +152,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   setSelectedCategory={setSelectedCategory}
                   searchName={searchName}
                   setSearchName={setSearchName}
+                  searchAddress={searchAddress}
+                  setSearchAddress={setSearchAddress}
                   menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
@@ -180,6 +186,8 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   setSelectedCategory={setSelectedCategory}
                   searchName={searchName}
                   setSearchName={setSearchName}
+                  searchAddress={searchAddress}
+                  setSearchAddress={setSearchAddress}
                   menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}

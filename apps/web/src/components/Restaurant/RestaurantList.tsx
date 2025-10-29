@@ -28,6 +28,8 @@ interface RestaurantListProps {
   setSelectedCategory: (category: string | null) => void
   searchName: string
   setSearchName: (searchName: string) => void
+  searchAddress: string
+  setSearchAddress: (searchAddress: string) => void
   menuProgress: { current: number; total: number; percentage: number } | null
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
@@ -51,6 +53,8 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   setSelectedCategory,
   searchName,
   setSearchName,
+  searchAddress,
+  setSearchAddress,
   menuProgress,
   crawlProgress,
   dbProgress,
@@ -192,6 +196,27 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
             {searchName.length > 0 && (
               <TouchableOpacity
                 onPress={() => setSearchName('')}
+                style={styles.clearButton}
+              >
+                <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* 레스토랑 주소 검색 영역 */}
+        <View style={styles.restaurantSearchSection}>
+          <View style={{ position: 'relative', flex: 1 }}>
+            <TextInput
+              style={[styles.restaurantSearchInput, { borderColor: colors.border, color: colors.text, backgroundColor: theme === 'light' ? '#fff' : colors.surface }]}
+              placeholder="레스토랑 주소 검색..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchAddress}
+              onChangeText={setSearchAddress}
+            />
+            {searchAddress.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchAddress('')}
                 style={styles.clearButton}
               >
                 <FontAwesomeIcon icon={faTimes} style={{ fontSize: 16, color: colors.textSecondary }} />
@@ -522,28 +547,28 @@ const styles = StyleSheet.create({
   searchSection: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   input: {
     flex: 1,
-    height: 48,
+    height: 40,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
   },
   addButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   restaurantSearchSection: {
-    marginBottom: 24,
+    marginBottom: 12,
   },
   restaurantSearchInput: {
-    height: 44,
+    height: 40,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 16,
@@ -553,7 +578,7 @@ const styles = StyleSheet.create({
   clearButton: {
     position: 'absolute',
     right: 12,
-    top: 14,
+    top: 12,
     padding: 4,
   },
   section: {
