@@ -243,6 +243,34 @@ export interface ReviewCrawlStatus {
   error?: string;
 }
 
+export interface RestaurantRanking {
+  rank: number;
+  restaurant: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
+  statistics: {
+    totalReviews: number;
+    analyzedReviews: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    positiveRate: number;
+    negativeRate: number;
+    neutralRate: number;
+  };
+}
+
+export interface RestaurantRankingsResponse {
+  type: 'positive' | 'negative' | 'neutral';
+  limit: number;
+  minReviews: number;
+  category?: string;
+  rankings: RestaurantRanking[];
+}
+
 // API 클래스
 class ApiService {
   private baseUrl: string;
@@ -507,6 +535,31 @@ class ApiService {
     }
 
     return this.request<RestaurantMenuStatistics>(url, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 레스토랑 순위 TOP N 조회
+   */
+  async getRestaurantRankings(
+    type: 'positive' | 'negative' | 'neutral' = 'positive',
+    limit: number = 5,
+    minReviews: number = 10,
+    category?: string,
+    invalidateCache?: boolean
+  ): Promise<ApiResponse<RestaurantRankingsResponse>> {
+    let url = `/api/restaurants/rankings?type=${type}&limit=${limit}&minReviews=${minReviews}`;
+
+    if (category) {
+      url += `&category=${encodeURIComponent(category)}`;
+    }
+
+    if (invalidateCache) {
+      url += '&invalidateCache=true';
+    }
+
+    return this.request<RestaurantRankingsResponse>(url, {
       method: 'GET',
     });
   }

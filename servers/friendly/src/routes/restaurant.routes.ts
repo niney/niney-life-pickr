@@ -4,6 +4,7 @@ import restaurantRepository from '../db/repositories/restaurant.repository';
 import reviewRepository from '../db/repositories/review.repository';
 import restaurantService from '../services/restaurant.service';
 import restaurantStatisticsService from '../services/restaurant-statistics.service';
+import restaurantRankingService from '../services/restaurant-ranking.service';
 import { ResponseHelper } from '../utils/response.utils';
 
 /**
@@ -69,6 +70,27 @@ const RestaurantReviewStatisticsSchema = Type.Object({
   neutralRate: Type.Number({ description: '중립률 (%)' })
 });
 
+// 레스토랑 순위 스키마
+const RestaurantRankingSchema = Type.Object({
+  rank: Type.Number({ description: '순위' }),
+  restaurant: Type.Object({
+    id: Type.Number({ description: '레스토랑 ID' }),
+    name: Type.String({ description: '레스토랑 이름' }),
+    category: Type.Union([Type.String(), Type.Null()], { description: '카테고리' }),
+    address: Type.Union([Type.String(), Type.Null()], { description: '주소' })
+  }),
+  statistics: Type.Object({
+    totalReviews: Type.Number({ description: '전체 리뷰 수' }),
+    analyzedReviews: Type.Number({ description: '분석 완료된 리뷰 수' }),
+    positive: Type.Number({ description: '긍정 리뷰 수' }),
+    negative: Type.Number({ description: '부정 리뷰 수' }),
+    neutral: Type.Number({ description: '중립 리뷰 수' }),
+    positiveRate: Type.Number({ description: '긍정률 (%)' }),
+    negativeRate: Type.Number({ description: '부정률 (%)' }),
+    neutralRate: Type.Number({ description: '중립률 (%)' })
+  })
+});
+
 /**
  * 음식점 관련 라우트
  */
@@ -111,6 +133,121 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       return ResponseHelper.error(
         reply,
         error instanceof Error ? error.message : 'Failed to fetch categories',
+        500
+      );
+    }
+  });
+
+  /**
+   * GET /api/restaurants/rankings
+   * 레스토랑 감정률 순위 TOP N 조회
+   */
+  fastify.get('/rankings', {
+    schema: {
+      tags: ['restaurants'],
+      summary: '레스토랑 감정률 순위 TOP N 조회',
+      description: '전체 레스토랑의 긍정/부정/중립률 순위를 조회합니다. 최소 리뷰 수, 분석 완료율 70% 이상 필터링 적용.',
+      querystring: Type.Object({
+        type: Type.Optional(Type.Union([
+          Type.Literal('positive'),
+          Type.Literal('negative'),
+          Type.Literal('neutral')
+        ], { description: '순위 타입 (기본: positive)', default: 'positive' })),
+        limit: Type.Optional(Type.Number({
+          description: '결과 개수 (1-100, 기본: 5)',
+          minimum: 1,
+          maximum: 100,
+          default: 5
+        })),
+        minReviews: Type.Optional(Type.Number({
+          description: '최소 분석된 리뷰 수 (1-100, 기본: 10)',
+          minimum: 1,
+          maximum: 100,
+          default: 10
+        })),
+        category: Type.Optional(Type.String({ description: '카테고리 필터 (선택)' })),
+        invalidateCache: Type.Optional(Type.Boolean({ description: '캐시 무효화 여부 (기본: false)', default: false }))
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            type: Type.Union([
+              Type.Literal('positive'),
+              Type.Literal('negative'),
+              Type.Literal('neutral')
+            ]),
+            limit: Type.Number(),
+            minReviews: Type.Number(),
+            category: Type.Optional(Type.String()),
+            rankings: Type.Array(RestaurantRankingSchema)
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { type = 'positive', limit = 5, minReviews = 10, category, invalidateCache = false } = request.query as {
+        type?: 'positive' | 'negative' | 'neutral';
+        limit?: number;
+        minReviews?: number;
+        category?: string;
+        invalidateCache?: boolean;
+      };
+
+      // 캐시 무효화 요청 처리
+      if (invalidateCache) {
+        restaurantRankingService.invalidateCache();
+        console.log('[Rankings API] Cache invalidated by user request');
+      }
+
+      // 파라미터 검증
+      if (limit < 1 || limit > 100) {
+        return ResponseHelper.error(reply, 'limit은 1-100 사이의 값이어야 합니다', 400);
+      }
+
+      if (minReviews < 1 || minReviews > 100) {
+        return ResponseHelper.error(reply, 'minReviews는 1-100 사이의 값이어야 합니다', 400);
+      }
+
+      // 순위 조회
+      const rankings = await restaurantRankingService.getRankings({
+        type,
+        limit,
+        minReviews,
+        category,
+      });
+
+      const typeMap = {
+        positive: '긍정률',
+        negative: '부정률',
+        neutral: '중립률',
+      };
+
+      return ResponseHelper.success(
+        reply,
+        rankings,
+        `${typeMap[type]} TOP ${rankings.rankings.length} 조회 성공`
+      );
+    } catch (error) {
+      console.error('순위 조회 에러:', error);
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to fetch rankings',
         500
       );
     }

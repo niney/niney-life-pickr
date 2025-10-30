@@ -1,58 +1,163 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
+import { useNavigation } from '@react-navigation/native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from 'shared/contexts';
-import { useAuth } from 'shared/hooks';
+import { useRankings } from 'shared/hooks';
 import { THEME_COLORS } from 'shared/constants';
+import type { RestaurantRanking } from 'shared/services';
+import type { RootTabParamList, RestaurantStackParamList } from '../navigation/types';
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<RootTabParamList, 'Home'>,
+  NativeStackNavigationProp<RestaurantStackParamList>
+>;
 
 const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp>();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refresh, refreshWithCacheInvalidation } = useRankings(5, 10);
   const colors = THEME_COLORS[theme];
 
-  return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        {/* 글래스모피즘 Welcome Card */}
-        <View style={[styles.cardContainer, styles.welcomeCard]}>
-          <BlurView
-            style={styles.blurContainer}
-            blurType={theme === 'dark' ? 'dark' : 'light'}
-            blurAmount={20}
-            reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
-          />
-          <View style={styles.cardContent}>
-            <Text style={[styles.title, { color: colors.text }]}>환영합니다! 👋</Text>
-            {user && (
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                {user.username}님
-              </Text>
-            )}
-          </View>
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRestaurantPress = (restaurantId: number) => {
+    // Restaurant 탭으로 이동 후 RestaurantDetail로 네비게이트
+    navigation.navigate('Restaurant', {
+      screen: 'RestaurantDetail',
+      params: { restaurantId },
+    });
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
+
+  const renderRankingCard = (
+    title: string,
+    emoji: string,
+    rankings: RestaurantRanking[] | null,
+    rateKey: 'positiveRate' | 'negativeRate' | 'neutralRate',
+    color: string
+  ) => (
+    <View style={styles.cardContainer}>
+      <BlurView
+        style={styles.blurContainer}
+        blurType={theme === 'dark' ? 'dark' : 'light'}
+        blurAmount={20}
+        reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+      />
+      <View style={styles.cardContent}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.emoji}>{emoji}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
         </View>
 
-        {/* 글래스모피즘 Stats Card */}
-        <View style={[styles.cardContainer, styles.statsCard]}>
-          <BlurView
-            style={styles.blurContainer}
-            blurType={theme === 'dark' ? 'dark' : 'light'}
-            blurAmount={20}
-            reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
-          />
-          <View style={styles.cardContent}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>통계</Text>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>저장한 맛집</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.primary }]}>0</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>방문 완료</Text>
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={color} />
+          </View>
+        )}
+
+        {!loading && rankings && rankings.rankings.length > 0 && (
+          <View style={styles.rankingList}>
+            {rankings.rankings.map((ranking) => (
+              <TouchableOpacity
+                key={ranking.rank}
+                style={[styles.rankingItem, { borderColor: colors.border }]}
+                onPress={() => handleRestaurantPress(ranking.restaurant.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.rankRow}>
+                  <Text style={[styles.rankNumber, { color }]}>{ranking.rank}</Text>
+                  <View style={styles.restaurantInfo}>
+                    <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
+                      {ranking.restaurant.name}
+                    </Text>
+                    <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {ranking.restaurant.category || '카테고리 없음'}
+                    </Text>
+                  </View>
+                  <View style={styles.rateContainer}>
+                    <Text style={[styles.rateValue, { color }]}>
+                      {ranking.statistics[rateKey].toFixed(1)}%
+                    </Text>
+                    <Text style={[styles.reviewCount, { color: colors.textSecondary }]}>
+                      {ranking.statistics.analyzedReviews}개
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {!loading && (!rankings || rankings.rankings.length === 0) && (
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            순위 데이터가 없습니다
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>레스토랑 순위</Text>
+          <TouchableOpacity
+            style={[styles.refreshButton, { backgroundColor: colors.primary }]}
+            onPress={() => refreshWithCacheInvalidation()}
+            activeOpacity={0.7}
+            disabled={loading}
+          >
+            <Text style={styles.refreshButtonText}>🔄 새로고침</Text>
+          </TouchableOpacity>
+        </View>
+
+        {error && (
+          <View style={styles.cardContainer}>
+            <BlurView
+              style={styles.blurContainer}
+              blurType={theme === 'dark' ? 'dark' : 'light'}
+              blurAmount={20}
+              reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+            />
+            <View style={styles.cardContent}>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>⚠️</Text>
+                <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+                <TouchableOpacity
+                  style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                  onPress={() => refresh()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.retryButtonText}>다시 시도</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
-        </View>
+        )}
+
+        {renderRankingCard('긍정 평가 TOP 5', '🌟', positiveRankings, 'positiveRate', '#10b981')}
+        {renderRankingCard('부정 평가 TOP 5', '⚠️', negativeRankings, 'negativeRate', '#ef4444')}
+        {renderRankingCard('중립 평가 TOP 5', '➖', neutralRankings, 'neutralRate', '#8b5cf6')}
       </View>
     </ScrollView>
   );
@@ -64,13 +169,35 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 100, // 하단 탭바 공간 확보
+    paddingBottom: 100,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  refreshButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  refreshButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   cardContainer: {
     overflow: 'hidden',
     borderRadius: 20,
     marginBottom: 16,
-    // 글래스모피즘 효과
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
     shadowColor: '#000',
@@ -87,41 +214,92 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   cardContent: {
-    padding: 24,
+    padding: 20,
   },
-  welcomeCard: {
-    minHeight: 120,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  statsCard: {
-    minHeight: 160,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
+  emoji: {
+    fontSize: 24,
+    marginRight: 10,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
-  statLabel: {
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankingList: {
+    gap: 8,
+  },
+  rankingItem: {
+    borderBottomWidth: 1,
+    paddingVertical: 12,
+  },
+  rankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rankNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    width: 28,
+  },
+  restaurantInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  restaurantName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  restaurantCategory: {
+    fontSize: 12,
+  },
+  rateContainer: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  rateValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  reviewCount: {
+    fontSize: 11,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  errorIcon: {
+    fontSize: 48,
+  },
+  errorText: {
     fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 24,
   },
 });
 

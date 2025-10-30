@@ -27,6 +27,21 @@ export class RestaurantRepository {
   }
 
   /**
+   * 여러 음식점 ID로 일괄 조회 (N+1 문제 해결)
+   */
+  async findByIds(ids: number[]): Promise<RestaurantDB[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    return await db.all<RestaurantDB>(
+      `SELECT * FROM restaurants WHERE id IN (${placeholders})`,
+      ids
+    );
+  }
+
+  /**
    * 음식점 정보 UPSERT (place_id 기준)
    * 이미 존재하면 업데이트, 없으면 삽입
    */

@@ -14,6 +14,7 @@ import {
   useReviews,
   useMenus,
   useRestaurantStatistics,
+  apiService,
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
@@ -83,11 +84,15 @@ const convertReview = (data: ReviewData) => ({
 
 const RestaurantDetailScreen: React.FC = () => {
   const route = useRoute<RestaurantDetailRouteProp>();
-  const { restaurantId, restaurant } = route.params;
+  const { restaurantId, restaurant: routeRestaurant } = route.params;
 
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
   const insets = useSafeAreaInsets();
+
+  // restaurant 상태 관리 (route에서 전달되거나 API에서 가져옴)
+  const [restaurant, setRestaurant] = useState<RestaurantData | null>(routeRestaurant || null);
+  const [restaurantLoading, setRestaurantLoading] = useState(!routeRestaurant);
 
   const {
     menuProgress,
@@ -281,6 +286,26 @@ const RestaurantDetailScreen: React.FC = () => {
     }
   }, [reviewSummaryStatus.status, resetSummaryStatus]);
 
+  // restaurant 데이터 가져오기 (route에서 전달되지 않은 경우)
+  useEffect(() => {
+    const fetchRestaurantData = async () => {
+      if (!routeRestaurant) {
+        try {
+          setRestaurantLoading(true);
+          const response = await apiService.getRestaurantById(restaurantId);
+          if (response.result && response.data) {
+            setRestaurant(response.data.restaurant);
+          }
+        } catch (error) {
+          console.error('[RestaurantDetail] Failed to fetch restaurant:', error);
+        } finally {
+          setRestaurantLoading(false);
+        }
+      }
+    };
+    fetchRestaurantData();
+  }, [restaurantId, routeRestaurant]);
+
   useEffect(() => {
     fetchReviews(restaurantId);
     fetchMenus(restaurantId);
@@ -355,11 +380,13 @@ const RestaurantDetailScreen: React.FC = () => {
           }
         }}>
           {/* 레스토랑 정보 헤더 */}
-          <RestaurantDetailHeader
-            restaurant={convertRestaurant(restaurant)}
-            menuCount={menus.length}
-            reviewCount={reviewsTotal}
-          />
+          {restaurant && (
+            <RestaurantDetailHeader
+              restaurant={convertRestaurant(restaurant)}
+              menuCount={menus.length}
+              reviewCount={reviewsTotal}
+            />
+          )}
 
           {/* 크롤링 진행 상태 */}
           {isCrawling && (

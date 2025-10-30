@@ -349,3 +349,47 @@ export interface RestaurantReviewStatistics {
   neutralRate: number;
 }
 
+/**
+ * 레스토랑 순위 정보
+ */
+export interface RestaurantRanking {
+  rank: number;
+  restaurant: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
+  statistics: {
+    totalReviews: number;
+    analyzedReviews: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    positiveRate: number;
+    negativeRate: number;
+    neutralRate: number;
+  };
+}
+
+/**
+ * 레스토랑 순위 응답
+ */
+export interface RestaurantRankingsResponse {
+  type: 'positive' | 'negative' | 'neutral';
+  limit: number;
+  minReviews: number;
+  category?: string;
+  rankings: RestaurantRanking[];
+}
+
+/**
+ * 레스토랑 순위 요청 옵션
+ */
+export interface RankingOptions {
+  type: 'positive' | 'negative' | 'neutral';
+  limit: number;
+  minReviews: number;
+  category?: string;
+}
+

@@ -369,6 +369,79 @@ export class ReviewSummaryRepository {
 
     return result;
   }
+
+  /**
+   * 모든 레스토랑의 감정 통계 조회 (순위 계산용)
+   * @param minReviews 최소 분석된 리뷰 수 (기본: 10)
+   * @param category 카테고리 필터 (선택)
+   */
+  async getAllRestaurantsSentimentStats(
+    minReviews: number = 10,
+    category?: string
+  ): Promise<Array<{
+    restaurant_id: number;
+    total_reviews: number;
+    analyzed_reviews: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    positive_rate: number;
+    negative_rate: number;
+    neutral_rate: number;
+  }>> {
+    let whereClause = '';
+    const params: any[] = [];
+
+    if (category) {
+      whereClause = 'WHERE r.category = ?';
+      params.push(category);
+    }
+
+    // 단일 집계 쿼리로 모든 레스토랑 통계 계산
+    const stats = await db.all<{
+      restaurant_id: number;
+      total_reviews: number;
+      analyzed_reviews: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+      positive_rate: number;
+      negative_rate: number;
+      neutral_rate: number;
+    }>(`
+      SELECT
+        r.id as restaurant_id,
+        COUNT(DISTINCT rv.id) as total_reviews,
+        COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END) as analyzed_reviews,
+        SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'positive' THEN 1 ELSE 0 END) as positive,
+        SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'negative' THEN 1 ELSE 0 END) as negative,
+        SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'neutral' THEN 1 ELSE 0 END) as neutral,
+        ROUND(
+          CAST(SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'positive' THEN 1 ELSE 0 END) AS REAL) * 100.0 /
+          NULLIF(COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END), 0),
+          1
+        ) as positive_rate,
+        ROUND(
+          CAST(SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'negative' THEN 1 ELSE 0 END) AS REAL) * 100.0 /
+          NULLIF(COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END), 0),
+          1
+        ) as negative_rate,
+        ROUND(
+          CAST(SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'neutral' THEN 1 ELSE 0 END) AS REAL) * 100.0 /
+          NULLIF(COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END), 0),
+          1
+        ) as neutral_rate
+      FROM restaurants r
+      INNER JOIN reviews rv ON rv.restaurant_id = r.id
+      LEFT JOIN review_summaries rs ON rs.review_id = rv.id AND rs.status = 'completed'
+      ${whereClause}
+      GROUP BY r.id
+      HAVING analyzed_reviews >= ?
+        AND CAST(analyzed_reviews AS REAL) / NULLIF(total_reviews, 0) >= 0.7
+    `, [...params, minReviews]);
+
+    return stats;
+  }
 }
 
 export const reviewSummaryRepository = new ReviewSummaryRepository();

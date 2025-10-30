@@ -23,4 +23,6 @@ export type {
   ReviewCrawlStatus,
   RestaurantReviewStatistics,
   RestaurantMenuStatistics,
+  RestaurantRanking,
+  RestaurantRankingsResponse,
 } from './api.service';

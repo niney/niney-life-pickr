@@ -16,7 +16,7 @@ export type RestaurantStackParamList = {
   RestaurantList: { searchAddress?: string } | undefined;
   RestaurantDetail: {
     restaurantId: number;
-    restaurant: RestaurantData;
+    restaurant?: RestaurantData;
   };
   RestaurantMap: undefined;
 };

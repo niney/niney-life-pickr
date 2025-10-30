@@ -15,3 +15,6 @@ export type { RestaurantListHookReturn, RestaurantListHookOptions } from './useR
 
 export { useRestaurantStatistics } from './useRestaurantStatistics';
 export type { RestaurantStatisticsHookReturn } from './useRestaurantStatistics';
+
+export { useRankings } from './useRankings';
+export type { UseRankingsReturn } from './useRankings';
