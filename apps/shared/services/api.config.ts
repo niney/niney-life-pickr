@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 /**
  * API Configuration for Mobile Platform (Android/iOS)
  * Uses YAML config loaded via babel.config.js
