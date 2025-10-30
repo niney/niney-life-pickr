@@ -22,12 +22,14 @@ export interface UseRankingsReturn {
  * @param limit 조회할 순위 개수 (기본: 5)
  * @param minReviews 최소 리뷰 개수 (기본: 10)
  * @param category 카테고리 필터 (선택)
+ * @param excludeNeutral 중립 제외 여부 (기본: false)
  * @param autoFetch 자동 로딩 여부 (기본: true)
  */
 export function useRankings(
   limit: number = 5,
   minReviews: number = 10,
   category?: string,
+  excludeNeutral: boolean = false,
   autoFetch: boolean = true
 ): UseRankingsReturn {
   const [positiveRankings, setPositiveRankings] = useState<RestaurantRankingsResponse | null>(null);
@@ -45,9 +47,9 @@ export function useRankings(
     try {
       // 3가지 순위를 병렬로 가져오기
       const [positive, negative, neutral] = await Promise.all([
-        apiService.getRestaurantRankings('positive', limit, minReviews, category, invalidateCache),
-        apiService.getRestaurantRankings('negative', limit, minReviews, category, invalidateCache),
-        apiService.getRestaurantRankings('neutral', limit, minReviews, category, invalidateCache),
+        apiService.getRestaurantRankings('positive', limit, minReviews, category, excludeNeutral, invalidateCache),
+        apiService.getRestaurantRankings('negative', limit, minReviews, category, excludeNeutral, invalidateCache),
+        apiService.getRestaurantRankings('neutral', limit, minReviews, category, excludeNeutral, invalidateCache),
       ]);
 
       if (!isMounted) return;
@@ -76,7 +78,7 @@ export function useRankings(
     return () => {
       isMounted = false;
     };
-  }, [limit, minReviews, category]);
+  }, [limit, minReviews, category, excludeNeutral]);
 
   const refresh = useCallback(async () => {
     await fetchRankings(false);

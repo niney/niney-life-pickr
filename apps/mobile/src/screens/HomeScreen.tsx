@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { useNavigation } from '@react-navigation/native';
@@ -8,7 +8,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from 'shared/contexts';
 import { useRankings } from 'shared/hooks';
 import { THEME_COLORS } from 'shared/constants';
-import type { RestaurantRanking } from 'shared/services';
+import type { RestaurantRanking, RestaurantRankingsResponse } from 'shared/services';
 import type { RootTabParamList, RestaurantStackParamList } from '../navigation/types';
 
 type NavigationProp = CompositeNavigationProp<
@@ -19,17 +19,44 @@ type NavigationProp = CompositeNavigationProp<
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { theme } = useTheme();
-  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refresh, refreshWithCacheInvalidation } = useRankings(5, 10);
+  const [refreshing, setRefreshing] = useState(false);
+  const [excludeNeutral, setExcludeNeutral] = useState(false);
+  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refresh, refreshWithCacheInvalidation } = useRankings(5, 10, undefined, excludeNeutral);
   const colors = THEME_COLORS[theme];
 
-  const [refreshing, setRefreshing] = useState(false);
+  // Dynamic styles based on theme and state
+  const dynamicStyles = useMemo(() => ({
+    toggleButtonActive: {
+      backgroundColor: '#8b5cf6',
+    },
+    toggleButtonInactive: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
+    toggleTextActive: {
+      color: '#ffffff',
+    },
+    toggleTextInactive: {
+      color: colors.text,
+    },
+    refreshButtonBg: {
+      backgroundColor: colors.primary,
+    },
+  }), [colors.surface, colors.border, colors.text, colors.primary]);
 
   const handleRestaurantPress = (restaurantId: number) => {
-    // Restaurant 탭으로 이동 후 RestaurantDetail로 네비게이트
-    navigation.navigate('Restaurant', {
-      screen: 'RestaurantDetail',
-      params: { restaurantId },
-    });
+    // 1. Restaurant 탭으로 먼저 전환 (RestaurantList 활성화)
+    navigation.navigate('Restaurant');
+
+    // 2. 즉시 RestaurantDetail로 navigate
+    // setTimeout을 사용하여 탭 전환이 완료된 후 실행
+    setTimeout(() => {
+      (navigation as any).navigate('Restaurant', {
+        screen: 'RestaurantDetail',
+        params: { restaurantId },
+      });
+    }, 0);
   };
 
   const onRefresh = useCallback(async () => {
@@ -41,10 +68,13 @@ const HomeScreen: React.FC = () => {
   const renderRankingCard = (
     title: string,
     emoji: string,
-    rankings: RestaurantRanking[] | null,
+    rankingsResponse: RestaurantRankingsResponse | null,
     rateKey: 'positiveRate' | 'negativeRate' | 'neutralRate',
     color: string
-  ) => (
+  ) => {
+    const rankings = rankingsResponse?.rankings || null;
+
+    return (
     <View style={styles.cardContainer}>
       <BlurView
         style={styles.blurContainer}
@@ -64,9 +94,9 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {!loading && rankings && rankings.rankings.length > 0 && (
+        {!loading && rankings && rankings.length > 0 && (
           <View style={styles.rankingList}>
-            {rankings.rankings.map((ranking) => (
+            {rankings.map((ranking: RestaurantRanking) => (
               <TouchableOpacity
                 key={ranking.rank}
                 style={[styles.rankingItem, { borderColor: colors.border }]}
@@ -97,14 +127,15 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {!loading && (!rankings || rankings.rankings.length === 0) && (
+        {!loading && (!rankings || rankings.length === 0) && (
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             순위 데이터가 없습니다
           </Text>
         )}
       </View>
     </View>
-  );
+    );
+  };
 
   return (
     <ScrollView
@@ -121,14 +152,32 @@ const HomeScreen: React.FC = () => {
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>레스토랑 순위</Text>
-          <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: colors.primary }]}
-            onPress={() => refreshWithCacheInvalidation()}
-            activeOpacity={0.7}
-            disabled={loading}
-          >
-            <Text style={styles.refreshButtonText}>🔄 새로고침</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                excludeNeutral ? dynamicStyles.toggleButtonActive : dynamicStyles.toggleButtonInactive
+              ]}
+              onPress={() => setExcludeNeutral(!excludeNeutral)}
+              activeOpacity={0.7}
+              disabled={loading}
+            >
+              <Text style={[
+                styles.toggleButtonText,
+                excludeNeutral ? dynamicStyles.toggleTextActive : dynamicStyles.toggleTextInactive
+              ]}>
+                {excludeNeutral ? '중립 제외' : '중립 포함'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.refreshButton, dynamicStyles.refreshButtonBg]}
+              onPress={() => refreshWithCacheInvalidation()}
+              activeOpacity={0.7}
+              disabled={loading}
+            >
+              <Text style={styles.refreshButtonText}>🔄 새로고침</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {error && (
@@ -183,11 +232,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
   },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  toggleButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   refreshButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    marginLeft: 12,
   },
   refreshButtonText: {
     color: '#ffffff',

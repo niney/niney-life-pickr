@@ -92,7 +92,7 @@ const RestaurantDetailScreen: React.FC = () => {
 
   // restaurant 상태 관리 (route에서 전달되거나 API에서 가져옴)
   const [restaurant, setRestaurant] = useState<RestaurantData | null>(routeRestaurant || null);
-  const [restaurantLoading, setRestaurantLoading] = useState(!routeRestaurant);
+  const [_restaurantLoading, setRestaurantLoading] = useState(!routeRestaurant);
 
   const {
     menuProgress,

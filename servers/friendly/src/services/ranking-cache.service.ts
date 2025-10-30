@@ -24,9 +24,10 @@ export class RankingCacheService {
     type: string,
     limit: number,
     minReviews: number,
-    category?: string
+    category?: string,
+    excludeNeutral?: boolean
   ): string {
-    return `ranking:${type}:${limit}:${minReviews}:${category || 'all'}`;
+    return `ranking:${type}:${limit}:${minReviews}:${category || 'all'}:${excludeNeutral ? 'polarized' : 'all'}`;
   }
 
   /**

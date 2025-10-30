@@ -547,12 +547,17 @@ class ApiService {
     limit: number = 5,
     minReviews: number = 10,
     category?: string,
+    excludeNeutral?: boolean,
     invalidateCache?: boolean
   ): Promise<ApiResponse<RestaurantRankingsResponse>> {
     let url = `/api/restaurants/rankings?type=${type}&limit=${limit}&minReviews=${minReviews}`;
 
     if (category) {
       url += `&category=${encodeURIComponent(category)}`;
+    }
+
+    if (excludeNeutral !== undefined) {
+      url += `&excludeNeutral=${excludeNeutral}`;
     }
 
     if (invalidateCache) {

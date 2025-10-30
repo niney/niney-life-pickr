@@ -391,5 +391,6 @@ export interface RankingOptions {
   limit: number;
   minReviews: number;
   category?: string;
+  excludeNeutral?: boolean; // true: 긍정+부정 중에서 비율 계산, false: 전체 중에서 비율 계산 (기본값)
 }
 

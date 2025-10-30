@@ -15,8 +15,9 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ onLogout }) => {
   const navigate = useNavigate()
   const { theme } = useTheme()
-  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refreshWithCacheInvalidation } = useRankings(5, 10)
   const [drawerVisible, setDrawerVisible] = useState(false)
+  const [excludeNeutral, setExcludeNeutral] = useState(false)
+  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refreshWithCacheInvalidation } = useRankings(5, 10, undefined, excludeNeutral)
 
   const colors = THEME_COLORS[theme]
 
@@ -99,14 +100,34 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
       <View style={styles.contentContainer}>
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>레스토랑 순위</Text>
-          <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: colors.primary }]}
-            onPress={() => refreshWithCacheInvalidation()}
-            activeOpacity={0.7}
-            disabled={loading}
-          >
-            <Text style={styles.refreshButtonText}>🔄 새로고침</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                excludeNeutral
+                  ? { backgroundColor: '#8b5cf6' }
+                  : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }
+              ]}
+              onPress={() => setExcludeNeutral(!excludeNeutral)}
+              activeOpacity={0.7}
+              disabled={loading}
+            >
+              <Text style={[
+                styles.toggleButtonText,
+                { color: excludeNeutral ? '#ffffff' : colors.text }
+              ]}>
+                {excludeNeutral ? '중립 제외' : '중립 포함'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.refreshButton, { backgroundColor: colors.primary }]}
+              onPress={() => refreshWithCacheInvalidation()}
+              activeOpacity={0.7}
+              disabled={loading}
+            >
+              <Text style={styles.refreshButtonText}>🔄 새로고침</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {error && (
@@ -146,11 +167,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
   },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  toggleButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   refreshButton: {
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    marginLeft: 16,
   },
   refreshButtonText: {
     color: '#ffffff',

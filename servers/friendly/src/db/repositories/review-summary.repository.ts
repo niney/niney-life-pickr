@@ -142,9 +142,9 @@ export class ReviewSummaryRepository {
 
     const placeholders = reviewIds.map(() => '?').join(',');
     return await db.all<ReviewSummaryDB>(`
-      SELECT * FROM review_summaries 
+      SELECT * FROM review_summaries
       WHERE review_id IN (${placeholders})
-      ORDER BY review_id ASC
+      ORDER BY review_id
     `, reviewIds);
   }
 
@@ -154,7 +154,7 @@ export class ReviewSummaryRepository {
   async findByStatus(status: ReviewSummaryStatus): Promise<ReviewSummaryDB[]> {
     return await db.all<ReviewSummaryDB>(`
       SELECT * FROM review_summaries WHERE status = ?
-      ORDER BY created_at ASC
+      ORDER BY created_at
     `, [status]);
   }
 
@@ -163,9 +163,9 @@ export class ReviewSummaryRepository {
    */
   async findIncomplete(): Promise<ReviewSummaryDB[]> {
     return await db.all<ReviewSummaryDB>(`
-      SELECT * FROM review_summaries 
+      SELECT * FROM review_summaries
       WHERE status IN ('pending', 'failed')
-      ORDER BY created_at ASC
+      ORDER BY created_at
     `);
   }
 
@@ -173,16 +173,16 @@ export class ReviewSummaryRepository {
    * 레스토랑의 미완료 요약 조회 (restaurant_id로 직접 조회, 페이지네이션)
    */
   async findIncompleteByRestaurant(
-    restaurantId: number, 
-    limit: number = 1000, 
+    restaurantId: number,
+    limit: number = 1000,
     offset: number = 0
   ): Promise<ReviewSummaryDB[]> {
     return await db.all<ReviewSummaryDB>(`
-      SELECT * 
+      SELECT *
       FROM review_summaries
-      WHERE restaurant_id = ? 
+      WHERE restaurant_id = ?
         AND status IN ('pending', 'failed')
-      ORDER BY created_at ASC
+      ORDER BY created_at
       LIMIT ? OFFSET ?
     `, [restaurantId, limit, offset]);
   }
@@ -192,10 +192,10 @@ export class ReviewSummaryRepository {
    */
   async findReviewIdsByRestaurantId(restaurantId: number): Promise<number[]> {
     const rows = await db.all<{ review_id: number }>(`
-      SELECT review_id 
+      SELECT review_id
       FROM review_summaries
       WHERE restaurant_id = ?
-      ORDER BY review_id ASC
+      ORDER BY review_id
     `, [restaurantId]);
     return rows.map(row => row.review_id);
   }
@@ -374,10 +374,12 @@ export class ReviewSummaryRepository {
    * 모든 레스토랑의 감정 통계 조회 (순위 계산용)
    * @param minReviews 최소 분석된 리뷰 수 (기본: 10)
    * @param category 카테고리 필터 (선택)
+   * @param excludeNeutral 중립 제외 여부 (true: 긍정+부정 중 비율, false: 전체 중 비율)
    */
   async getAllRestaurantsSentimentStats(
     minReviews: number = 10,
-    category?: string
+    category?: string,
+    excludeNeutral: boolean = false
   ): Promise<Array<{
     restaurant_id: number;
     total_reviews: number;
@@ -397,8 +399,19 @@ export class ReviewSummaryRepository {
       params.push(category);
     }
 
+    // 비율 계산 분모 결정
+    // excludeNeutral = true: positive + negative (중립 제외)
+    // excludeNeutral = false: analyzed_reviews (전체)
+    const denominator = excludeNeutral
+      ? `NULLIF(
+          SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'positive' THEN 1 ELSE 0 END) +
+          SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'negative' THEN 1 ELSE 0 END),
+          0
+        )`
+      : `NULLIF(COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END), 0)`;
+
     // 단일 집계 쿼리로 모든 레스토랑 통계 계산
-    const stats = await db.all<{
+    return await db.all<{
       restaurant_id: number;
       total_reviews: number;
       analyzed_reviews: number;
@@ -418,12 +431,12 @@ export class ReviewSummaryRepository {
         SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'neutral' THEN 1 ELSE 0 END) as neutral,
         ROUND(
           CAST(SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'positive' THEN 1 ELSE 0 END) AS REAL) * 100.0 /
-          NULLIF(COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END), 0),
+          ${denominator},
           1
         ) as positive_rate,
         ROUND(
           CAST(SUM(CASE WHEN json_extract(rs.summary_data, '$.sentiment') = 'negative' THEN 1 ELSE 0 END) AS REAL) * 100.0 /
-          NULLIF(COUNT(DISTINCT CASE WHEN rs.status = 'completed' THEN rs.id END), 0),
+          ${denominator},
           1
         ) as negative_rate,
         ROUND(
@@ -439,8 +452,6 @@ export class ReviewSummaryRepository {
       HAVING analyzed_reviews >= ?
         AND CAST(analyzed_reviews AS REAL) / NULLIF(total_reviews, 0) >= 0.7
     `, [...params, minReviews]);
-
-    return stats;
   }
 }
 

@@ -16,10 +16,10 @@ export class RestaurantRankingService {
    * 레스토랑 순위 조회
    */
   async getRankings(options: RankingOptions): Promise<RestaurantRankingsResponse> {
-    const { type, limit, minReviews, category } = options;
+    const { type, limit, minReviews, category, excludeNeutral = false } = options;
 
     // 캐시 조회
-    const cacheKey = rankingCacheService.getCacheKey(type, limit, minReviews, category);
+    const cacheKey = rankingCacheService.getCacheKey(type, limit, minReviews, category, excludeNeutral);
     const cached = rankingCacheService.get(cacheKey);
 
     if (cached) {
@@ -35,7 +35,8 @@ export class RestaurantRankingService {
     // Repository에서 모든 레스토랑 통계 조회
     const stats = await reviewSummaryRepository.getAllRestaurantsSentimentStats(
       minReviews,
-      category
+      category,
+      excludeNeutral
     );
 
     // 타입에 따라 정렬

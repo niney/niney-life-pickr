@@ -166,6 +166,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
           default: 10
         })),
         category: Type.Optional(Type.String({ description: '카테고리 필터 (선택)' })),
+        excludeNeutral: Type.Optional(Type.Boolean({ description: '중립 제외 여부 (true: 긍정+부정만, false: 전체, 기본: false)', default: false })),
         invalidateCache: Type.Optional(Type.Boolean({ description: '캐시 무효화 여부 (기본: false)', default: false }))
       }),
       response: {
@@ -201,11 +202,12 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }, async (request, reply) => {
     try {
-      const { type = 'positive', limit = 5, minReviews = 10, category, invalidateCache = false } = request.query as {
+      const { type = 'positive', limit = 5, minReviews = 10, category, excludeNeutral = false, invalidateCache = false } = request.query as {
         type?: 'positive' | 'negative' | 'neutral';
         limit?: number;
         minReviews?: number;
         category?: string;
+        excludeNeutral?: boolean;
         invalidateCache?: boolean;
       };
 
@@ -230,6 +232,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
         limit,
         minReviews,
         category,
+        excludeNeutral,
       });
 
       const typeMap = {
