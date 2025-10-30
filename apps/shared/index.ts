@@ -18,3 +18,6 @@ export * from './services';
 
 // 공통 컨텍스트들
 export * from './contexts';
+
+// 공통 데이터들
+export * from './data/SeoulMapDistricts';

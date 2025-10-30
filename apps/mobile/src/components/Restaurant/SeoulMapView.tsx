@@ -7,8 +7,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
-import { SEOUL_DISTRICTS, District } from './SeoulMapDistricts'
-import { useTheme, THEME_COLORS } from 'shared'
+import { SEOUL_DISTRICTS, District, useTheme, THEME_COLORS } from 'shared'
 
 interface SeoulMapViewProps {
   onDistrictClick: (districtName: string) => void
