@@ -13,6 +13,7 @@ import {
   THEME_COLORS,
   useReviews,
   useMenus,
+  useRestaurantStatistics,
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 
@@ -145,6 +146,11 @@ const RestaurantDetailScreen: React.FC = () => {
   });
   const { menuStatistics, statisticsLoading, fetchMenuStatistics } = useMenuStatistics(restaurantId);
   const {
+    reviewStatistics,
+    reviewStatisticsLoading,
+    fetchReviewStatistics,
+  } = useRestaurantStatistics();
+  const {
     resummaryModalVisible,
     selectedModel,
     setSelectedModel,
@@ -176,6 +182,7 @@ const RestaurantDetailScreen: React.FC = () => {
   const fetchReviewsRef = useRef(fetchReviews);
   const fetchMenusRef = useRef(fetchMenus);
   const fetchMenuStatisticsRef = useRef(fetchMenuStatistics);
+  const fetchReviewStatisticsRef = useRef(fetchReviewStatistics);
 
   // ref 업데이트
   useEffect(() => {
@@ -183,6 +190,7 @@ const RestaurantDetailScreen: React.FC = () => {
     fetchReviewsRef.current = fetchReviews;
     fetchMenusRef.current = fetchMenus;
     fetchMenuStatisticsRef.current = fetchMenuStatistics;
+    fetchReviewStatisticsRef.current = fetchReviewStatistics;
   });
 
   // Room 입장/퇴장 및 크롤링 완료 콜백 설정
@@ -225,6 +233,7 @@ const RestaurantDetailScreen: React.FC = () => {
         // 통계 탭이면 통계도 새로고침
         if (activeTabRef.current === 'statistics') {
           await fetchMenuStatisticsRef.current();
+          await fetchReviewStatisticsRef.current(restaurantId);
         }
       },
       onReviewSummaryCompleted: async () => {
@@ -234,6 +243,7 @@ const RestaurantDetailScreen: React.FC = () => {
         // 통계 탭이면 통계도 새로고침
         if (activeTabRef.current === 'statistics') {
           await fetchMenuStatisticsRef.current();
+          await fetchReviewStatisticsRef.current(restaurantId);
         }
       },
       onReviewCrawlError: async () => {
@@ -280,8 +290,9 @@ const RestaurantDetailScreen: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'statistics') {
       fetchMenuStatistics();
+      fetchReviewStatistics(restaurantId);
     }
-  }, [activeTab, fetchMenuStatistics]);
+  }, [activeTab, restaurantId, fetchMenuStatistics, fetchReviewStatistics]);
 
 
   // 스크롤 이벤트 처리 (무한 스크롤)
@@ -424,7 +435,9 @@ const RestaurantDetailScreen: React.FC = () => {
         {activeTab === 'statistics' && (
           <StatisticsTab
             menuStatistics={menuStatistics}
+            reviewStatistics={reviewStatistics}
             statisticsLoading={statisticsLoading}
+            reviewStatisticsLoading={reviewStatisticsLoading}
             colors={colors}
           />
         )}

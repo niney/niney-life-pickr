@@ -334,3 +334,18 @@ export interface RestaurantMenuStatistics {
   }>;
 }
 
+/**
+ * 레스토랑 리뷰 감정 통계
+ */
+export interface RestaurantReviewStatistics {
+  restaurantId: number;
+  totalReviews: number;
+  analyzedReviews: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  positiveRate: number;
+  negativeRate: number;
+  neutralRate: number;
+}
+

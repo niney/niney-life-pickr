@@ -3,6 +3,7 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
+import { useRestaurantStatistics } from '@shared/hooks'
 
 // 분리된 컴포넌트 임포트
 import RestaurantDetailHeader from './header/RestaurantDetailHeader'
@@ -62,6 +63,11 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const { expandedKeywords, toggleKeywords } = useKeywordToggle()
   const { menuStatistics, statisticsLoading, fetchMenuStatistics, setMenuStatistics } =
     useMenuStatistics()
+  const {
+    reviewStatistics,
+    reviewStatisticsLoading,
+    fetchReviewStatistics,
+  } = useRestaurantStatistics()
   const {
     resummaryModalVisible,
     selectedModel,
@@ -161,9 +167,10 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       const restaurantId = parseInt(id, 10)
       if (!isNaN(restaurantId)) {
         fetchMenuStatistics(restaurantId)
+        fetchReviewStatistics(restaurantId)
       }
     }
-  }, [activeTab, id, fetchMenuStatistics])
+  }, [activeTab, id, fetchMenuStatistics, fetchReviewStatistics])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
@@ -333,7 +340,12 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
         {/* 통계 탭 */}
         {activeTab === 'statistics' && (
-          <StatisticsTab menuStatistics={menuStatistics} statisticsLoading={statisticsLoading} />
+          <StatisticsTab
+            menuStatistics={menuStatistics}
+            reviewStatistics={reviewStatistics}
+            statisticsLoading={statisticsLoading}
+            reviewStatisticsLoading={reviewStatisticsLoading}
+          />
         )}
 
         {/* 네이버맵 탭 */}

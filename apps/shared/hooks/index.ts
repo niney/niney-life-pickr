@@ -12,3 +12,6 @@ export type { ReviewsHookReturn, SentimentFilter } from './useReviews';
 
 export { useRestaurantList } from './useRestaurantList';
 export type { RestaurantListHookReturn, RestaurantListHookOptions } from './useRestaurantList';
+
+export { useRestaurantStatistics } from './useRestaurantStatistics';
+export type { RestaurantStatisticsHookReturn } from './useRestaurantStatistics';

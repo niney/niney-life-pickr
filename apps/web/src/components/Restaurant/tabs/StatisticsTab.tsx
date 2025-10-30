@@ -2,21 +2,32 @@ import React from 'react'
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
+import type { RestaurantReviewStatistics } from '@shared/services'
 import StatisticsSummaryCard from './StatisticsSummaryCard'
+import ReviewStatisticsCard from './ReviewStatisticsCard'
 import TopMenuList from './TopMenuList'
 import MenuStatItem from './MenuStatItem'
 import type { MenuStatistics } from './types'
 
 interface StatisticsTabProps {
   menuStatistics: MenuStatistics | null
+  reviewStatistics: RestaurantReviewStatistics | null
   statisticsLoading: boolean
+  reviewStatisticsLoading: boolean
 }
 
-const StatisticsTab: React.FC<StatisticsTabProps> = ({ menuStatistics, statisticsLoading }) => {
+const StatisticsTab: React.FC<StatisticsTabProps> = ({
+  menuStatistics,
+  reviewStatistics,
+  statisticsLoading,
+  reviewStatisticsLoading
+}) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
 
-  if (statisticsLoading) {
+  const isLoading = statisticsLoading || reviewStatisticsLoading
+
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -24,7 +35,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ menuStatistics, statistic
     )
   }
 
-  if (!menuStatistics) {
+  if (!menuStatistics && !reviewStatistics) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -36,15 +47,20 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ menuStatistics, statistic
 
   return (
     <View style={styles.container}>
+      {/* 리뷰 감정 통계 */}
+      {reviewStatistics && <ReviewStatisticsCard statistics={reviewStatistics} />}
+
       {/* 전체 요약 */}
-      <StatisticsSummaryCard
-        totalReviews={menuStatistics.totalReviews}
-        analyzedReviews={menuStatistics.analyzedReviews}
-        menuCount={menuStatistics.menuStatistics.length}
-      />
+      {menuStatistics && (
+        <StatisticsSummaryCard
+          totalReviews={menuStatistics.totalReviews}
+          analyzedReviews={menuStatistics.analyzedReviews}
+          menuCount={menuStatistics.menuStatistics.length}
+        />
+      )}
 
       {/* Top 긍정 메뉴 */}
-      {menuStatistics.topPositiveMenus.length > 0 && (
+      {menuStatistics && menuStatistics.topPositiveMenus.length > 0 && (
         <TopMenuList
           menus={menuStatistics.topPositiveMenus}
           type="positive"
@@ -53,7 +69,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ menuStatistics, statistic
       )}
 
       {/* Top 부정 메뉴 */}
-      {menuStatistics.topNegativeMenus.length > 0 && (
+      {menuStatistics && menuStatistics.topNegativeMenus.length > 0 && (
         <TopMenuList
           menus={menuStatistics.topNegativeMenus}
           type="negative"
@@ -62,22 +78,24 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ menuStatistics, statistic
       )}
 
       {/* 전체 메뉴 통계 */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme === 'light' ? '#fff' : colors.surface,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>📋 전체 메뉴 통계</Text>
-        <View style={styles.list}>
-          {menuStatistics.menuStatistics.map((stat, index) => (
-            <MenuStatItem key={index} stat={stat} />
-          ))}
+      {menuStatistics && menuStatistics.menuStatistics.length > 0 && (
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme === 'light' ? '#fff' : colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.title, { color: colors.text }]}>📋 전체 메뉴 통계</Text>
+          <View style={styles.list}>
+            {menuStatistics.menuStatistics.map((stat, index) => (
+              <MenuStatItem key={index} stat={stat} />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   )
 }

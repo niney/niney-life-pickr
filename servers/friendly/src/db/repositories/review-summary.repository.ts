@@ -327,6 +327,48 @@ export class ReviewSummaryRepository {
     
     return menuItems;
   }
+
+  /**
+   * 레스토랑별 감정 통계 조회
+   */
+  async countSentimentByRestaurant(restaurantId: number): Promise<{
+    positive: number;
+    negative: number;
+    neutral: number;
+    total: number;
+  }> {
+    const rows = await db.all<{ sentiment: string; count: number }>(`
+      SELECT
+        json_extract(summary_data, '$.sentiment') as sentiment,
+        COUNT(*) as count
+      FROM review_summaries
+      WHERE restaurant_id = ?
+        AND status = 'completed'
+        AND summary_data IS NOT NULL
+        AND json_extract(summary_data, '$.sentiment') IS NOT NULL
+      GROUP BY sentiment
+    `, [restaurantId]);
+
+    const result = {
+      positive: 0,
+      negative: 0,
+      neutral: 0,
+      total: 0
+    };
+
+    for (const row of rows) {
+      const sentiment = row.sentiment;
+      const count = row.count;
+
+      if (sentiment === 'positive') result.positive = count;
+      else if (sentiment === 'negative') result.negative = count;
+      else if (sentiment === 'neutral') result.neutral = count;
+
+      result.total += count;
+    }
+
+    return result;
+  }
 }
 
 export const reviewSummaryRepository = new ReviewSummaryRepository();

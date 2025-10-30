@@ -188,6 +188,21 @@ export interface RestaurantMenuStatistics {
   topNegativeMenus: TopMenu[];
 }
 
+/**
+ * 레스토랑 리뷰 감정 통계
+ */
+export interface RestaurantReviewStatistics {
+  restaurantId: number;
+  totalReviews: number;
+  analyzedReviews: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  positiveRate: number;
+  negativeRate: number;
+  neutralRate: number;
+}
+
 export interface ReviewData {
   id: number;
   userName: string | null;
@@ -466,6 +481,33 @@ class ApiService {
   }>> {
     return this.request(`/api/restaurants/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * 레스토랑 리뷰 감정 통계 조회
+   */
+  async getRestaurantStatistics(restaurantId: number): Promise<ApiResponse<RestaurantReviewStatistics>> {
+    return this.request<RestaurantReviewStatistics>(`/api/restaurants/${restaurantId}/statistics`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 레스토랑 메뉴별 감정 통계 조회
+   */
+  async getRestaurantMenuStatistics(
+    restaurantId: number,
+    minMentions: number = 1
+  ): Promise<ApiResponse<RestaurantMenuStatistics>> {
+    let url = `/api/restaurants/${restaurantId}/menu-statistics`;
+
+    if (minMentions > 1) {
+      url += `?minMentions=${minMentions}`;
+    }
+
+    return this.request<RestaurantMenuStatistics>(url, {
+      method: 'GET',
     });
   }
 }

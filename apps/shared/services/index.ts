@@ -21,4 +21,6 @@ export type {
   VisitInfo,
   ReviewCrawlProgress,
   ReviewCrawlStatus,
+  RestaurantReviewStatistics,
+  RestaurantMenuStatistics,
 } from './api.service';

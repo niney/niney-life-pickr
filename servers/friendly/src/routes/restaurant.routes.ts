@@ -3,6 +3,7 @@ import { Type } from '@sinclair/typebox';
 import restaurantRepository from '../db/repositories/restaurant.repository';
 import reviewRepository from '../db/repositories/review.repository';
 import restaurantService from '../services/restaurant.service';
+import restaurantStatisticsService from '../services/restaurant-statistics.service';
 import { ResponseHelper } from '../utils/response.utils';
 
 /**
@@ -53,6 +54,19 @@ const ReviewSchema = Type.Object({
   crawledAt: Type.String({ description: '크롤링 시간 (ISO 8601)' }),
   createdAt: Type.String({ description: '생성 시간 (ISO 8601)' }),
   summary: Type.Optional(Type.Union([ReviewSummarySchema, Type.Null()], { description: 'AI 요약 데이터 (있는 경우)' }))
+});
+
+// 레스토랑 리뷰 통계 스키마
+const RestaurantReviewStatisticsSchema = Type.Object({
+  restaurantId: Type.Number({ description: '레스토랑 ID' }),
+  totalReviews: Type.Number({ description: '전체 리뷰 수' }),
+  analyzedReviews: Type.Number({ description: '분석 완료된 리뷰 수' }),
+  positive: Type.Number({ description: '긍정 리뷰 수' }),
+  negative: Type.Number({ description: '부정 리뷰 수' }),
+  neutral: Type.Number({ description: '중립 리뷰 수' }),
+  positiveRate: Type.Number({ description: '긍정률 (%)' }),
+  negativeRate: Type.Number({ description: '부정률 (%)' }),
+  neutralRate: Type.Number({ description: '중립률 (%)' })
 });
 
 /**
@@ -365,6 +379,69 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
       return ResponseHelper.error(
         reply,
         error instanceof Error ? error.message : 'Failed to fetch reviews',
+        500
+      );
+    }
+  });
+
+  /**
+   * GET /api/restaurants/:id/statistics
+   * 레스토랑별 리뷰 감정 통계 조회
+   */
+  fastify.get('/:id/statistics', {
+    schema: {
+      tags: ['restaurants'],
+      summary: '레스토랑별 리뷰 감정 통계 조회',
+      description: '레스토랑의 리뷰를 분석하여 긍정/부정/중립 통계와 비율을 제공합니다.',
+      params: Type.Object({
+        id: Type.Number({ description: '레스토랑 ID' })
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: RestaurantReviewStatisticsSchema,
+          timestamp: Type.String()
+        }),
+        404: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: number };
+
+    try {
+      // 1. 음식점 존재 여부 확인
+      const restaurant = await restaurantRepository.findById(id);
+
+      if (!restaurant) {
+        return ResponseHelper.notFound(reply, `레스토랑 ID ${id}를 찾을 수 없습니다`);
+      }
+
+      // 2. 통계 계산
+      const statistics = await restaurantStatisticsService.calculateReviewStatistics(id);
+
+      return ResponseHelper.success(
+        reply,
+        statistics,
+        '리뷰 통계를 성공적으로 조회했습니다.'
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ 리뷰 통계 조회 실패:', errorMessage);
+      return ResponseHelper.error(
+        reply,
+        `리뷰 통계 조회에 실패했습니다: ${errorMessage}`,
         500
       );
     }
