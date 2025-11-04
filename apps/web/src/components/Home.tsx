@@ -17,9 +17,21 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [excludeNeutral, setExcludeNeutral] = useState(false)
-  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refreshWithCacheInvalidation } = useRankings(5, 10, undefined, excludeNeutral)
+  const [displayCounts, setDisplayCounts] = useState({
+    positive: 10,
+    negative: 10,
+    neutral: 10,
+  })
+  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refreshWithCacheInvalidation } = useRankings(100, 10, undefined, excludeNeutral)
 
   const colors = THEME_COLORS[theme]
+
+  const loadMore = (type: 'positive' | 'negative' | 'neutral') => {
+    setDisplayCounts(prev => ({
+      ...prev,
+      [type]: prev[type] + 10,
+    }))
+  }
 
   const handleLogout = async () => {
     await onLogout()
@@ -35,9 +47,13 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
     emoji: string,
     rankingsResponse: RestaurantRankingsResponse | null,
     rateKey: 'positiveRate' | 'negativeRate' | 'neutralRate',
-    color: string
+    color: string,
+    type: 'positive' | 'negative' | 'neutral'
   ) => {
     const rankings = rankingsResponse?.rankings || null;
+    const displayLimit = displayCounts[type];
+    const displayedRankings = rankings?.slice(0, displayLimit) || null;
+    const hasMore = rankings && rankings.length > displayLimit;
 
     return (
     <View style={[styles.rankingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -52,9 +68,9 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
         </View>
       )}
 
-      {!loading && rankings && rankings.length > 0 && (
+      {!loading && displayedRankings && displayedRankings.length > 0 && (
         <View style={styles.rankingList}>
-          {rankings.map((ranking: RestaurantRanking) => (
+          {displayedRankings.map((ranking: RestaurantRanking) => (
             <TouchableOpacity
               key={ranking.rank}
               style={[styles.rankingItem, { borderColor: colors.border }]}
@@ -88,6 +104,18 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
           순위 데이터가 없습니다
         </Text>
+      )}
+
+      {!loading && hasMore && (
+        <TouchableOpacity
+          style={[styles.loadMoreButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => loadMore(type)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+            더보기 ({displayedRankings?.length || 0} / {rankings?.length || 0})
+          </Text>
+        </TouchableOpacity>
       )}
     </View>
     );
@@ -137,9 +165,9 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
         )}
 
         <div className="rankings-grid">
-          {renderRankingCard('긍정 평가 TOP 5', '🌟', positiveRankings, 'positiveRate', '#10b981')}
-          {renderRankingCard('부정 평가 TOP 5', '⚠️', negativeRankings, 'negativeRate', '#ef4444')}
-          {renderRankingCard('중립 평가 TOP 5', '➖', neutralRankings, 'neutralRate', '#8b5cf6')}
+          {renderRankingCard('긍정 평가 TOP 5', '🌟', positiveRankings, 'positiveRate', '#10b981', 'positive')}
+          {renderRankingCard('부정 평가 TOP 5', '⚠️', negativeRankings, 'negativeRate', '#ef4444', 'negative')}
+          {renderRankingCard('중립 평가 TOP 5', '➖', neutralRankings, 'neutralRate', '#8b5cf6', 'neutral')}
         </div>
       </View>
 
@@ -237,9 +265,10 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   rankNumber: {
+    textAlign: 'right',
     fontSize: 24,
     fontWeight: 'bold',
-    width: 32,
+    width: 44,
   },
   restaurantInfo: {
     flex: 1,
@@ -267,6 +296,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 32,
+  },
+  loadMoreButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 })
 

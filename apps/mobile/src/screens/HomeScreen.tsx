@@ -21,7 +21,12 @@ const HomeScreen: React.FC = () => {
   const { theme } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [excludeNeutral, setExcludeNeutral] = useState(false);
-  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refresh, refreshWithCacheInvalidation } = useRankings(5, 10, undefined, excludeNeutral);
+  const [displayCounts, setDisplayCounts] = useState({
+    positive: 10,
+    negative: 10,
+    neutral: 10,
+  });
+  const { positiveRankings, negativeRankings, neutralRankings, loading, error, refresh, refreshWithCacheInvalidation } = useRankings(100, 10, undefined, excludeNeutral);
   const colors = THEME_COLORS[theme];
 
   // Dynamic styles based on theme and state
@@ -44,6 +49,13 @@ const HomeScreen: React.FC = () => {
       backgroundColor: colors.primary,
     },
   }), [colors.surface, colors.border, colors.text, colors.primary]);
+
+  const loadMore = (type: 'positive' | 'negative' | 'neutral') => {
+    setDisplayCounts(prev => ({
+      ...prev,
+      [type]: prev[type] + 10,
+    }));
+  };
 
   const handleRestaurantPress = (restaurantId: number) => {
     // 1. Restaurant 탭으로 먼저 전환 (RestaurantList 활성화)
@@ -70,9 +82,13 @@ const HomeScreen: React.FC = () => {
     emoji: string,
     rankingsResponse: RestaurantRankingsResponse | null,
     rateKey: 'positiveRate' | 'negativeRate' | 'neutralRate',
-    color: string
+    color: string,
+    type: 'positive' | 'negative' | 'neutral'
   ) => {
     const rankings = rankingsResponse?.rankings || null;
+    const displayLimit = displayCounts[type];
+    const displayedRankings = rankings?.slice(0, displayLimit) || null;
+    const hasMore = rankings && rankings.length > displayLimit;
 
     return (
     <View style={styles.cardContainer}>
@@ -94,9 +110,9 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {!loading && rankings && rankings.length > 0 && (
+        {!loading && displayedRankings && displayedRankings.length > 0 && (
           <View style={styles.rankingList}>
-            {rankings.map((ranking: RestaurantRanking) => (
+            {displayedRankings.map((ranking: RestaurantRanking) => (
               <TouchableOpacity
                 key={ranking.rank}
                 style={[styles.rankingItem, { borderColor: colors.border }]}
@@ -131,6 +147,18 @@ const HomeScreen: React.FC = () => {
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             순위 데이터가 없습니다
           </Text>
+        )}
+
+        {!loading && hasMore && (
+          <TouchableOpacity
+            style={[styles.loadMoreButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => loadMore(type)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+              더보기 ({displayedRankings?.length || 0} / {rankings?.length || 0})
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -204,9 +232,9 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {renderRankingCard('긍정 평가 TOP 5', '🌟', positiveRankings, 'positiveRate', '#10b981')}
-        {renderRankingCard('부정 평가 TOP 5', '⚠️', negativeRankings, 'negativeRate', '#ef4444')}
-        {renderRankingCard('중립 평가 TOP 5', '➖', neutralRankings, 'neutralRate', '#8b5cf6')}
+        {renderRankingCard('긍정 평가 TOP 5', '🌟', positiveRankings, 'positiveRate', '#10b981', 'positive')}
+        {renderRankingCard('부정 평가 TOP 5', '⚠️', negativeRankings, 'negativeRate', '#ef4444', 'negative')}
+        {renderRankingCard('중립 평가 TOP 5', '➖', neutralRankings, 'neutralRate', '#8b5cf6', 'neutral')}
       </View>
     </ScrollView>
   );
@@ -217,7 +245,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 100,
   },
   header: {
@@ -225,7 +253,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   pageTitle: {
     fontSize: 28,
@@ -275,7 +303,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   cardContent: {
-    padding: 20,
+    padding: 5,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -308,9 +336,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rankNumber: {
+    textAlign: 'right',
     fontSize: 20,
     fontWeight: 'bold',
-    width: 28,
+    width: 36,
   },
   restaurantInfo: {
     flex: 1,
@@ -361,6 +390,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 24,
+  },
+  loadMoreButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
