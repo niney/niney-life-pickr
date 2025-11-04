@@ -1,7 +1,7 @@
 # WEB-HOME.md
 
-> **Last Updated**: 2025-10-23 21:35
-> **Purpose**: Home screen implementation and user welcome interface
+> **Last Updated**: 2025-11-04
+> **Purpose**: Home screen with restaurant rankings dashboard
 
 ---
 
@@ -10,7 +10,7 @@
 1. [Overview](#1-overview)
 2. [Component Structure](#2-component-structure)
 3. [Implementation](#3-implementation)
-4. [User Information Display](#4-user-information-display)
+4. [Restaurant Rankings](#4-restaurant-rankings)
 5. [Theme Integration](#5-theme-integration)
 6. [Navigation Integration](#6-navigation-integration)
 7. [Best Practices](#7-best-practices)
@@ -20,25 +20,31 @@
 
 ## 1. Overview
 
-The Home component is the main landing page after user login. It displays a welcome message with user information and serves as the entry point to the application.
+The Home component is the main landing page displaying restaurant rankings by sentiment analysis (positive, negative, neutral).
 
 ### Key Features
-- **Welcome Message**: Personalized greeting for logged-in users
-- **User Info Card**: Displays email and username
+- **Restaurant Rankings**: Top 5 restaurants by positive/negative/neutral rates
+- **Neutral Filter Toggle**: Include/exclude neutral reviews from calculations
+- **Cache Refresh**: Invalidate cache and fetch fresh data
 - **Theme Support**: Adapts to light/dark theme
+- **Restaurant Navigation**: Click ranking to view restaurant details
 - **Header & Drawer**: Integrated navigation components
-- **Simple Layout**: Centered card with user information
+- **Real-time Loading**: Shows loading spinners during data fetch
 
 ### Component Hierarchy
 ```
 Home
 ├── Header (with hamburger menu and theme toggle)
 ├── Content Area
-│   ├── Welcome Section (card)
-│   │   ├── Title: "환영합니다!"
-│   │   ├── Subtitle: "로그인에 성공했습니다."
-│   │   └── User Info (email, username)
-│   └── Placeholder Text
+│   ├── Page Title & Controls
+│   │   ├── "레스토랑 순위" title
+│   │   ├── Neutral Toggle Button (중립 제외/포함)
+│   │   └── Refresh Button (🔄 새로고침)
+│   ├── Error Display (if any)
+│   └── Rankings Grid (3 columns)
+│       ├── Positive Ranking Card (🌟 긍정 평가 TOP 5)
+│       ├── Negative Ranking Card (⚠️부정 평가 TOP 5)
+│       └── Neutral Ranking Card (➖ 중립 평가 TOP 5)
 └── Drawer (slide-out sidebar)
 ```
 
@@ -69,245 +75,300 @@ const Home: React.FC<HomeProps> = ({ onLogout }) => {
 
 ## 3. Implementation
 
-### 3.1 Full Component Code
+### 3.1 Dependencies
 
 ```typescript
 import React, { useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
-import { useAuth } from '@shared/hooks'
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { useNavigate } from 'react-router-dom'
+import { useRankings } from '@shared/hooks'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
+import type { RestaurantRanking, RestaurantRankingsResponse } from '@shared/services'
 import Header from './Header'
 import Drawer from './Drawer'
-
-interface HomeProps {
-  onLogout: () => Promise<void>
-}
-
-const Home: React.FC<HomeProps> = ({ onLogout }) => {
-  const { user } = useAuth()
-  const { theme } = useTheme()
-  const [drawerVisible, setDrawerVisible] = useState(false)
-
-  const colors = THEME_COLORS[theme]
-
-  const handleLogout = async () => {
-    await onLogout()
-    window.location.href = '/login'
-  }
-
-  return (
-    <div className="page-container" style={{ backgroundColor: colors.background }}>
-      <Header onMenuPress={() => setDrawerVisible(true)} />
-
-      <View style={styles.content}>
-        <View style={[styles.welcomeSection, {
-          backgroundColor: colors.surface,
-          borderColor: colors.border
-        }]}>
-          <Text style={[styles.title, { color: colors.text }]}>환영합니다!</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            로그인에 성공했습니다.
-          </Text>
-          {user && (
-            <View style={[styles.userInfo, {
-              backgroundColor: colors.background,
-              borderColor: colors.border
-            }]}>
-              <Text style={[styles.userInfoText, { color: colors.text }]}>
-                이메일: {user.email}
-              </Text>
-              <Text style={[styles.userInfoText, { color: colors.text }]}>
-                사용자명: {user.username}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
-          홈 화면 콘텐츠가 여기에 표시됩니다.
-        </Text>
-      </View>
-
-      <Drawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        onLogout={handleLogout}
-      />
-    </div>
-  )
-}
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    padding: 24,
-  },
-  welcomeSection: {
-    padding: 32,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  userInfo: {
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    width: '100%',
-    maxWidth: 400,
-  },
-  userInfoText: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  placeholderText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-})
-
-export default Home
 ```
 
 ### 3.2 State Management
 
 ```typescript
-const { user } = useAuth()                        // Get logged-in user
+const navigate = useNavigate()                    // React Router navigation
 const { theme } = useTheme()                      // Get current theme
 const [drawerVisible, setDrawerVisible] = useState(false)  // Drawer state
+const [excludeNeutral, setExcludeNeutral] = useState(false)  // Neutral filter toggle
+
+// useRankings hook - fetch rankings data
+const {
+  positiveRankings,    // Top restaurants by positive rate
+  negativeRankings,    // Top restaurants by negative rate
+  neutralRankings,     // Top restaurants by neutral rate
+  loading,             // Loading state
+  error,               // Error message
+  refreshWithCacheInvalidation  // Force refresh from database
+} = useRankings(
+  5,                   // limit: 5 restaurants
+  10,                  // minReviews: 10 analyzed reviews minimum
+  undefined,           // category: no filter
+  excludeNeutral       // excludeNeutral: dynamic toggle
+)
+
 const colors = THEME_COLORS[theme]                // Get theme colors
 ```
 
 **State Variables**:
-- `user`: Current user object from useAuth hook
+- `navigate`: React Router navigation function
 - `theme`: Current theme ('light' | 'dark')
 - `drawerVisible`: Boolean to control drawer visibility
+- `excludeNeutral`: Boolean to exclude neutral reviews from calculations
+- `positiveRankings`: Top 5 restaurants by positive rate (from useRankings)
+- `negativeRankings`: Top 5 restaurants by negative rate (from useRankings)
+- `neutralRankings`: Top 5 restaurants by neutral rate (from useRankings)
+- `loading`: Boolean indicating data fetching state
+- `error`: Error message string if fetch failed
 - `colors`: Theme-specific color palette
 
-### 3.3 Layout Structure
+### 3.3 Event Handlers
 
-**Container**: `.page-container` div with theme-aware background
+#### 3.3.1 Restaurant Navigation
 
-**Content Area**:
 ```typescript
-<View style={styles.content}>
-  {/* Welcome Section (card) */}
-  {/* Placeholder Text */}
+const handleRestaurantPress = (restaurantId: number) => {
+  navigate(`/restaurant/${restaurantId}`)
+}
+```
+
+**Behavior**: Navigate to restaurant detail page when ranking item is clicked.
+
+#### 3.3.2 Logout Handler
+
+```typescript
+const handleLogout = async () => {
+  await onLogout()                // Clear auth state and storage
+  window.location.href = '/login' // Force reload to login page
+}
+```
+
+**Behavior**: Same as before - clears storage and hard redirects to login.
+
+### 3.4 Header Section
+
+```typescript
+<View style={styles.header}>
+  <Text style={[styles.pageTitle, { color: colors.text }]}>레스토랑 순위</Text>
+  <View style={styles.buttonGroup}>
+    <TouchableOpacity
+      style={[
+        styles.toggleButton,
+        excludeNeutral
+          ? { backgroundColor: '#8b5cf6' }
+          : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }
+      ]}
+      onPress={() => setExcludeNeutral(!excludeNeutral)}
+      activeOpacity={0.7}
+      disabled={loading}
+    >
+      <Text style={[
+        styles.toggleButtonText,
+        { color: excludeNeutral ? '#ffffff' : colors.text }
+      ]}>
+        {excludeNeutral ? '중립 제외' : '중립 포함'}
+      </Text>
+    </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.refreshButton, { backgroundColor: colors.primary }]}
+      onPress={() => refreshWithCacheInvalidation()}
+      activeOpacity={0.7}
+      disabled={loading}
+    >
+      <Text style={styles.refreshButtonText}>🔄 새로고침</Text>
+    </TouchableOpacity>
+  </View>
 </View>
 ```
 
-**Padding**: 24px all around for breathing room
+**Components**:
+1. **Page Title**: "레스토랑 순위" (Restaurant Rankings)
+2. **Neutral Toggle Button**:
+   - Active state (excludeNeutral=true): Purple background, white text, "중립 제외"
+   - Inactive state (excludeNeutral=false): Surface background, border, "중립 포함"
+   - Disabled during loading
+3. **Refresh Button**:
+   - Primary color background
+   - 🔄 emoji + "새로고침" text
+   - Calls `refreshWithCacheInvalidation()` to invalidate cache
+   - Disabled during loading
 
 ---
 
-## 4. User Information Display
+## 4. Restaurant Rankings
 
-### 4.1 Welcome Section Card
+### 4.1 Overview
 
-**Structure**:
-```typescript
-<View style={[styles.welcomeSection, {
-  backgroundColor: colors.surface,
-  borderColor: colors.border
-}]}>
-  {/* Title */}
-  {/* Subtitle */}
-  {/* User Info (conditional) */}
-</View>
-```
+The home screen displays three ranking cards in a grid layout:
+1. **Positive Rankings** (🌟): Top 5 restaurants by positive sentiment rate
+2. **Negative Rankings** (⚠️): Top 5 restaurants by negative sentiment rate
+3. **Neutral Rankings** (➖): Top 5 restaurants by neutral sentiment rate
 
-**Styling**:
-- **Padding**: 32px (spacious)
-- **Border**: 1px with theme border color
-- **Border Radius**: 12px (rounded corners)
-- **Margin Bottom**: 32px (separation from placeholder)
-- **Alignment**: Centered content
+Each ranking is fetched automatically on mount using the `useRankings` hook.
 
-**Visual Representation** (Light Mode):
-```
-┌──────────────────────────────┐
-│                              │
-│       환영합니다!             │ ← Title (28px, bold)
-│   로그인에 성공했습니다.       │ ← Subtitle (16px)
-│                              │
-│  ┌────────────────────────┐  │
-│  │ 이메일: user@email.com │  │
-│  │ 사용자명: username     │  │ ← User Info Card
-│  └────────────────────────┘  │
-│                              │
-└──────────────────────────────┘
-```
+### 4.2 Ranking Card Component
 
-### 4.2 Title and Subtitle
+The `renderRankingCard` function renders a reusable card component for each ranking type.
 
 ```typescript
-<Text style={[styles.title, { color: colors.text }]}>환영합니다!</Text>
-<Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-  로그인에 성공했습니다.
-</Text>
+const renderRankingCard = (
+  title: string,                                    // Card title
+  emoji: string,                                    // Emoji icon
+  rankingsResponse: RestaurantRankingsResponse | null,  // Rankings data
+  rateKey: 'positiveRate' | 'negativeRate' | 'neutralRate',  // Rate field to display
+  color: string                                     // Accent color for numbers
+) => {
+  const rankings = rankingsResponse?.rankings || null;
+
+  return (
+    <View style={[styles.rankingCard, {
+      backgroundColor: colors.surface,
+      borderColor: colors.border
+    }]}>
+      {/* Card Header */}
+      <View style={styles.cardHeader}>
+        <Text style={styles.emoji}>{emoji}</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+      </View>
+
+      {/* Loading State */}
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={color} />
+        </View>
+      )}
+
+      {/* Rankings List */}
+      {!loading && rankings && rankings.length > 0 && (
+        <View style={styles.rankingList}>
+          {rankings.map((ranking: RestaurantRanking) => (
+            <TouchableOpacity
+              key={ranking.rank}
+              style={[styles.rankingItem, { borderColor: colors.border }]}
+              onPress={() => handleRestaurantPress(ranking.restaurant.id)}
+            >
+              <View style={styles.rankRow}>
+                {/* Rank Number */}
+                <Text style={[styles.rankNumber, { color }]}>
+                  {ranking.rank}
+                </Text>
+
+                {/* Restaurant Info */}
+                <View style={styles.restaurantInfo}>
+                  <Text style={[styles.restaurantName, { color: colors.text }]}
+                        numberOfLines={1}>
+                    {ranking.restaurant.name}
+                  </Text>
+                  <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}
+                        numberOfLines={1}>
+                    {ranking.restaurant.category || '카테고리 없음'}
+                  </Text>
+                </View>
+
+                {/* Rate & Review Count */}
+                <View style={styles.rateContainer}>
+                  <Text style={[styles.rateValue, { color }]}>
+                    {ranking.statistics[rateKey].toFixed(1)}%
+                  </Text>
+                  <Text style={[styles.reviewCount, { color: colors.textSecondary }]}>
+                    {ranking.statistics.analyzedReviews}개 리뷰
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Empty State */}
+      {!loading && (!rankings || rankings.length === 0) && (
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          순위 데이터가 없습니다
+        </Text>
+      )}
+    </View>
+  );
+};
 ```
 
-**Title**:
-- Text: "환영합니다!" (Welcome!)
-- Size: 28px
-- Weight: Bold
-- Color: Primary text color
-- Margin Bottom: 8px
-
-**Subtitle**:
-- Text: "로그인에 성공했습니다." (Login successful)
-- Size: 16px
-- Color: Secondary text color (gray)
-- Margin Bottom: 16px
-
-### 4.3 User Info Card
+### 4.3 Ranking Card Usage
 
 ```typescript
-{user && (
-  <View style={[styles.userInfo, {
-    backgroundColor: colors.background,
-    borderColor: colors.border
-  }]}>
-    <Text style={[styles.userInfoText, { color: colors.text }]}>
-      이메일: {user.email}
-    </Text>
-    <Text style={[styles.userInfoText, { color: colors.text }]}>
-      사용자명: {user.username}
-    </Text>
+<div className="rankings-grid">
+  {renderRankingCard('긍정 평가 TOP 5', '🌟', positiveRankings, 'positiveRate', '#10b981')}
+  {renderRankingCard('부정 평가 TOP 5', '⚠️', negativeRankings, 'negativeRate', '#ef4444')}
+  {renderRankingCard('중립 평가 TOP 5', '➖', neutralRankings, 'neutralRate', '#8b5cf6')}
+</div>
+```
+
+**Grid Layout** (CSS):
+```css
+.rankings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 24px;
+}
+```
+
+**Parameters**:
+| Card Type | Title | Emoji | Rankings Data | Rate Key | Color |
+|-----------|-------|-------|---------------|----------|-------|
+| Positive | 긍정 평가 TOP 5 | 🌟 | `positiveRankings` | `positiveRate` | Green (#10b981) |
+| Negative | 부정 평가 TOP 5 | ⚠️ | `negativeRankings` | `negativeRate` | Red (#ef4444) |
+| Neutral | 중립 평가 TOP 5 | ➖ | `neutralRankings` | `neutralRate` | Purple (#8b5cf6) |
+
+### 4.4 Ranking Item Structure
+
+Each ranking item displays:
+
+```
+┌────────────────────────────────────────────┐
+│ 1  Restaurant Name             85.5%      │
+│    Korean Cuisine              120개 리뷰  │
+└────────────────────────────────────────────┘
+  ↑  ↑                            ↑
+  Rank  Restaurant Info           Rate & Count
+```
+
+**Layout**:
+- **Rank Number**: Large, bold, colored (24px)
+- **Restaurant Info** (flex: 1):
+  - Name: 16px, bold, primary text color
+  - Category: 13px, secondary text color
+- **Rate Container**:
+  - Rate: 20px, bold, colored (e.g., 85.5%)
+  - Review Count: 12px, secondary text (e.g., 120개 리뷰)
+
+**Interaction**: Clicking a ranking item navigates to restaurant detail page.
+
+### 4.5 Loading & Empty States
+
+**Loading State**:
+```typescript
+{loading && (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color={color} />
   </View>
 )}
 ```
+- Shows colored spinner in center of card
+- Prevents user interaction
 
-**Conditional Rendering**: Only shown when `user` exists
-
-**Styling**:
-- **Margin Top**: 16px (separation from subtitle)
-- **Padding**: 16px
-- **Border**: 1px with theme border color
-- **Border Radius**: 8px
-- **Max Width**: 400px (prevents excessive stretching)
-- **Width**: 100% (responsive within max width)
-
-**Content**:
-- Email address from `user.email`
-- Username from `user.username`
-
-**Example**:
+**Empty State**:
+```typescript
+{!loading && (!rankings || rankings.length === 0) && (
+  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+    순위 데이터가 없습니다
+  </Text>
+)}
 ```
-이메일: niney@ks.com
-사용자명: niney
-```
+- Shows when no rankings data is available
+- Uses secondary text color
 
 ---
 
@@ -324,37 +385,57 @@ surface: colors.surface             // Card background (#F5F5F5 / #1C1C1E)
 border: colors.border               // Card border (#E0E0E0 / #38383A)
 text: colors.text                   // Primary text (#000000 / #FFFFFF)
 textSecondary: colors.textSecondary // Secondary text (#666666 / #ABABAB)
+primary: colors.primary             // Refresh button (#007AFF)
 ```
 
-### 5.2 Light Mode Appearance
+### 5.2 Accent Colors (Fixed)
+
+**Ranking Cards**: Use fixed accent colors regardless of theme
+- **Positive**: Green `#10b981` (emerald-500)
+- **Negative**: Red `#ef4444` (red-500)
+- **Neutral**: Purple `#8b5cf6` (violet-500)
+- **Toggle Active**: Purple `#8b5cf6` (when excludeNeutral is true)
+
+These colors provide consistent visual meaning across themes.
+
+### 5.3 Light Mode Appearance
 
 ```
 Background: White (#FFFFFF)
-Card: Light gray (#F5F5F5)
-Border: Light gray (#E0E0E0)
-Title: Black (#000000)
-Subtitle: Dark gray (#666666)
+Ranking Cards: Light gray (#F5F5F5)
+Card Border: Light gray (#E0E0E0)
+Page Title: Black (#000000)
+Restaurant Names: Black (#000000)
+Categories: Dark gray (#666666)
+Positive Rate: Green (#10b981)
+Negative Rate: Red (#ef4444)
+Neutral Rate: Purple (#8b5cf6)
 ```
 
-### 5.3 Dark Mode Appearance
+### 5.4 Dark Mode Appearance
 
 ```
 Background: True black (#000000)
-Card: Dark gray (#1C1C1E)
-Border: Dark gray (#38383A)
-Title: White (#FFFFFF)
-Subtitle: Light gray (#ABABAB)
+Ranking Cards: Dark gray (#1C1C1E)
+Card Border: Dark gray (#38383A)
+Page Title: White (#FFFFFF)
+Restaurant Names: White (#FFFFFF)
+Categories: Light gray (#ABABAB)
+Positive Rate: Green (#10b981)
+Negative Rate: Red (#ef4444)
+Neutral Rate: Purple (#8b5cf6)
 ```
 
-### 5.4 Theme Toggle
+### 5.5 Theme Toggle
 
 **User Action**: Click theme icon in Header (🌙/☀️)
 
 **Result**:
 1. Theme changes (light ↔ dark)
 2. Home component re-renders with new colors
-3. All color values update instantly
-4. No flicker or delay
+3. All theme-aware colors update instantly
+4. Accent colors remain the same (positive/negative/neutral)
+5. No flicker or delay
 
 ---
 
@@ -410,7 +491,7 @@ const handleLogout = async () => {
 
 ## 7. Best Practices
 
-### 7.1 Always Use Theme Colors
+### 7.1 Always Use Theme Colors (Except Semantic Colors)
 
 **❌ Bad** (hardcoded):
 ```typescript
@@ -422,48 +503,63 @@ const handleLogout = async () => {
 <View style={{ backgroundColor: colors.background }}>
 ```
 
-### 7.2 Conditional User Display
-
-**❌ Bad** (assumes user exists):
+**✅ Also Good** (semantic colors for rankings):
 ```typescript
-<Text>{user.email}</Text>  // Runtime error if user is null
+<Text style={{ color: '#10b981' }}>85.5%</Text>  // Green for positive rate
+<Text style={{ color: '#ef4444' }}>15.2%</Text>  // Red for negative rate
 ```
 
-**✅ Good** (conditional rendering):
+### 7.2 Handle Loading and Empty States
+
+**❌ Bad** (no loading state):
 ```typescript
-{user && (
-  <Text>{user.email}</Text>
+return (
+  <View>
+    {rankings.map(r => <Text>{r.name}</Text>)}
+  </View>
+)
+```
+
+**✅ Good** (with loading and empty):
+```typescript
+{loading && <ActivityIndicator />}
+{!loading && rankings && rankings.length > 0 && (
+  <View>{rankings.map(r => <Text>{r.name}</Text>)}</View>
+)}
+{!loading && (!rankings || rankings.length === 0) && (
+  <Text>No data</Text>
 )}
 ```
 
-### 7.3 Logout with Hard Redirect
+### 7.3 Disable Buttons During Loading
 
-**❌ Bad** (state may linger):
+**❌ Bad** (can trigger multiple requests):
 ```typescript
-const handleLogout = async () => {
-  await onLogout()
-  navigate('/login')  // Soft navigation
-}
+<TouchableOpacity onPress={() => refreshWithCacheInvalidation()}>
+  <Text>Refresh</Text>
+</TouchableOpacity>
 ```
 
-**✅ Good** (clean state):
+**✅ Good** (disabled during loading):
 ```typescript
-const handleLogout = async () => {
-  await onLogout()
-  window.location.href = '/login'  // Hard redirect
-}
+<TouchableOpacity
+  onPress={() => refreshWithCacheInvalidation()}
+  disabled={loading}
+>
+  <Text>Refresh</Text>
+</TouchableOpacity>
 ```
 
-### 7.4 Close Drawer Before Logout
+### 7.4 Use Safe Optional Chaining
 
-**Pattern**: Always close drawer before navigation/logout
-
+**❌ Bad** (runtime error if null):
 ```typescript
-const handleLogout = async () => {
-  // Drawer closes automatically via onLogout callback in Drawer component
-  await onLogout()
-  window.location.href = '/login'
-}
+const rankings = rankingsResponse.rankings
+```
+
+**✅ Good** (safe access):
+```typescript
+const rankings = rankingsResponse?.rankings || null
 ```
 
 ---
@@ -475,11 +571,16 @@ const handleLogout = async () => {
 - **[WEB-THEME.md](./WEB-THEME.md)**: Theme system and color palette
 - **[WEB-LAYOUT.md](./WEB-LAYOUT.md)**: Page layout patterns
 - **[WEB-ROUTING.md](./WEB-ROUTING.md)**: Navigation and routing
-- **[WEB-LOGIN.md](./WEB-LOGIN.md)**: Login screen (pre-Home flow)
+- **[WEB-RESTAURANT.md](./WEB-RESTAURANT.md)**: Restaurant detail page (where rankings navigate to)
 
 ### Shared Documentation
-- **[SHARED-HOOKS.md](../03-shared/SHARED-HOOKS.md)**: useAuth hook (user state)
+- **[SHARED-HOOKS.md](../03-shared/SHARED-HOOKS.md)**: useRankings, useAuth hooks
 - **[SHARED-CONTEXTS.md](../03-shared/SHARED-CONTEXTS.md)**: ThemeContext usage
+- **[SHARED-SERVICES.md](../03-shared/SHARED-SERVICES.md)**: API service (getRestaurantRankings)
+
+### Backend Documentation
+- **[FRIENDLY-ROUTES.md](../04-friendly/FRIENDLY-ROUTES.md)**: Restaurant ranking API endpoint
+- **[FRIENDLY-REPOSITORIES.md](../04-friendly/FRIENDLY-REPOSITORIES.md)**: Review summary repository
 
 ### Core Documentation
 - **[ARCHITECTURE.md](../00-core/ARCHITECTURE.md)**: Overall architecture
@@ -487,32 +588,6 @@ const handleLogout = async () => {
 
 ---
 
-## Appendix: Future Enhancements
-
-### Potential Features
-1. **Dashboard Cards**: Quick stats, recent activity, shortcuts
-2. **Notifications**: Unread messages, alerts
-3. **Quick Actions**: Frequently used features
-4. **Personalization**: Customizable home widgets
-5. **Search**: Global search from home screen
-
-### Example Dashboard Layout
-```
-┌──────────────────────────────┐
-│       환영합니다, User!       │
-├──────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐   │
-│  │ Recent  │  │ Favorites│   │
-│  │ 5 items │  │ 3 items │   │
-│  └─────────┘  └─────────┘   │
-│  ┌─────────┐  ┌─────────┐   │
-│  │ Stats   │  │ Quick   │   │
-│  │ Graph   │  │ Actions │   │
-│  └─────────┘  └─────────┘   │
-└──────────────────────────────┘
-```
-
----
-
-**Document Version**: 1.0.0
-**Covers Files**: `Home.tsx`, home screen patterns
+**Document Version**: 2.0.0
+**Last Updated**: 2025-11-04
+**Covers Files**: `Home.tsx`, restaurant ranking dashboard

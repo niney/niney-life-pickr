@@ -1,6 +1,6 @@
 # FRIENDLY-ROUTES.md
 
-> **Last Updated**: 2025-10-23 23:00
+> **Last Updated**: 2025-11-04
 > **Purpose**: Complete API route reference for Friendly backend
 
 ---
@@ -15,9 +15,10 @@
 6. [Restaurant Routes](#6-restaurant-routes)
 7. [Review Routes](#7-review-routes)
 8. [Review Summary Routes](#8-review-summary-routes)
-9. [Menu Statistics Routes](#9-menu-statistics-routes)
-10. [Job Routes](#10-job-routes)
-11. [Docs Routes](#11-docs-routes)
+9. [Restaurant Statistics Routes](#9-restaurant-statistics-routes)
+10. [Menu Statistics Routes](#10-menu-statistics-routes)
+11. [Job Routes](#11-job-routes)
+12. [Docs Routes](#12-docs-routes)
 
 ---
 
@@ -107,15 +108,71 @@ All routes are defined in `servers/friendly/src/routes/*.routes.ts` and register
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/api/restaurants/rankings` | **NEW** Get restaurant rankings by sentiment rate |
 | GET | `/api/restaurants/categories` | Get category list with counts |
-| GET | `/api/restaurants` | List restaurants (paginated, filterable) |
+| GET | `/api/restaurants` | List restaurants (paginated, filterable, searchable) |
 | GET | `/api/restaurants/:id` | Get restaurant details with menus |
 | DELETE | `/api/restaurants/:id` | Delete restaurant (hard delete) |
 
-**Query Params** (GET list):
-- `limit` (number, default: 20)
+### 6.1 Rankings Endpoint (NEW)
+
+**GET** `/api/restaurants/rankings`
+
+Get top restaurants by positive/negative/neutral sentiment rates.
+
+**Query Params**:
+- `type` (string): `'positive'` | `'negative'` | `'neutral'` (default: `'positive'`)
+- `limit` (number): Results count, 1-100 (default: 5)
+- `minReviews` (number): Minimum analyzed reviews, 1-100 (default: 10)
+- `category` (string, optional): Filter by category
+- `excludeNeutral` (boolean): Exclude neutral from calculations (default: false)
+- `invalidateCache` (boolean): Force refresh cache (default: false)
+
+**Response**:
+```json
+{
+  "result": true,
+  "data": {
+    "type": "positive",
+    "limit": 5,
+    "minReviews": 10,
+    "rankings": [
+      {
+        "rank": 1,
+        "restaurant": {
+          "id": 123,
+          "name": "Restaurant Name",
+          "category": "Korean",
+          "address": "Seoul..."
+        },
+        "statistics": {
+          "totalReviews": 150,
+          "analyzedReviews": 120,
+          "positive": 100,
+          "negative": 15,
+          "neutral": 5,
+          "positiveRate": 83.3,
+          "negativeRate": 12.5,
+          "neutralRate": 4.2
+        }
+      }
+    ]
+  }
+}
+```
+
+**Cache**: Results are cached for 5 minutes. Use `invalidateCache=true` to force refresh.
+
+### 6.2 List Restaurants (UPDATED)
+
+**GET** `/api/restaurants`
+
+**Query Params**:
+- `limit` (number, default: 20, max: 1000)
 - `offset` (number, default: 0)
 - `category` (string, optional)
+- **`searchName`** (string, optional): **NEW** Search by restaurant name
+- **`searchAddress`** (string, optional): **NEW** Search by address
 
 **See**: [FRIENDLY-RESTAURANT.md](./FRIENDLY-RESTAURANT.md)
 
@@ -162,7 +219,43 @@ All routes are defined in `servers/friendly/src/routes/*.routes.ts` and register
 
 ---
 
-## 9. Menu Statistics Routes
+## 9. Restaurant Statistics Routes (NEW)
+
+**File**: `src/routes/restaurant.routes.ts`
+
+**Tag**: `restaurant`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/restaurants/:id/statistics` | **NEW** Get review sentiment statistics for a restaurant |
+
+### 9.1 Restaurant Statistics Endpoint
+
+**GET** `/api/restaurants/:id/statistics`
+
+Get aggregated review sentiment statistics for a specific restaurant.
+
+**Response**:
+```json
+{
+  "result": true,
+  "data": {
+    "restaurantId": 123,
+    "totalReviews": 150,
+    "analyzedReviews": 120,
+    "positive": 100,
+    "negative": 15,
+    "neutral": 5,
+    "positiveRate": 83.3,
+    "negativeRate": 12.5,
+    "neutralRate": 4.2
+  }
+}
+```
+
+---
+
+## 10. Menu Statistics Routes
 
 **File**: `src/routes/menu-statistics.routes.ts`
 
@@ -172,11 +265,14 @@ All routes are defined in `servers/friendly/src/routes/*.routes.ts` and register
 |--------|------|-------------|
 | GET | `/api/restaurants/:id/menu-statistics` | Get menu sentiment statistics |
 
-**Response**: Aggregated sentiment stats per menu, top positive/negative menus
+**Query Params**:
+- `minMentions` (number, default: 1): Minimum mention count to include menu
+
+**Response**: Aggregated sentiment stats per menu, filtered by minimum mentions
 
 ---
 
-## 10. Job Routes
+## 11. Job Routes
 
 **File**: `src/routes/job.routes.ts`
 
@@ -192,7 +288,7 @@ All routes are defined in `servers/friendly/src/routes/*.routes.ts` and register
 
 ---
 
-## 11. Docs Routes
+## 12. Docs Routes
 
 **File**: `src/routes/docs.routes.ts`
 
@@ -211,5 +307,12 @@ All routes are defined in `servers/friendly/src/routes/*.routes.ts` and register
 
 ---
 
-**Document Version**: 1.0.0
+**Document Version**: 2.0.0
+**Last Updated**: 2025-11-04
 **Covers Files**: All route definitions in `src/routes/*.routes.ts`
+
+**Changelog (v2.0.0)**:
+- Added GET `/api/restaurants/rankings` - Restaurant rankings by sentiment
+- Added GET `/api/restaurants/:id/statistics` - Restaurant sentiment statistics
+- Updated GET `/api/restaurants` - Added `searchName` and `searchAddress` params
+- Updated Menu Statistics with `minMentions` param

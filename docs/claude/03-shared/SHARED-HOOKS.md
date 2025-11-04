@@ -1,6 +1,6 @@
 # Shared React Hooks
 
-> **Last Updated**: 2025-10-23
+> **Last Updated**: 2025-11-04
 > **Purpose**: Cross-platform React hooks for authentication, data fetching, and business logic
 
 ---
@@ -12,7 +12,9 @@
 3. [useMenus](#3-usemenus)
 4. [useReviews](#4-usereviews)
 5. [useRestaurantList](#5-userestaurantlist)
-6. [Related Documentation](#6-related-documentation)
+6. [useRankings](#6-userankings)
+7. [useRestaurantStatistics](#7-userestaurantstatistics)
+8. [Related Documentation](#8-related-documentation)
 
 ---
 
@@ -378,6 +380,7 @@ export const useMenus = () => {
     menus: MenuItem[];
     menusLoading: boolean;
     fetchMenus: (restaurantId: number) => Promise<void>;
+    setMenus: (menus: MenuItem[]) => void;
     clearMenus: () => void;
   }
 }
@@ -392,6 +395,7 @@ export type MenusHookReturn = ReturnType<typeof useMenus>
 | `menus` | `MenuItem[]` | Array of menu items |
 | `menusLoading` | `boolean` | True during API call |
 | `fetchMenus` | `Function` | Fetch menus for a restaurant |
+| `setMenus` | `Function` | Manually set menus array |
 | `clearMenus` | `Function` | Clear menus array |
 
 ### 3.4 Implementation
@@ -962,26 +966,443 @@ function RestaurantListScreen() {
 
 ---
 
-## 6. Related Documentation
+## 6. useRankings
 
-### 6.1 Shared Module Documentation
+**Location**: `apps/shared/hooks/useRankings.ts`
+
+### 6.1 Overview
+
+Restaurant ranking management hook that fetches top restaurants by sentiment rates (positive, negative, neutral).
+
+### 6.2 Hook Signature
+
+```typescript
+export interface UseRankingsReturn {
+  positiveRankings: RestaurantRankingsResponse | null;
+  negativeRankings: RestaurantRankingsResponse | null;
+  neutralRankings: RestaurantRankingsResponse | null;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  refreshWithCacheInvalidation: () => Promise<void>;
+}
+
+export function useRankings(
+  limit: number = 5,
+  minReviews: number = 10,
+  category?: string,
+  excludeNeutral: boolean = false,
+  autoFetch: boolean = true
+): UseRankingsReturn
+```
+
+### 6.3 Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | `number` | `5` | Number of top restaurants to fetch (1-100) |
+| `minReviews` | `number` | `10` | Minimum number of analyzed reviews required |
+| `category` | `string?` | `undefined` | Optional category filter (e.g., "한식", "중식") |
+| `excludeNeutral` | `boolean` | `false` | Exclude neutral reviews from rate calculation |
+| `autoFetch` | `boolean` | `true` | Automatically fetch on mount |
+
+### 6.4 Return Values
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `positiveRankings` | `RestaurantRankingsResponse \| null` | Top restaurants by positive rate |
+| `negativeRankings` | `RestaurantRankingsResponse \| null` | Top restaurants by negative rate |
+| `neutralRankings` | `RestaurantRankingsResponse \| null` | Top restaurants by neutral rate |
+| `loading` | `boolean` | True during API call |
+| `error` | `string \| null` | Error message if fetch failed |
+| `refresh` | `Function` | Refresh rankings (use cached data) |
+| `refreshWithCacheInvalidation` | `Function` | Refresh rankings (invalidate cache) |
+
+### 6.5 Implementation Details
+
+#### 6.5.1 Parallel Fetching
+
+```typescript
+const fetchRankings = useCallback(async (invalidateCache: boolean = false) => {
+  setLoading(true);
+  setError(null);
+
+  try {
+    // Fetch all 3 ranking types in parallel
+    const [positive, negative, neutral] = await Promise.all([
+      apiService.getRestaurantRankings('positive', limit, minReviews, category, excludeNeutral, invalidateCache),
+      apiService.getRestaurantRankings('negative', limit, minReviews, category, excludeNeutral, invalidateCache),
+      apiService.getRestaurantRankings('neutral', limit, minReviews, category, excludeNeutral, invalidateCache),
+    ]);
+
+    if (positive.result && positive.data) {
+      setPositiveRankings(positive.data);
+    }
+    if (negative.result && negative.data) {
+      setNegativeRankings(negative.data);
+    }
+    if (neutral.result && neutral.data) {
+      setNeutralRankings(neutral.data);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : '순위 데이터를 불러오는데 실패했습니다';
+    setError(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+}, [limit, minReviews, category, excludeNeutral]);
+```
+
+**Features**:
+- Fetches positive, negative, and neutral rankings in parallel
+- Optimizes performance with `Promise.all()`
+- Handles partial failures (continues even if one ranking type fails)
+
+#### 6.5.2 Cache Management
+
+```typescript
+const refresh = useCallback(async () => {
+  await fetchRankings(false); // Use cache
+}, [fetchRankings]);
+
+const refreshWithCacheInvalidation = useCallback(async () => {
+  await fetchRankings(true); // Invalidate cache
+}, [fetchRankings]);
+```
+
+**Behavior**:
+- `refresh()`: Uses cached rankings (faster, suitable for pull-to-refresh)
+- `refreshWithCacheInvalidation()`: Forces fresh data from database (slower, use when data changes)
+
+### 6.6 Usage Example
+
+```typescript
+import { useRankings } from '@shared/hooks'
+
+function HomePage() {
+  const {
+    positiveRankings,
+    negativeRankings,
+    neutralRankings,
+    loading,
+    error,
+    refresh,
+    refreshWithCacheInvalidation
+  } = useRankings(5, 10, undefined, false, true)
+
+  if (loading) {
+    return <LoadingSpinner />
+  }
+
+  if (error) {
+    return <Text>Error: {error}</Text>
+  }
+
+  return (
+    <ScrollView>
+      <View>
+        <Text>Top Positive Restaurants</Text>
+        {positiveRankings?.rankings.map((ranking, index) => (
+          <View key={ranking.restaurant.id}>
+            <Text>#{index + 1} {ranking.restaurant.name}</Text>
+            <Text>Positive Rate: {ranking.statistics.positiveRate.toFixed(1)}%</Text>
+          </View>
+        ))}
+      </View>
+
+      <View>
+        <Text>Top Negative Restaurants</Text>
+        {negativeRankings?.rankings.map((ranking, index) => (
+          <View key={ranking.restaurant.id}>
+            <Text>#{index + 1} {ranking.restaurant.name}</Text>
+            <Text>Negative Rate: {ranking.statistics.negativeRate.toFixed(1)}%</Text>
+          </View>
+        ))}
+      </View>
+
+      <Button onPress={refresh} title="Refresh (cached)" />
+      <Button onPress={refreshWithCacheInvalidation} title="Refresh (fresh data)" />
+    </ScrollView>
+  )
+}
+```
+
+### 6.7 Response Type
+
+```typescript
+interface RestaurantRankingsResponse {
+  type: 'positive' | 'negative' | 'neutral';
+  limit: number;
+  minReviews: number;
+  category?: string;
+  excludeNeutral: boolean;
+  rankings: Array<{
+    rank: number;
+    restaurant: {
+      id: number;
+      name: string;
+      category: string | null;
+      address: string | null;
+    };
+    statistics: {
+      totalReviews: number;
+      analyzedReviews: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+      positiveRate: number;
+      negativeRate: number;
+      neutralRate: number;
+    };
+  }>;
+}
+```
+
+---
+
+## 7. useRestaurantStatistics
+
+**Location**: `apps/shared/hooks/useRestaurantStatistics.ts`
+
+### 7.1 Overview
+
+Restaurant statistics management hook for fetching review sentiment statistics and menu-based sentiment statistics.
+
+### 7.2 Hook Signature
+
+```typescript
+export const useRestaurantStatistics = () => {
+  return {
+    // Review sentiment statistics
+    reviewStatistics: RestaurantReviewStatistics | null;
+    reviewStatisticsLoading: boolean;
+    fetchReviewStatistics: (restaurantId: number) => Promise<void>;
+
+    // Menu statistics
+    menuStatistics: RestaurantMenuStatistics | null;
+    menuStatisticsLoading: boolean;
+    minMentions: number;
+    fetchMenuStatistics: (restaurantId: number, minMentionsParam?: number) => Promise<void>;
+    changeMinMentions: (restaurantId: number, newMinMentions: number) => Promise<void>;
+
+    // Common
+    clearStatistics: () => void;
+    fetchAllStatistics: (restaurantId: number) => Promise<void>;
+  }
+}
+
+export type RestaurantStatisticsHookReturn = ReturnType<typeof useRestaurantStatistics>
+```
+
+### 7.3 Return Values
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `reviewStatistics` | `RestaurantReviewStatistics \| null` | Review sentiment statistics (positive/negative/neutral counts and rates) |
+| `reviewStatisticsLoading` | `boolean` | True during review statistics API call |
+| `fetchReviewStatistics` | `Function` | Fetch review sentiment statistics |
+| `menuStatistics` | `RestaurantMenuStatistics \| null` | Menu-based sentiment statistics |
+| `menuStatisticsLoading` | `boolean` | True during menu statistics API call |
+| `minMentions` | `number` | Minimum mention count filter (default: 1) |
+| `fetchMenuStatistics` | `Function` | Fetch menu statistics with optional min mentions |
+| `changeMinMentions` | `Function` | Change min mentions and refetch |
+| `clearStatistics` | `Function` | Clear all statistics |
+| `fetchAllStatistics` | `Function` | Fetch both review and menu statistics in parallel |
+
+### 7.4 Implementation Details
+
+#### 7.4.1 Review Sentiment Statistics
+
+```typescript
+const fetchReviewStatistics = useCallback(async (restaurantId: number) => {
+  setReviewStatisticsLoading(true);
+  try {
+    const response = await apiService.getRestaurantStatistics(restaurantId);
+    if (response.result && response.data) {
+      setReviewStatistics(response.data);
+    }
+  } catch (err) {
+    console.error('리뷰 통계 조회 실패:', err);
+    Alert.error('조회 실패', '리뷰 통계를 불러오는데 실패했습니다');
+  } finally {
+    setReviewStatisticsLoading(false);
+  }
+}, []);
+```
+
+**Returns**: `RestaurantReviewStatistics` containing:
+- `restaurantId`: Restaurant ID
+- `totalReviews`: Total number of reviews
+- `analyzedReviews`: Number of reviews analyzed by AI
+- `positive`, `negative`, `neutral`: Sentiment counts
+- `positiveRate`, `negativeRate`, `neutralRate`: Sentiment percentages
+
+#### 7.4.2 Menu Statistics
+
+```typescript
+const fetchMenuStatistics = useCallback(async (restaurantId: number, minMentionsParam?: number) => {
+  const mentions = minMentionsParam ?? minMentions;
+  setMenuStatisticsLoading(true);
+  try {
+    const response = await apiService.getRestaurantMenuStatistics(restaurantId, mentions);
+    if (response.result && response.data) {
+      setMenuStatistics(response.data);
+    }
+  } catch (err) {
+    console.error('메뉴 통계 조회 실패:', err);
+    Alert.error('조회 실패', '메뉴 통계를 불러오는데 실패했습니다');
+  } finally {
+    setMenuStatisticsLoading(false);
+  }
+}, [minMentions]);
+```
+
+**Returns**: `RestaurantMenuStatistics` containing menu items with sentiment breakdown by menu name.
+
+#### 7.4.3 Change Min Mentions
+
+```typescript
+const changeMinMentions = useCallback(async (restaurantId: number, newMinMentions: number) => {
+  setMinMentions(newMinMentions);
+  await fetchMenuStatistics(restaurantId, newMinMentions);
+}, [fetchMenuStatistics]);
+```
+
+**Behavior**: Updates the minimum mention count filter and automatically refetches menu statistics.
+
+#### 7.4.4 Fetch All Statistics
+
+```typescript
+const fetchAllStatistics = useCallback(async (restaurantId: number) => {
+  await Promise.all([
+    fetchReviewStatistics(restaurantId),
+    fetchMenuStatistics(restaurantId)
+  ]);
+}, [fetchReviewStatistics, fetchMenuStatistics]);
+```
+
+**Features**: Fetches both review and menu statistics in parallel for better performance.
+
+### 7.5 Usage Example
+
+```typescript
+import { useRestaurantStatistics } from '@shared/hooks'
+
+function StatisticsTab({ restaurantId }: { restaurantId: number }) {
+  const {
+    reviewStatistics,
+    reviewStatisticsLoading,
+    menuStatistics,
+    menuStatisticsLoading,
+    minMentions,
+    fetchAllStatistics,
+    changeMinMentions,
+    clearStatistics
+  } = useRestaurantStatistics()
+
+  useEffect(() => {
+    fetchAllStatistics(restaurantId)
+    return () => clearStatistics()
+  }, [restaurantId])
+
+  if (reviewStatisticsLoading || menuStatisticsLoading) {
+    return <LoadingSpinner />
+  }
+
+  return (
+    <ScrollView>
+      {/* Review Sentiment Statistics */}
+      <View>
+        <Text>Review Sentiment Analysis</Text>
+        {reviewStatistics && (
+          <View>
+            <Text>Total: {reviewStatistics.totalReviews}</Text>
+            <Text>Analyzed: {reviewStatistics.analyzedReviews}</Text>
+            <Text>Positive: {reviewStatistics.positiveRate.toFixed(1)}%</Text>
+            <Text>Negative: {reviewStatistics.negativeRate.toFixed(1)}%</Text>
+            <Text>Neutral: {reviewStatistics.neutralRate.toFixed(1)}%</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Menu Statistics */}
+      <View>
+        <Text>Menu Sentiment Statistics</Text>
+        <View>
+          <Text>Min Mentions: {minMentions}</Text>
+          <Button onPress={() => changeMinMentions(restaurantId, 1)} title="1+" />
+          <Button onPress={() => changeMinMentions(restaurantId, 5)} title="5+" />
+          <Button onPress={() => changeMinMentions(restaurantId, 10)} title="10+" />
+        </View>
+        {menuStatistics?.menus.map((menu, index) => (
+          <View key={index}>
+            <Text>{menu.name}</Text>
+            <Text>Mentions: {menu.mentionCount}</Text>
+            <Text>Positive: {menu.positiveRate.toFixed(1)}%</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  )
+}
+```
+
+### 7.6 Response Types
+
+```typescript
+interface RestaurantReviewStatistics {
+  restaurantId: number;
+  totalReviews: number;
+  analyzedReviews: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  positiveRate: number;
+  negativeRate: number;
+  neutralRate: number;
+}
+
+interface RestaurantMenuStatistics {
+  restaurantId: number;
+  minMentions: number;
+  menus: Array<{
+    name: string;
+    mentionCount: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    positiveRate: number;
+    negativeRate: number;
+    neutralRate: number;
+  }>;
+}
+```
+
+---
+
+## 8. Related Documentation
+
+### 8.1 Shared Module Documentation
 - **[Shared Contexts](./SHARED-CONTEXTS.md)** - ThemeContext, SocketContext
 - **[Shared Utils](./SHARED-UTILS.md)** - Alert, Storage, Socket utils
 - **[Shared Services](./SHARED-SERVICES.md)** - API service layer
 - **[Shared Constants](./SHARED-CONSTANTS.md)** - AUTH_CONSTANTS, APP_INFO_CONSTANTS
 - **[Shared Overview](./SHARED-OVERVIEW.md)** - Barrel Export pattern
 
-### 6.2 Backend Documentation
+### 8.2 Backend Documentation
 - **[Friendly Auth](../04-friendly/FRIENDLY-AUTH.md)** - Backend authentication API
+- **[Friendly Routes](../04-friendly/FRIENDLY-ROUTES.md)** - All API routes including rankings and statistics
 
-### 6.3 Web/Mobile Documentation
+### 8.3 Web/Mobile Documentation
 - **[Web Login](../01-web/WEB-LOGIN.md)** - Web login component using useLogin
 - **[Mobile Login](../02-mobile/MOBILE-LOGIN.md)** - Mobile login screen using useLogin
+- **[Web Home](../01-web/WEB-HOME.md)** - Web home component using useRankings
+- **[Mobile Home](../02-mobile/MOBILE-HOME.md)** - Mobile home screen using useRankings
 - **[Web Restaurant](../01-web/WEB-RESTAURANT.md)** - Web restaurant component using hooks
 - **[Mobile Restaurant Detail](../02-mobile/MOBILE-RESTAURANT-DETAIL.md)** - Mobile detail screen using hooks
 
 ---
 
-**문서 버전**: 1.0
-**작성일**: 2025-10-23
+**문서 버전**: 2.0
+**작성일**: 2025-11-04
 **관리**: Claude Code Documentation Team
