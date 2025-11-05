@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { apiService, type RestaurantCategory, type RestaurantData, Alert } from '../'
 
 export interface RestaurantListHookOptions {
@@ -22,6 +22,7 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchName, setSearchName] = useState('')
   const [searchAddress, setSearchAddress] = useState('')
+  const hasInitializedSearch = useRef(false)
 
   const fetchCategories = async () => {
     setCategoriesLoading(true)
@@ -41,11 +42,11 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     setRestaurantsLoading(true)
     try {
       const response = await apiService.getRestaurants(
-        limit,
-        offset,
-        selectedCategory || undefined,
-        searchName || undefined,
-        searchAddress || undefined
+          limit,
+          offset,
+          selectedCategory || undefined,
+          searchName || undefined,
+          searchAddress || undefined
       )
       if (response.result && response.data) {
         setRestaurants(response.data.restaurants)
@@ -117,23 +118,19 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     fetchRestaurants()
   }, [selectedCategory])
 
-  // 검색어 변경 시 디바운스 적용하여 레스토랑 재조회
+  // 검색어 변경 시 디바운스 적용하여 레스토랑 재조회 (마운트 이후만 실행)
   useEffect(() => {
+    if (!hasInitializedSearch.current) {
+      hasInitializedSearch.current = true
+      return
+    }
+
     const timer = setTimeout(() => {
       fetchRestaurants()
     }, 300) // 300ms 디바운스
 
     return () => clearTimeout(timer)
-  }, [searchName])
-
-  // 주소 검색어 변경 시 디바운스 적용하여 레스토랑 재조회
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRestaurants()
-    }, 300) // 300ms 디바운스
-
-    return () => clearTimeout(timer)
-  }, [searchAddress])
+  }, [searchName, searchAddress])
 
   return {
     url,
