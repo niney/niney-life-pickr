@@ -1,6 +1,6 @@
 # Unified Job + Socket.io System
 
-> **Last Updated**: 2025-10-23
+> **Last Updated**: 2025-11-10
 > **Purpose**: Complete documentation of the unified Job + Socket.io real-time system
 
 ---
@@ -1296,6 +1296,105 @@ this.io.to(`restaurant:${restaurantId}`).emit('review:started', eventData)
 // → Emits ONLY to room 'restaurant:${restaurantId}'
 // → All sockets in that room receive the event
 ```
+
+### 4.4 Job Interruption Detection
+
+**Location**: `servers/friendly/src/socket/socket.ts`
+
+#### 4.4.1 Subscribe Event with State Synchronization
+
+When a client subscribes to a restaurant room, the server sends the current state including interrupted jobs.
+
+**Implementation**:
+```typescript
+socket.on('subscribe:restaurant', async (restaurantId: string) => {
+  await socket.join(`restaurant:${restaurantId}`)
+
+  // Fetch active jobs from DB
+  const dbActiveJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId))
+
+  const activeEventNames: string[] = []
+  const interruptedJobs: any[] = []
+
+  // Check each DB job against memory
+  for (const job of dbActiveJobs) {
+    const memoryJob = jobManager.getJob(job.id)
+
+    if (memoryJob) {
+      // Job exists in memory → actively running
+      // Send current progress...
+      activeEventNames.push(job.event_name)
+    } else {
+      // Job NOT in memory but DB shows 'active' → server restarted
+      interruptedJobs.push(job)
+
+      // Send interruption event
+      const interruptEvent = getInterruptEventName(job.type)
+      socket.emit(interruptEvent, {
+        jobId: job.id,
+        type: job.type,
+        restaurantId: job.restaurant_id,
+        status: 'interrupted',
+        reason: 'Server restarted',
+        timestamp: Date.now()
+      })
+    }
+  }
+
+  // Send current state summary
+  socket.emit('restaurant:current_state', {
+    restaurantId: parseInt(restaurantId),
+    activeEventNames,
+    interruptedCount: interruptedJobs.length,  // ← Number of interrupted jobs
+    hasActiveJobs: activeEventNames.length > 0,
+    timestamp: Date.now()
+  })
+})
+```
+
+**Key Points**:
+- **Memory-DB Sync Check**: Compare `jobManager.getJob(jobId)` with DB active jobs
+- **Interruption Detection**: If DB shows 'active' but memory doesn't have the job → server was restarted
+- **DB State Preserved**: DB status stays 'active' so subsequent clients also detect interruption
+- **Dual Notification**: Sends both individual `{type}:interrupted` events AND `restaurant:current_state` with `interruptedCount`
+
+#### 4.4.2 Interruption Events
+
+**Event Names**:
+- `review:interrupted` - Review crawl interrupted
+- `review_summary:interrupted` - Review summary interrupted
+- `restaurant_crawl:interrupted` - Restaurant crawl interrupted
+
+**Payload**:
+```typescript
+{
+  jobId: string;
+  type: JobType;
+  restaurantId: number;
+  status: 'interrupted';
+  reason: string;  // e.g., "Server restarted"
+  timestamp: number;
+}
+```
+
+**Helper Function**:
+```typescript
+export function getInterruptEventName(type: JobType): string {
+  const eventMap: Record<JobType, string> = {
+    review_crawl: SOCKET_EVENTS.REVIEW_INTERRUPTED,
+    review_summary: SOCKET_EVENTS.REVIEW_SUMMARY_INTERRUPTED,
+    restaurant_crawl: SOCKET_EVENTS.RESTAURANT_CRAWL_INTERRUPTED
+  };
+  return eventMap[type] || `${type}:interrupted`;
+}
+```
+
+#### 4.4.3 Benefits
+
+1. **Persistent Detection**: Every client that subscribes sees the interruption state
+2. **No Phantom Jobs**: Users know that a job was interrupted and needs retry
+3. **No DB Updates**: DB state remains 'active' for detection by all clients
+4. **Automatic Cleanup**: When user retries, existing logic in `jobService.start()` cleans up old jobs
 
 ---
 

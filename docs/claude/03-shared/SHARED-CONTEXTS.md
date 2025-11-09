@@ -1,6 +1,6 @@
 # Shared Contexts
 
-> **Last Updated**: 2025-10-23
+> **Last Updated**: 2025-11-10
 > **Purpose**: React Context providers for theme management and real-time Socket.io communication
 
 ---
@@ -290,6 +290,7 @@ interface SocketContextValue {
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
   imageProgress: ProgressData | null
+  isCrawlInterrupted: boolean  // ✅ Interrupted state flag
 
   // Review Summary State
   reviewSummaryStatus: ReviewSummaryStatus
@@ -616,7 +617,159 @@ socket.on('review:crawl_progress', (data: any) => {
 
 ### 2.8 Event Listeners
 
-#### 2.8.1 Menu Crawl Events
+#### 2.8.1 Current State Event
+
+**Event**: `restaurant:current_state`
+
+**Purpose**: Synchronize client state when subscribing to a restaurant room. Includes active job events and interrupted job count.
+
+**Payload**:
+```typescript
+{
+  restaurantId: number;
+  activeEventNames: string[];  // List of active event names
+  interruptedCount: number;    // Number of interrupted jobs
+  hasActiveJobs: boolean;
+  timestamp: number;
+}
+```
+
+**Handler Implementation**:
+```typescript
+socket.on('restaurant:current_state', (data: any) => {
+  console.log('[Socket.io] Current State:', data)
+
+  const activeEvents = new Set(data.activeEventNames || [])
+
+  // ✅ Reflect interrupted state
+  if (data.interruptedCount > 0) {
+    setIsCrawlInterrupted(true)
+  } else if (activeEvents.size === 0) {
+    // No active jobs and no interrupted jobs → reset
+    setIsCrawlInterrupted(false)
+  }
+
+  // Reset progress states based on active events
+  if (!activeEvents.has('restaurant:menu_progress')) {
+    setMenuProgress(null)
+  }
+
+  if (!activeEvents.has('review:crawl_progress')) {
+    setCrawlProgress(null)
+    lastCrawlSequenceRef.current = 0
+  }
+
+  if (!activeEvents.has('review:db_progress')) {
+    setDbProgress(null)
+    lastDbSequenceRef.current = 0
+  }
+
+  if (!activeEvents.has('review:image_progress')) {
+    setImageProgress(null)
+    lastImageSequenceRef.current = 0
+  }
+
+  if (!activeEvents.has('review_summary:progress')) {
+    setReviewSummaryStatus({ status: 'idle' })
+    setSummaryProgress(null)
+    lastSummarySequenceRef.current = 0
+  }
+
+  console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}], Interrupted: ${data.interruptedCount > 0}`)
+})
+```
+
+**Key Features**:
+- **State Synchronization**: Received when joining a restaurant room
+- **Interrupted Job Detection**: `interruptedCount > 0` indicates server restart during job execution
+- **Progress Reset**: Clears progress for inactive events
+- **UI State Management**: Sets `isCrawlInterrupted` flag for visual indicators
+
+**Use Case**:
+```typescript
+// Client subscribes to restaurant:123
+joinRestaurantRoom('123')
+
+// Server sends current state
+// → If server was restarted mid-job, interruptedCount > 0
+// → Client shows "⚠️ 크롤링 중단됨" UI
+```
+
+#### 2.8.2 Interrupted Events
+
+The following interruption events are sent when the server detects a job interruption (DB shows 'active' but memory doesn't have the job).
+
+**Event**: `review:interrupted`
+
+```typescript
+socket.on('review:interrupted', (data: any) => {
+  console.warn('[Socket.io] Review crawl interrupted:', data)
+  const jobId = data.jobId
+
+  // Mark job as completed (terminal state)
+  if (jobId) {
+    markCrawlJobAsCompleted(jobId)
+    currentCrawlJobIdRef.current = null
+  }
+
+  // Set interrupted flag
+  setIsCrawlInterrupted(true)
+
+  // Reset all progress
+  setCrawlProgress(null)
+  setDbProgress(null)
+  setImageProgress(null)
+  lastCrawlSequenceRef.current = 0
+  lastDbSequenceRef.current = 0
+  lastImageSequenceRef.current = 0
+
+  // Trigger callback
+  if (callbacksRef.current.onReviewCrawlError) {
+    callbacksRef.current.onReviewCrawlError({
+      restaurantId: data.restaurantId?.toString() || '',
+      error: data.reason || 'Server restarted - job was interrupted'
+    })
+  }
+})
+```
+
+**Event**: `review_summary:interrupted`
+
+```typescript
+socket.on('review_summary:interrupted', (data: any) => {
+  console.warn('[Socket.io] Review summary interrupted:', data)
+  const jobId = data.jobId
+
+  if (jobId) {
+    markSummaryJobAsCompleted(jobId)
+    currentSummaryJobIdRef.current = null
+  }
+
+  setReviewSummaryStatus({
+    status: 'failed',
+    error: data.reason || 'Server restarted - job was interrupted'
+  })
+  setSummaryProgress(null)
+  lastSummarySequenceRef.current = 0
+})
+```
+
+**Event**: `restaurant_crawl:interrupted`
+
+```typescript
+socket.on('restaurant_crawl:interrupted', (data: any) => {
+  console.warn('[Socket.io] Restaurant crawl interrupted:', data)
+  setMenuProgress(null)
+})
+```
+
+**Benefits**:
+- **Immediate Notification**: Clients know about interruption as soon as they subscribe
+- **Persistent State**: DB keeps 'active' status so all future clients also get notified
+- **No Alerts**: Only UI state updates, no disruptive popups
+- **Visual Indicators**: `isCrawlInterrupted` flag triggers orange border and warning icon
+
+#### 2.8.3 Menu Crawl Events
 
 **Event**: `restaurant:menu_progress`
 
@@ -646,7 +799,7 @@ socket.on('restaurant:menu_progress', (data: any) => {
 })
 ```
 
-#### 2.8.2 Review Crawl Events
+#### 2.8.4 Review Crawl Events
 
 **Event**: `review:crawl_progress` (Web crawling phase)
 
@@ -821,7 +974,7 @@ socket.on('review:error', (data: any) => {
 })
 ```
 
-#### 2.8.3 Review Summary Events
+#### 2.8.5 Review Summary Events
 
 **Event**: `review_summary:progress`
 
@@ -971,13 +1124,14 @@ const resetCrawlStatus = () => {
   setCrawlProgress(null)
   setDbProgress(null)
   setImageProgress(null)
+  setIsCrawlInterrupted(false)  // ✅ Reset interrupted flag
   lastCrawlSequenceRef.current = 0
   lastDbSequenceRef.current = 0
   lastImageSequenceRef.current = 0
 }
 ```
 
-**Usage**: Call when navigating away from restaurant or manually resetting progress.
+**Usage**: Call when navigating away from restaurant or manually resetting progress. Also resets the interrupted state flag.
 
 #### 2.10.2 Reset Summary Status
 
@@ -1015,6 +1169,7 @@ function RestaurantDetail({ restaurantId }: { restaurantId: number }) {
     isConnected,
     crawlProgress,
     dbProgress,
+    isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
     joinRestaurantRoom,
@@ -1051,8 +1206,16 @@ function RestaurantDetail({ restaurantId }: { restaurantId: number }) {
       {/* Connection Status */}
       {!isConnected && <Text>Socket disconnected</Text>}
 
+      {/* Interrupted State */}
+      {isCrawlInterrupted && (
+        <View style={{ borderColor: '#ff9800', borderWidth: 1 }}>
+          <Text style={{ color: '#ff9800' }}>⚠️ 크롤링 중단됨</Text>
+          <Text>서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.</Text>
+        </View>
+      )}
+
       {/* Crawl Progress */}
-      {crawlProgress && (
+      {crawlProgress && !isCrawlInterrupted && (
         <View>
           <Text>Crawling: {crawlProgress.percentage}%</Text>
           <ProgressBar value={crawlProgress.percentage} />
