@@ -1,6 +1,8 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { FastifyInstance } from 'fastify';
 import jobRepository from '../db/repositories/job.repository';
+import jobManager from '../services/job-manager.service';
+import { getInterruptEventName } from './events';
 
 let io: SocketIOServer | null = null;
 
@@ -51,32 +53,55 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
 
       // 현재 활성 Job 조회 및 상태 전송
       try {
-        const activeJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId));
+        const dbActiveJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId));
 
         // 활성 Job의 이벤트명 목록 수집
         const activeEventNames: string[] = [];
+        const interruptedJobs: any[] = [];
 
-        // 활성 Job이 있으면 저장된 진행률을 클라이언트에 전송
-        for (const job of activeJobs) {
-          if (job.event_name && job.metadata) {
-            try {
-              const metadata = JSON.parse(job.metadata);
-              
-              // 저장된 이벤트 이름으로 진행률 전송
-              socket.emit(job.event_name, {
-                jobId: job.id,
-                type: job.type,
-                restaurantId: job.restaurant_id,
-                status: 'progress',
-                ...metadata,
-                timestamp: Date.now()
-              });
+        // DB에서 조회된 활성 Job 처리
+        for (const job of dbActiveJobs) {
+          // 메모리에 해당 Job이 있는지 확인
+          const memoryJob = jobManager.getJob(job.id);
 
-              activeEventNames.push(job.event_name);
-              console.log(`[Socket.io] Sent saved progress to ${socket.id} - Event: ${job.event_name}, Progress: ${metadata.percentage}%`);
-            } catch (error) {
-              console.error(`[Socket.io] Failed to parse job metadata for job ${job.id}:`, error);
+          if (memoryJob) {
+            // 메모리에 있음 = 실제 실행 중 → 진행률 전송
+            if (job.event_name && job.metadata) {
+              try {
+                const metadata = JSON.parse(job.metadata);
+
+                // 저장된 이벤트 이름으로 진행률 전송
+                socket.emit(job.event_name, {
+                  jobId: job.id,
+                  type: job.type,
+                  restaurantId: job.restaurant_id,
+                  status: 'progress',
+                  ...metadata,
+                  timestamp: Date.now()
+                });
+
+                activeEventNames.push(job.event_name);
+                console.log(`[Socket.io] Sent saved progress to ${socket.id} - Event: ${job.event_name}, Progress: ${metadata.percentage}%`);
+              } catch (error) {
+                console.error(`[Socket.io] Failed to parse job metadata for job ${job.id}:`, error);
+              }
             }
+          } else {
+            // 메모리에 없음 = 중단됨 (서버 재시작/에러) → 중단 알림만 전송 (DB는 유지)
+            interruptedJobs.push(job);
+
+            // 클라이언트에 중단 이벤트 전송
+            const interruptEvent = getInterruptEventName(job.type as any);
+            socket.emit(interruptEvent, {
+              jobId: job.id,
+              type: job.type,
+              restaurantId: job.restaurant_id,
+              status: 'interrupted',
+              reason: 'Server restarted',
+              timestamp: Date.now()
+            });
+
+            console.log(`[Socket.io] Job ${job.id} (${job.type}) interrupted - notified client ${socket.id}`);
           }
         }
 
@@ -84,11 +109,12 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
         socket.emit('restaurant:current_state', {
           restaurantId: parseInt(restaurantId),
           activeEventNames, // 현재 활성화된 이벤트 목록
-          hasActiveJobs: activeJobs.length > 0,
+          interruptedCount: interruptedJobs.length,
+          hasActiveJobs: activeEventNames.length > 0,
           timestamp: Date.now()
         });
 
-        console.log(`[Socket.io] Sent current state to ${socket.id} - Active jobs: ${activeJobs.length}, Events: [${activeEventNames.join(', ')}]`);
+        console.log(`[Socket.io] Sent current state to ${socket.id} - Active: ${activeEventNames.length}, Interrupted: ${interruptedJobs.length}`);
       } catch (error) {
         console.error(`[Socket.io] Error fetching active jobs for restaurant ${restaurantId}:`, error);
       }

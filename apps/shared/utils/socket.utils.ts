@@ -33,6 +33,6 @@ export interface SummaryProgress extends ProgressData {
  * 리뷰 요약 상태
  */
 export interface ReviewSummaryStatus {
-  status: 'idle' | 'active' | 'completed' | 'failed';
+  status: 'idle' | 'active' | 'completed' | 'failed' | 'interrupted';
   error?: string;
 }

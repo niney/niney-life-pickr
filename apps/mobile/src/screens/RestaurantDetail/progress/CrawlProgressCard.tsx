@@ -13,6 +13,7 @@ interface CrawlProgressCardProps {
   crawlProgress: ProgressData | null;
   imageProgress: ProgressData | null;
   dbProgress: ProgressData | null;
+  isInterrupted?: boolean;
 }
 
 const CrawlProgressCard: React.FC<CrawlProgressCardProps> = ({
@@ -20,6 +21,7 @@ const CrawlProgressCard: React.FC<CrawlProgressCardProps> = ({
   crawlProgress,
   imageProgress,
   dbProgress,
+  isInterrupted = false,
 }) => {
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
@@ -27,21 +29,27 @@ const CrawlProgressCard: React.FC<CrawlProgressCardProps> = ({
   const dynamicStyles = useMemo(() => ({
     card: {
       backgroundColor: theme === 'light' ? '#fff' : colors.surface,
-      borderColor: colors.border,
+      borderColor: isInterrupted ? '#ff9800' : colors.border,
     },
-  }), [theme, colors]);
+  }), [theme, colors, isInterrupted]);
 
-  // At least one progress should be present
-  if (!menuProgress && !crawlProgress && !imageProgress && !dbProgress) {
+  // At least one progress should be present or interrupted
+  if (!menuProgress && !crawlProgress && !imageProgress && !dbProgress && !isInterrupted) {
     return null;
   }
 
   return (
     <View style={styles.container}>
       <View style={[styles.card, dynamicStyles.card]}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          🔄 크롤링 중...
+        <Text style={[styles.title, { color: isInterrupted ? '#ff9800' : colors.text }]}>
+          {isInterrupted ? '⚠️ 크롤링 중단됨' : '🔄 크롤링 중...'}
         </Text>
+
+        {isInterrupted && (
+          <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
+            서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
+          </Text>
+        )}
 
         {menuProgress && menuProgress.total > 0 && (
           <ProgressIndicator
@@ -101,6 +109,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 12,
+  },
+  interruptedMessage: {
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
   },
 });
 

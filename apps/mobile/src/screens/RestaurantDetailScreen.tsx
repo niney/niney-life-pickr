@@ -99,6 +99,7 @@ const RestaurantDetailScreen: React.FC = () => {
     crawlProgress,
     dbProgress,
     imageProgress,
+    isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
     joinRestaurantRoom,
@@ -108,8 +109,8 @@ const RestaurantDetailScreen: React.FC = () => {
     resetSummaryStatus
   } = useSocket();
 
-  // 크롤링 중인지 체크
-  const isCrawling = menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null;
+  // 크롤링 중인지 체크 (진행률이 하나라도 있거나 중단 상태이면 표시)
+  const isCrawling = menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null || isCrawlInterrupted;
 
   // 크롤링 완료 추적 (wasCrawling)
   const wasCrawling = useRef(false);
@@ -395,6 +396,7 @@ const RestaurantDetailScreen: React.FC = () => {
               crawlProgress={crawlProgress}
               imageProgress={imageProgress}
               dbProgress={dbProgress}
+              isInterrupted={isCrawlInterrupted}
             />
           )}
 

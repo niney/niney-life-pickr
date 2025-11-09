@@ -181,7 +181,7 @@ const RestaurantListScreen: React.FC = () => {
   const route = useRoute<RouteProp<RestaurantStackParamList, 'RestaurantList'>>();
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
-  const { menuProgress, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket();
+  const { menuProgress, crawlProgress, dbProgress, isCrawlInterrupted, setRestaurantCallbacks, resetCrawlStatus } = useSocket();
 
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
@@ -577,12 +577,20 @@ const RestaurantListScreen: React.FC = () => {
         </View>
 
         {/* 크롤링 진행 상황 */}
-        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null) && (
+        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링 진행 상황</Text>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: isCrawlInterrupted ? '#ff9800' : colors.text }]}>
+                {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
+              </Text>
+              {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
             </View>
+
+            {isCrawlInterrupted && (
+              <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
+                서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
+              </Text>
+            )}
 
             {menuProgress && menuProgress.total > 0 && (
               <View style={progressCardStyle}>
@@ -895,6 +903,13 @@ const styles = StyleSheet.create({
   progressPercentage: {
     fontSize: 13,
     textAlign: 'right',
+  },
+  interruptedMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 12,
+    lineHeight: 20,
+    paddingHorizontal: 4,
   },
 });
 

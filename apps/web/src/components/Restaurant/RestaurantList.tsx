@@ -33,6 +33,7 @@ interface RestaurantListProps {
   menuProgress: { current: number; total: number; percentage: number } | null
   crawlProgress: { current: number; total: number; percentage: number } | null
   dbProgress: { current: number; total: number; percentage: number } | null
+  isCrawlInterrupted?: boolean
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
   fetchRestaurants: (limit?: number, offset?: number) => Promise<void | RestaurantData[]>
@@ -60,6 +61,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   menuProgress,
   crawlProgress,
   dbProgress,
+  isCrawlInterrupted = false,
   handleCrawl,
   handleRestaurantClick,
   fetchRestaurants,
@@ -334,12 +336,20 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         </View>
 
         {/* 크롤링 진행 상황 */}
-        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null) && (
+        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>크롤링 진행 상황</Text>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: isCrawlInterrupted ? '#ff9800' : colors.text }]}>
+                {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
+              </Text>
+              {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
             </View>
+
+            {isCrawlInterrupted && (
+              <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
+                서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
+              </Text>
+            )}
 
             {menuProgress && menuProgress.total > 0 && (
               <ProgressIndicator
@@ -844,6 +854,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  interruptedMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 12,
+    lineHeight: 20,
   },
 })
 

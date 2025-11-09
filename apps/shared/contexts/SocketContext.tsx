@@ -15,6 +15,7 @@ interface SocketContextValue {
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
   imageProgress: ProgressData | null
+  isCrawlInterrupted: boolean
   reviewSummaryStatus: ReviewSummaryStatus
   summaryProgress: SummaryProgress | null
   joinRestaurantRoom: (restaurantId: string) => void
@@ -47,6 +48,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const [crawlProgress, setCrawlProgress] = useState<ProgressData | null>(null)
   const [dbProgress, setDbProgress] = useState<ProgressData | null>(null)
   const [imageProgress, setImageProgress] = useState<ProgressData | null>(null)
+  const [isCrawlInterrupted, setIsCrawlInterrupted] = useState(false)
   const [reviewSummaryStatus, setReviewSummaryStatus] = useState<ReviewSummaryStatus>({
     status: 'idle'
   })
@@ -187,14 +189,22 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // 레스토랑 현재 상태 (활성 이벤트 목록)
     socket.on('restaurant:current_state', (data: any) => {
       console.log('[Socket.io] Current State:', data)
-      
+
       const activeEvents = new Set(data.activeEventNames || [])
-      
+
+      // ✅ 중단 상태 반영
+      if (data.interruptedCount > 0) {
+        setIsCrawlInterrupted(true)
+      } else if (activeEvents.size === 0) {
+        // 활성 job도 없고 중단된 job도 없으면 초기화
+        setIsCrawlInterrupted(false)
+      }
+
       // 메뉴 크롤링: restaurant:menu_progress가 없으면 초기화
       if (!activeEvents.has('restaurant:menu_progress')) {
         setMenuProgress(null)
       }
-      
+
       // 리뷰 크롤링: review:crawl_progress, review:db_progress, review:image_progress가 없으면 초기화
       if (!activeEvents.has('review:crawl_progress')) {
         setCrawlProgress(null)
@@ -208,15 +218,15 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         setImageProgress(null)
         lastImageSequenceRef.current = 0
       }
-      
+
       // 리뷰 요약: review_summary:progress가 없으면 초기화
       if (!activeEvents.has('review_summary:progress')) {
         setReviewSummaryStatus({ status: 'idle' })
         setSummaryProgress(null)
         lastSummarySequenceRef.current = 0
       }
-      
-      console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}]`)
+
+      console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}], Interrupted: ${data.interruptedCount > 0}`)
     })
 
     // 크롤링 진행 상황 (웹 크롤링 단계, subscribe 시점 + 실시간 업데이트)
@@ -365,6 +375,37 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       }
     })
 
+    // 크롤링 중단 (서버 재시작/에러로 인한 중단)
+    socket.on('review:interrupted', (data: any) => {
+      console.warn('[Socket.io] Review crawl interrupted:', data)
+      const jobId = data.jobId
+
+      // ✅ jobId가 있으면 완료로 마킹 (중단도 종료 상태)
+      if (jobId) {
+        markCrawlJobAsCompleted(jobId)
+        currentCrawlJobIdRef.current = null
+      }
+
+      // 중단 상태 설정
+      setIsCrawlInterrupted(true)
+
+      // 모든 진행률 초기화
+      setCrawlProgress(null)
+      setDbProgress(null)
+      setImageProgress(null)
+      lastCrawlSequenceRef.current = 0
+      lastDbSequenceRef.current = 0
+      lastImageSequenceRef.current = 0
+
+      // 콜백 호출 (에러 콜백 재사용)
+      if (callbacksRef.current.onReviewCrawlError) {
+        callbacksRef.current.onReviewCrawlError({
+          restaurantId: data.restaurantId?.toString() || '',
+          error: data.reason || 'Server restarted - job was interrupted'
+        })
+      }
+    })
+
     // 리뷰 요약 진행 (subscribe 시점 + 실시간 업데이트)
     socket.on('review_summary:progress', (data: any) => {
       console.log('[Socket.io] Summary Progress:', data)
@@ -444,6 +485,34 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       Alert.error('요약 실패', errorMessage)
     })
 
+    // 리뷰 요약 중단 (서버 재시작/에러로 인한 중단)
+    socket.on('review_summary:interrupted', (data: any) => {
+      console.warn('[Socket.io] Review summary interrupted:', data)
+      const jobId = data.jobId
+
+      // ✅ jobId가 있으면 완료로 마킹 (중단도 종료 상태)
+      if (jobId) {
+        markSummaryJobAsCompleted(jobId)
+        currentSummaryJobIdRef.current = null
+      }
+
+      // 상태 초기화 (에러 메시지 포함)
+      setReviewSummaryStatus({
+        status: 'failed',
+        error: data.reason || 'Server restarted - job was interrupted'
+      })
+      setSummaryProgress(null)
+      lastSummarySequenceRef.current = 0
+    })
+
+    // 레스토랑 크롤링 중단 (서버 재시작/에러로 인한 중단)
+    socket.on('restaurant_crawl:interrupted', (data: any) => {
+      console.warn('[Socket.io] Restaurant crawl interrupted:', data)
+
+      // 메뉴 진행률 초기화
+      setMenuProgress(null)
+    })
+
     // ✅ 주기적으로 오래된 완료 Job 정리 (5분마다)
     const cleanupInterval = setInterval(() => {
       cleanupCompletedCrawlJobs()
@@ -458,8 +527,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       socket.off('review:db_progress')
       socket.off('review:image_progress')
       socket.off('review:error')
+      socket.off('review:interrupted')
       socket.off('review_summary:progress')
       socket.off('review_summary:error')
+      socket.off('review_summary:interrupted')
+      socket.off('restaurant_crawl:interrupted')
     }
   }, [])
 
@@ -514,6 +586,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setCrawlProgress(null)
     setDbProgress(null)
     setImageProgress(null)
+    setIsCrawlInterrupted(false) // 중단 상태 초기화
     lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
     lastDbSequenceRef.current = 0 // ✅ Sequence 초기화
     lastImageSequenceRef.current = 0 // ✅ Sequence 초기화
@@ -532,6 +605,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     crawlProgress,
     dbProgress,
     imageProgress,
+    isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
     joinRestaurantRoom,

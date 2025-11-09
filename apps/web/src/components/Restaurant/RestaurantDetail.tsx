@@ -40,6 +40,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     crawlProgress,
     dbProgress,
     imageProgress,
+    isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
   } = useSocket()
@@ -235,9 +236,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     }
   }, [activeTab, isMobile, handleLoadMore])
 
-  // 크롤링 중인지 체크 (진행률이 하나라도 있으면 크롤링 중)
+  // 크롤링 중인지 체크 (진행률이 하나라도 있거나 중단 상태이면 표시)
   const isCrawling =
-    menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null
+    menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null || isCrawlInterrupted
   const isSummarizing = reviewSummaryStatus.status === 'active'
 
   // 재요약 핸들러
@@ -285,6 +286,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           crawlProgress={crawlProgress}
           imageProgress={imageProgress}
           dbProgress={dbProgress}
+          isInterrupted={isCrawlInterrupted}
         />
       )}
 

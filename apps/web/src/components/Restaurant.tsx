@@ -32,6 +32,7 @@ interface DesktopLayoutProps {
   menuProgress: ProgressData | null
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
+  isCrawlInterrupted?: boolean
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
   fetchRestaurants: (limit?: number, offset?: number) => Promise<RestaurantData[]>
@@ -68,7 +69,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const restaurantState = useRestaurant()
 
   // Socket 연결 (전역 단일 연결)
-  const { menuProgress, crawlProgress, dbProgress, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
+  const { menuProgress, crawlProgress, dbProgress, isCrawlInterrupted, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
 
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -187,6 +188,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
+                  isCrawlInterrupted={isCrawlInterrupted}
                   handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClick}
                   fetchRestaurants={fetchRestaurants}
@@ -231,6 +233,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   menuProgress={menuProgress}
                   crawlProgress={crawlProgress}
                   dbProgress={dbProgress}
+                  isCrawlInterrupted={isCrawlInterrupted}
                   handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClickWithMapClose}
                   fetchRestaurants={fetchRestaurants}
