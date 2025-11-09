@@ -271,6 +271,38 @@ export interface RestaurantRankingsResponse {
   rankings: RestaurantRanking[];
 }
 
+// 네이버 플레이스 검색 관련 타입
+export interface NaverPlaceItem {
+  name: string;
+  category?: string;
+  address?: string;
+  status?: string;
+  reviewCount?: number;
+  isAd: boolean;
+  tvShow?: string | null;
+  hasReservation: boolean;
+  hasCoupon: boolean;
+  images: string[];
+  reviewSnippets: string[];
+  placeId?: string;
+  url?: string;
+}
+
+export interface NaverPlaceSearchResult {
+  keyword: string;
+  totalCount: number;
+  places: NaverPlaceItem[];
+  crawledAt: string;
+  duration: number;
+}
+
+export interface RestaurantSearchRequest {
+  keyword: string;
+  maxResults?: number;
+  enableScroll?: boolean;
+  headless?: boolean;
+}
+
 // API 클래스
 class ApiService {
   private baseUrl: string;
@@ -567,6 +599,45 @@ class ApiService {
     return this.request<RestaurantRankingsResponse>(url, {
       method: 'GET',
     });
+  }
+
+  /**
+   * 네이버 플레이스 레스토랑 검색
+   */
+  async searchRestaurants(params: RestaurantSearchRequest): Promise<ApiResponse<NaverPlaceSearchResult>> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('keyword', params.keyword);
+    
+    if (params.maxResults !== undefined) {
+      queryParams.append('maxResults', params.maxResults.toString());
+    }
+    if (params.enableScroll !== undefined) {
+      queryParams.append('enableScroll', params.enableScroll.toString());
+    }
+    if (params.headless !== undefined) {
+      queryParams.append('headless', params.headless.toString());
+    }
+
+    return this.request<NaverPlaceSearchResult>(`/api/crawler/search?${queryParams.toString()}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 선택된 레스토랑들의 Place ID 추출
+   */
+  async extractPlaceIds(params: {
+    keyword: string;
+    restaurantNames: string[];
+    headless?: boolean;
+  }): Promise<ApiResponse<Array<{ name: string; placeId: string | null; url: string | null }>>> {
+    return this.request<Array<{ name: string; placeId: string | null; url: string | null }>>(
+      '/api/crawler/extract-place-ids',
+      {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }
+    );
   }
 }
 

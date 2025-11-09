@@ -24,6 +24,7 @@ import jobRoutes from './routes/job.routes';
 import reviewSummaryRoutes from './routes/review-summary.routes';
 import reviewRoutes from './routes/review.routes';
 import menuStatisticsRoutes from './routes/menu-statistics.routes';
+import searchRoutes from './routes/search.routes';
 
 // Create Fastify app with TypeBox provider
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -100,7 +101,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
         { name: 'health', description: 'Health check endpoints' },
         { name: 'api', description: 'General API endpoints' },
         { name: 'users', description: 'User management endpoints' },
-        { name: 'crawler', description: 'Naver Map restaurant crawler endpoints' },
+        { name: 'crawler', description: 'Naver Map restaurant crawler and search endpoints' },
         { name: 'restaurants', description: 'Restaurant data management endpoints' },
         { name: 'reviews', description: 'Individual review operations' },
         { name: 'jobs', description: 'Background job management endpoints' },
@@ -202,6 +203,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(docsRoutes, { prefix: '/api/docs' });
   await app.register(crawlerRoutes, { prefix: '/api/crawler' });
+  await app.register(searchRoutes, { prefix: '/api/crawler' }); // 레스토랑 검색 (/api/crawler/search)
   await app.register(restaurantRoutes, { prefix: '/api/restaurants' });
   await app.register(jobRoutes, { prefix: '/api/jobs' });
   

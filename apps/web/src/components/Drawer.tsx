@@ -71,6 +71,11 @@ const Drawer: React.FC<DrawerProps> = ({ visible, onClose, onLogout }) => {
               <Text style={[styles.menuItemText, { color: colors.text }]}>맛집</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('/restaurant-search')}>
+              <Text style={[styles.menuItemIcon, { color: colors.text }]}>🔍</Text>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>맛집 검색</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.menuItem}>
               <Text style={[styles.menuItemIcon, { color: colors.text }]}>👤</Text>
               <Text style={[styles.menuItemText, { color: colors.text }]}>프로필</Text>

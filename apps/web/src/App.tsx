@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import Login from './components/Login'
 import Home from './components/Home'
 import Restaurant from './components/Restaurant'
+import RestaurantSearch from './components/RestaurantSearch'
 import { useAuth } from '@shared/hooks'
 import { ThemeProvider, SocketProvider } from '@shared/contexts'
 
@@ -39,6 +40,7 @@ function AppContent() {
           <>
             <Route path="/" element={<Home onLogout={logout} />} />
             <Route path="/restaurant/*" element={<Restaurant onLogout={logout} />} />
+            <Route path="/restaurant-search/*" element={<RestaurantSearch onLogout={logout} />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>

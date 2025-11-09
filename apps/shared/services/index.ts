@@ -25,4 +25,7 @@ export type {
   RestaurantMenuStatistics,
   RestaurantRanking,
   RestaurantRankingsResponse,
+  NaverPlaceItem,
+  NaverPlaceSearchResult,
+  RestaurantSearchRequest,
 } from './api.service';

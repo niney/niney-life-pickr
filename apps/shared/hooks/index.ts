@@ -18,3 +18,6 @@ export type { RestaurantStatisticsHookReturn } from './useRestaurantStatistics';
 
 export { useRankings } from './useRankings';
 export type { UseRankingsReturn } from './useRankings';
+
+export { useRestaurantSearch } from './useRestaurantSearch';
+export type { UseRestaurantSearchResult } from './useRestaurantSearch';
