@@ -23,11 +23,47 @@ interface Job {
     total: number;
     percentage: number;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, string | number | boolean>;
   error?: string;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+}
+
+// Socket 이벤트 데이터 타입들
+interface ProgressEventData {
+  jobId: string;
+  restaurantId: number;
+  sequence?: number;
+  current: number;
+  total: number;
+  percentage: number;
+  timestamp?: number;
+}
+
+interface CompletionEventData {
+  jobId: string;
+  timestamp: number;
+}
+
+interface ErrorEventData {
+  jobId: string;
+  error: string;
+}
+
+interface CancellationEventData {
+  jobId: string;
+}
+
+interface JobNewEventData {
+  jobId: string;
+  type: string;
+  restaurantId: number;
+  timestamp: number;
+}
+
+interface MenuProgressEventData extends ProgressEventData {
+  metadata?: Record<string, string | number>;
 }
 
 /**
@@ -172,12 +208,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - 진행률 이벤트에 상세 정보 포함
      * - Room 구독만 하고, 실제 Job 추가는 진행률 이벤트에서 처리
      */
-    newSocket.on('job:new', (data: {
-      jobId: string;
-      type: string;
-      restaurantId: number;
-      timestamp: number;
-    }) => {
+    newSocket.on('job:new', (data: JobNewEventData) => {
       console.log('[JobMonitor] 새 Job 시작 알림:', data);
       
       // 새 레스토랑이면 Room 자동 구독
@@ -205,7 +236,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - Job이 없으면 새로 추가 (job:new 이후 첫 진행률 이벤트)
      * - 100% 도달 시 자동 완료 처리 (3초 후)
      */
-    newSocket.on('review:crawl_progress', (data: any) => {
+    newSocket.on('review:crawl_progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] 크롤링 진행률:', data);
       
       // ✅ Sequence 체크: 구 버전 이벤트 무시
@@ -264,7 +295,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - Job이 없으면 새로 추가
      * - 100% 도달 시 자동 완료 처리 (3초 후)
      */
-    newSocket.on('review:db_progress', (data: any) => {
+    newSocket.on('review:db_progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] DB 저장 진행률:', data);
       
       // ✅ Sequence 체크: 구 버전 이벤트 무시
@@ -323,7 +354,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - Job이 없으면 새로 추가
      * - 100% 도달 시 자동 완료 처리 (3초 후)
      */
-    newSocket.on('review:image_progress', (data: any) => {
+    newSocket.on('review:image_progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] 이미지 다운로드 진행률:', data);
       
       // ✅ Sequence 체크: 구 버전 이벤트 무시
@@ -381,7 +412,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - completedAt 타임스탬프 추가
      * - Sequence 초기화
      */
-    newSocket.on('review:completed', (data: any) => {
+    newSocket.on('review:completed', (data: CompletionEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 완료:', data);
       
       // ✅ Sequence 초기화
@@ -406,7 +437,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - error 메시지 추가
      * - Sequence 초기화
      */
-    newSocket.on('review:error', (data: any) => {
+    newSocket.on('review:error', (data: ErrorEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 실패:', data);
       
       // ✅ Sequence 초기화
@@ -430,7 +461,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - Job 상태를 'cancelled'로 변경
      * - Sequence 초기화
      */
-    newSocket.on('review:cancelled', (data: any) => {
+    newSocket.on('review:cancelled', (data: CancellationEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 취소:', data);
       
       // ✅ Sequence 초기화
@@ -451,7 +482,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - Job이 없으면 새로 추가
      * - 100% 도달 시 자동 완료 처리 (3초 후)
      */
-    newSocket.on('review_summary:progress', (data: any) => {
+    newSocket.on('review_summary:progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] 리뷰 요약 진행률:', data);
       
       // ✅ Sequence 체크: 구 버전 이벤트 무시
@@ -503,7 +534,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     /**
      * review_summary:completed - 리뷰 요약 완료
      */
-    newSocket.on('review_summary:completed', (data: any) => {
+    newSocket.on('review_summary:completed', (data: CompletionEventData) => {
       console.log('[JobMonitor] 리뷰 요약 완료:', data);
       
       // ✅ Sequence 초기화
@@ -523,7 +554,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     /**
      * review_summary:error - 리뷰 요약 실패
      */
-    newSocket.on('review_summary:error', (data: any) => {
+    newSocket.on('review_summary:error', (data: ErrorEventData) => {
       console.log('[JobMonitor] 리뷰 요약 실패:', data);
       
       // ✅ Sequence 초기화
@@ -549,7 +580,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      * - Job이 없으면 새로 추가
      * - 100% 도달 시 자동 완료 처리 (3초 후)
      */
-    newSocket.on('restaurant:menu_progress', (data: any) => {
+    newSocket.on('restaurant:menu_progress', (data: MenuProgressEventData) => {
       console.log('[JobMonitor] 메뉴 크롤링 진행률:', data);
       
       // ✅ Sequence 체크: 구 버전 이벤트 무시
@@ -563,7 +594,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
         
         // Job이 없으면 새로 추가
         if (!existingJob) {
-          return [createJobFromProgress(data, 'restaurant_crawl', data.metadata || data), ...prev];
+          return [createJobFromProgress(data, 'restaurant_crawl', data.metadata), ...prev];
         }
 
         // 기존 Job 업데이트
@@ -607,7 +638,11 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       newSocket.emit('unsubscribe:all_jobs'); // 전체 Job 구독 해제
       newSocket.close();
     };
-  }, []); // 빈 배열: 컴포넌트 마운트 시 1회만 실행
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ℹ️ 빈 배열 의도: Socket 핸들러는 마운트 시 1회만 등록
+  // ℹ️ checkSequence, resetSequence, createJobFromProgress는 useRef와 함께
+  //    안전하게 클로저에 캡처됨 - 다시 등록할 필요 없음
 
   // ==================== 3️⃣ 초기 Job 로딩 (Socket 연결 후) ====================
 
@@ -655,9 +690,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
    * - job:new를 놓쳤거나 네트워크 이슈로 Job이 없을 때 방어 로직
    */
   const createJobFromProgress = useCallback((
-    data: any,
+    data: ProgressEventData | MenuProgressEventData,
     type: Job['type'],
-    additionalMetadata?: Record<string, any>
+    additionalMetadata?: Record<string, string | number>
   ): Job => {
     console.log(`[JobMonitor] 새 Job 추가 (${type}):`, data.jobId);
     return {
