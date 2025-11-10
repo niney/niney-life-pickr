@@ -6,7 +6,13 @@ import { THEME_COLORS } from '@shared/constants'
 interface RecrawlModalProps {
   visible: boolean
   onClose: () => void
-  onConfirm: (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean; resetSummary?: boolean }) => Promise<void>
+  onConfirm: (options: { 
+    crawlMenus: boolean
+    crawlReviews: boolean
+    createSummary: boolean
+    resetSummary?: boolean
+    useQueue?: boolean  // ✅ Queue 사용 여부
+  }) => Promise<void>
   restaurantName: string
 }
 
@@ -23,6 +29,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
   const [crawlReviews, setCrawlReviews] = useState(false)
   const [createSummary, setCrawlSummary] = useState(false)
   const [resetSummary, setResetSummary] = useState(false)
+  const [useQueue, setUseQueue] = useState(false) // ✅ Queue 사용 여부
   const [loading, setLoading] = useState(false)
 
   const handleConfirm = async () => {
@@ -37,7 +44,8 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
         crawlMenus,
         crawlReviews,
         createSummary,
-        resetSummary: createSummary && resetSummary
+        resetSummary: createSummary && resetSummary,
+        useQueue, // ✅ Queue 사용 여부 전달
       })
       onClose()
       // 상태 초기화
@@ -45,6 +53,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
       setCrawlReviews(false)
       setCrawlSummary(false)
       setResetSummary(false)
+      setUseQueue(false)
     } catch (error) {
       console.error('재크롤링 실패:', error)
     } finally {
@@ -131,6 +140,34 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
                 </View>
               </TouchableOpacity>
             )}
+
+            {/* ✅ Queue 옵션 - 리뷰 크롤링이 선택되었을 때만 표시 */}
+            {crawlReviews && (
+              <View style={styles.queueSection}>
+                <View style={styles.queueDivider} />
+                <TouchableOpacity
+                  style={styles.optionRow}
+                  onPress={() => setUseQueue(!useQueue)}
+                >
+                  <View style={[styles.checkbox, useQueue && { backgroundColor: colors.primary }]}>
+                    {useQueue && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <View style={styles.optionText}>
+                    <Text style={[styles.optionTitle, { color: colors.text }]}>
+                      대기열에 추가 🔄
+                    </Text>
+                    <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>
+                      순차적으로 처리됩니다 (중복 방지, 서버 부하 감소)
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {!useQueue && (
+                  <Text style={[styles.queueWarning, { color: '#ff9800' }]}>
+                    ⚠️ 병렬 처리: 즉시 실행되지만 동시 크롤링으로 서버 부하가 발생할 수 있습니다
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={styles.buttonContainer}>
@@ -196,6 +233,20 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: 'rgba(0, 0, 0, 0.1)',
     marginTop: 8,
+  },
+  queueSection: {
+    marginTop: 8,
+  },
+  queueDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    marginVertical: 16,
+  },
+  queueWarning: {
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 36,
+    lineHeight: 18,
   },
   checkbox: {
     width: 24,

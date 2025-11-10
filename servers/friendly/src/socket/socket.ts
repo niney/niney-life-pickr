@@ -194,6 +194,50 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       // 특별한 처리 불필요 (Room 기반 아님)
     });
 
+    /**
+     * ✅ Queue 구독 (Job Queue 관리 화면용)
+     * - 메모리에 저장된 Queue 목록 조회
+     * - HTTP API 대신 Socket 통신으로 초기 데이터 로딩
+     */
+    socket.on('subscribe:queue', async () => {
+      console.log(`[Socket.io] Client ${socket.id} subscribed to queue`);
+
+      try {
+        const jobQueueManager = await import('../services/job-queue-manager.service');
+        
+        // Queue 조회
+        const queue = jobQueueManager.default.getQueue();
+        const stats = jobQueueManager.default.getStats();
+
+        // 초기 상태 전송
+        socket.emit('queue:current_state', {
+          total: queue.length,
+          queue,
+          stats,
+          timestamp: Date.now(),
+        });
+
+        console.log(
+          `[Socket.io] Sent queue state to ${socket.id} - Total: ${queue.length}, Waiting: ${stats.waiting}, Processing: ${stats.processing}`
+        );
+      } catch (error) {
+        console.error(`[Socket.io] Error fetching queue:`, error);
+
+        socket.emit('queue:error', {
+          message: 'Failed to fetch queue',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+        });
+      }
+    });
+
+    /**
+     * ✅ Queue 구독 해제
+     */
+    socket.on('unsubscribe:queue', () => {
+      console.log(`[Socket.io] Client ${socket.id} unsubscribed from queue`);
+    });
+
     socket.on('disconnect', () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
     });

@@ -5,6 +5,8 @@ import { useTheme } from '@shared/contexts';
 import { THEME_COLORS } from '@shared/constants';
 import Header from './Header';
 import Drawer from './Drawer';
+import { QueueCard } from './QueueCard';
+import type { QueuedJob, QueueStats } from '../types';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
 
@@ -68,17 +70,17 @@ interface MenuProgressEventData extends ProgressEventData {
 
 /**
  * JobMonitor 컴포넌트
- * 
+ *
  * 핵심 전략:
  * 1. 초기 로딩: Socket으로 active Job 조회 (1회만)
  * 2. Room 구독: 모든 레스토랑 Room 구독 (1회만)
  * 3. 실시간 업데이트: Socket 이벤트만 사용 (HTTP Polling 없음)
- * 
+ *
  * 동작 방식:
  * - 초기 로딩: subscribe:all_jobs → jobs:current_state → 레스토랑 Room 자동 구독
  * - 진행률 변경: review:crawl_progress, review:db_progress, restaurant:menu_progress 등
  * - Job 완료/실패: review:completed, review:error 등
- * 
+ *
  * 장점:
  * - 서버 부하 최소화 (HTTP Polling 제거)
  * - 실시간 동기화 (즉시 반영)
@@ -93,13 +95,26 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
   const [drawerVisible, setDrawerVisible] = useState(false);
-  // ==================== State 관리 ====================
-  
+
+  // ==================== Job State 관리 ====================
+
   const [jobs, setJobs] = useState<Job[]>([]); // Job 리스트
   const [isLoading, setIsLoading] = useState(true); // 초기 로딩 상태
   const [socketConnected, setSocketConnected] = useState(false); // Socket 연결 상태
   const [socket, setSocket] = useState<Socket | null>(null); // Socket 인스턴스
   const [subscribedRooms, setSubscribedRooms] = useState<Set<number>>(new Set()); // 구독 중인 Room
+
+  // ==================== Queue State 관리 ====================
+
+  const [queueItems, setQueueItems] = useState<QueuedJob[]>([]); // Queue 리스트
+  const [queueStats, setQueueStats] = useState<QueueStats>({
+    total: 0,
+    waiting: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+  });
 
   // ✅ Sequence 번호 추적 (순서 보장) - Job별로 관리
   const lastSequenceRef = useRef<Map<string, number>>(new Map());
@@ -110,7 +125,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
    * Socket으로 초기 Job 리스트 조회
    * - subscribe:all_jobs 이벤트 발행
    * - jobs:current_state 이벤트 수신 (1회만)
-   * 
+   *
    * HTTP API 대신 Socket 통신으로 초기 데이터 로딩
    * - restaurant:current_state와 동일한 패턴
    * - 서버가 DB 조회 후 Socket으로 응답
@@ -119,7 +134,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     if (!socket) return;
 
     console.log('[JobMonitor] 전체 Job 구독 시작...');
-    
+
     // 전체 Job 구독 요청
     socket.emit('subscribe:all_jobs');
 
@@ -131,7 +146,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       timestamp: number;
     }) => {
       console.log('[JobMonitor] 초기 Job 리스트 수신:', data);
-      
+
       // Job 리스트 설정
       setJobs(data.jobs);
       setIsLoading(false);
@@ -159,7 +174,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
   /**
    * Socket 연결 및 이벤트 리스너 등록
-   * 
+   *
    * 이벤트 종류:
    * - review:crawl_progress → 웹 크롤링 진행률
    * - review:db_progress → DB 저장 진행률
@@ -174,7 +189,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
    */
   useEffect(() => {
     console.log('[JobMonitor] Socket 연결 시도...');
-    
+
     const newSocket = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
@@ -198,11 +213,11 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * job:new - 새 Job 시작 전역 알림 (모든 클라이언트 수신)
-     * 
+     *
      * 처리 로직:
      * 1. 새 레스토랑이면 Room 자동 구독
      * 2. Job 리스트에는 추가하지 않음 (진행률 이벤트에서 추가)
-     * 
+     *
      * 왜 Job을 바로 추가하지 않나?
      * - job:new는 최소 정보만 포함 (jobId, type, restaurantId)
      * - 진행률 이벤트에 상세 정보 포함
@@ -210,18 +225,18 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('job:new', (data: JobNewEventData) => {
       console.log('[JobMonitor] 새 Job 시작 알림:', data);
-      
+
       // 새 레스토랑이면 Room 자동 구독
       setSubscribedRooms(prev => {
         if (prev.has(data.restaurantId)) {
           console.log(`[JobMonitor] 이미 구독 중: restaurant:${data.restaurantId}`);
           return prev;
         }
-        
+
         // Room 구독
         newSocket.emit('subscribe:restaurant', data.restaurantId);
         console.log(`[JobMonitor] 새 Restaurant Room 구독: ${data.restaurantId}`);
-        
+
         const newSet = new Set(prev);
         newSet.add(data.restaurantId);
         return newSet;
@@ -230,7 +245,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review:crawl_progress - 웹 크롤링 진행률 업데이트
-     * 
+     *
      * 처리 로직:
      * - 기존 Job의 progress 업데이트
      * - Job이 없으면 새로 추가 (job:new 이후 첫 진행률 이벤트)
@@ -238,16 +253,16 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review:crawl_progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] 크롤링 진행률:', data);
-      
+
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
       if (!checkSequence(data.jobId, sequence)) {
         return;
       }
-      
+
       setJobs(prev => {
         const existingJob = prev.find(job => job.jobId === data.jobId);
-        
+
         // Job이 없으면 새로 추가
         if (!existingJob) {
           return [createJobFromProgress(data, 'review_crawl', { phase: 'crawl' }), ...prev];
@@ -288,7 +303,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review:db_progress - DB 저장 진행률 업데이트
-     * 
+     *
      * 처리 로직:
      * - 기존 Job의 progress 업데이트
      * - metadata에 phase: 'db' 추가
@@ -297,16 +312,16 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review:db_progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] DB 저장 진행률:', data);
-      
+
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
       if (!checkSequence(data.jobId, sequence)) {
         return;
       }
-      
+
       setJobs(prev => {
         const existingJob = prev.find(job => job.jobId === data.jobId);
-        
+
         // Job이 없으면 새로 추가
         if (!existingJob) {
           return [createJobFromProgress(data, 'review_crawl', { phase: 'db' }), ...prev];
@@ -347,7 +362,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review:image_progress - 이미지 다운로드 진행률 업데이트
-     * 
+     *
      * 처리 로직:
      * - 기존 Job의 progress 업데이트
      * - metadata에 phase: 'image' 추가
@@ -356,16 +371,16 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review:image_progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] 이미지 다운로드 진행률:', data);
-      
+
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
       if (!checkSequence(data.jobId, sequence)) {
         return;
       }
-      
+
       setJobs(prev => {
         const existingJob = prev.find(job => job.jobId === data.jobId);
-        
+
         // Job이 없으면 새로 추가
         if (!existingJob) {
           return [createJobFromProgress(data, 'review_crawl', { phase: 'image' }), ...prev];
@@ -406,7 +421,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review:completed - 리뷰 크롤링 완료
-     * 
+     *
      * 처리 로직:
      * - Job 상태를 'completed'로 변경
      * - completedAt 타임스탬프 추가
@@ -414,10 +429,10 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review:completed', (data: CompletionEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 완료:', data);
-      
+
       // ✅ Sequence 초기화
       resetSequence(data.jobId);
-      
+
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
           ? {
@@ -431,7 +446,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review:error - 리뷰 크롤링 실패
-     * 
+     *
      * 처리 로직:
      * - Job 상태를 'failed'로 변경
      * - error 메시지 추가
@@ -439,10 +454,10 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review:error', (data: ErrorEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 실패:', data);
-      
+
       // ✅ Sequence 초기화
       resetSequence(data.jobId);
-      
+
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
           ? {
@@ -456,17 +471,17 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review:cancelled - 리뷰 크롤링 취소
-     * 
+     *
      * 처리 로직:
      * - Job 상태를 'cancelled'로 변경
      * - Sequence 초기화
      */
     newSocket.on('review:cancelled', (data: CancellationEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 취소:', data);
-      
+
       // ✅ Sequence 초기화
       resetSequence(data.jobId);
-      
+
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
           ? { ...job, status: 'cancelled' }
@@ -476,7 +491,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * review_summary:progress - 리뷰 요약 진행률
-     * 
+     *
      * 처리 로직:
      * - 기존 Job의 progress 업데이트
      * - Job이 없으면 새로 추가
@@ -484,16 +499,16 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review_summary:progress', (data: ProgressEventData) => {
       console.log('[JobMonitor] 리뷰 요약 진행률:', data);
-      
+
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
       if (!checkSequence(data.jobId, sequence)) {
         return;
       }
-      
+
       setJobs(prev => {
         const existingJob = prev.find(job => job.jobId === data.jobId);
-        
+
         // Job이 없으면 새로 추가
         if (!existingJob) {
           return [createJobFromProgress(data, 'review_summary'), ...prev];
@@ -536,10 +551,10 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review_summary:completed', (data: CompletionEventData) => {
       console.log('[JobMonitor] 리뷰 요약 완료:', data);
-      
+
       // ✅ Sequence 초기화
       resetSequence(data.jobId);
-      
+
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
           ? {
@@ -556,10 +571,10 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('review_summary:error', (data: ErrorEventData) => {
       console.log('[JobMonitor] 리뷰 요약 실패:', data);
-      
+
       // ✅ Sequence 초기화
       resetSequence(data.jobId);
-      
+
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
           ? {
@@ -573,7 +588,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
     /**
      * restaurant:menu_progress - 메뉴 크롤링 진행률
-     * 
+     *
      * 처리 로직:
      * - 레스토랑 정보 + 메뉴 크롤링 진행률 업데이트
      * - metadata에 step 정보 저장 (normalizing, saving 등)
@@ -582,16 +597,16 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
      */
     newSocket.on('restaurant:menu_progress', (data: MenuProgressEventData) => {
       console.log('[JobMonitor] 메뉴 크롤링 진행률:', data);
-      
+
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
       if (!checkSequence(data.jobId, sequence)) {
         return;
       }
-      
+
       setJobs(prev => {
         const existingJob = prev.find(job => job.jobId === data.jobId);
-        
+
         // Job이 없으면 새로 추가
         if (!existingJob) {
           return [createJobFromProgress(data, 'restaurant_crawl', data.metadata), ...prev];
@@ -630,6 +645,130 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       }
     });
 
+    // ==================== Queue 이벤트 리스너 ====================
+
+    /**
+     * queue:current_state - Queue 초기 상태 수신
+     */
+    newSocket.on('queue:current_state', (data: {
+      total: number;
+      queue: QueuedJob[];
+      stats: QueueStats;
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] Queue 초기 상태 수신:', data);
+      setQueueItems(data.queue);
+      setQueueStats(data.stats);
+    });
+
+    /**
+     * queue:job_added - Queue에 새 Job 추가됨
+     */
+    newSocket.on('queue:job_added', (data: {
+      queueId: string;
+      type: string;
+      restaurantId: number;
+      position: number;
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] Queue에 Job 추가:', data);
+
+      // Queue 목록 다시 조회 (Socket으로)
+      newSocket.emit('subscribe:queue');
+    });
+
+    /**
+     * queue:job_started - Queue Item 처리 시작
+     */
+    newSocket.on('queue:job_started', (data: {
+      queueId: string;
+      type: string;
+      restaurantId: number;
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] Queue Item 처리 시작:', data);
+
+      // Queue Item 상태 업데이트
+      setQueueItems(prev => prev.map(item =>
+        item.queueId === data.queueId
+          ? { ...item, queueStatus: 'processing', startedAt: new Date().toISOString() }
+          : item
+      ));
+    });
+
+    /**
+     * queue:job_completed - Queue Item 완료
+     */
+    newSocket.on('queue:job_completed', (data: {
+      queueId: string;
+      jobId: string;
+      type: string;
+      restaurantId: number;
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] Queue Item 완료:', data);
+
+      // Queue에서 제거
+      setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId));
+      setQueueStats(prev => ({
+        ...prev,
+        processing: Math.max(0, prev.processing - 1),
+      }));
+    });
+
+    /**
+     * queue:job_failed - Queue Item 실패
+     */
+    newSocket.on('queue:job_failed', (data: {
+      queueId: string;
+      jobId?: string;
+      type: string;
+      restaurantId: number;
+      error: string;
+      timestamp: number;
+    }) => {
+      console.error('[JobMonitor] Queue Item 실패:', data);
+
+      // Queue Item 상태 업데이트
+      setQueueItems(prev => prev.map(item =>
+        item.queueId === data.queueId
+          ? {
+              ...item,
+              queueStatus: 'failed',
+              completedAt: new Date().toISOString(),
+              error: data.error,
+            }
+          : item
+      ));
+
+      // 3초 후 Queue에서 제거
+      setTimeout(() => {
+        setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId));
+        setQueueStats(prev => ({
+          ...prev,
+          processing: Math.max(0, prev.processing - 1),
+        }));
+      }, 3000);
+    });
+
+    /**
+     * queue:job_cancelled - Queue Item 취소됨
+     */
+    newSocket.on('queue:job_cancelled', (data: {
+      queueId: string;
+      restaurantId: number;
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] Queue Item 취소:', data);
+
+      // Queue에서 제거
+      setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId));
+      setQueueStats(prev => ({
+        ...prev,
+        waiting: Math.max(0, prev.waiting - 1),
+      }));
+    });
+
     setSocket(newSocket);
 
     // Cleanup: 컴포넌트 unmount 시 Socket 연결 해제
@@ -647,8 +786,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
   // ==================== 3️⃣ 초기 Job 로딩 (Socket 연결 후) ====================
 
   /**
-   * Socket 연결 완료 후 전체 Job 구독
-   * 
+   * Socket 연결 완료 후 전체 Job 및 Queue 구독
+   *
    * 조건:
    * - Socket이 연결되어 있어야 함
    * - 1회만 실행 (isLoading 플래그로 방지)
@@ -656,6 +795,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
   useEffect(() => {
     if (socket && socketConnected && isLoading) {
       subscribeToAllJobs(); // ✅ Socket 기반 초기 로딩
+      socket.emit('subscribe:queue'); // ✅ Queue 초기 로딩
+      setIsLoading(false);
     }
   }, [socket, socketConnected, isLoading, subscribeToAllJobs]);
 
@@ -667,12 +808,12 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
    */
   const checkSequence = useCallback((jobId: string, newSequence: number): boolean => {
     const lastSequence = lastSequenceRef.current.get(jobId) || 0;
-    
+
     if (newSequence < lastSequence) {
       console.warn(`[JobMonitor] Outdated event ignored - Job: ${jobId}, ${newSequence} < ${lastSequence}`);
       return false;
     }
-    
+
     lastSequenceRef.current.set(jobId, newSequence);
     return true;
   }, []);
@@ -744,7 +885,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     if (job.type === 'restaurant_crawl') {
       const step = job.metadata?.step;
       const substep = job.metadata?.substep;
-      
+
       if (step === 'crawling') return '웹 크롤링 중';
       if (step === 'menu') {
         if (substep === 'normalizing') return '메뉴 정규화 중';
@@ -799,6 +940,33 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     window.location.href = '/login';
   };
 
+  /**
+   * Queue 아이템 취소
+   */
+  const handleCancelQueue = async (queueId: string) => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+    try {
+      const response = await fetch(`${API_URL}/api/crawler/queue/${queueId}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        const errorMessage = error.message || 'Failed to cancel queue item';
+        console.error('[JobMonitor] Failed to cancel queue item:', errorMessage);
+        alert('Queue 취소 실패: ' + errorMessage);
+        return;
+      }
+
+      console.log(`[JobMonitor] Queue item cancelled: ${queueId}`);
+    } catch (error) {
+      console.error('[JobMonitor] Failed to cancel queue item:', error);
+      alert('Queue 취소 실패: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
   // ==================== 렌더링 ====================
 
   if (isLoading) {
@@ -835,9 +1003,35 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
           </View>
           <View style={styles.statusItem}>
             <Text style={[styles.jobCount, { color: colors.text }]}>
-              총 {jobs.length}개 Job
+              실행 중 {jobs.length}개 | 대기열 {queueStats.total}개
             </Text>
           </View>
+        </View>
+
+        {/* ==================== 대기열 섹션 ==================== */}
+        {queueItems.length > 0 && (
+          <>
+            <View style={[styles.sectionHeader, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                📋 대기열 ({queueStats.waiting} 대기 / {queueStats.processing} 처리 중)
+              </Text>
+            </View>
+
+            {queueItems.map(item => (
+              <QueueCard
+                key={item.queueId}
+                item={item}
+                onCancel={handleCancelQueue}
+              />
+            ))}
+          </>
+        )}
+
+        {/* ==================== 실행 중 Job 섹션 ==================== */}
+        <View style={[styles.sectionHeader, { backgroundColor: colors.surface, marginTop: queueItems.length > 0 ? 24 : 0 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            ▶️ 실행 중 Job ({jobs.length})
+          </Text>
         </View>
 
         {/* Job 카드 리스트 */}
@@ -962,10 +1156,10 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
         ))}
 
         {/* 빈 상태 */}
-        {jobs.length === 0 && (
+        {jobs.length === 0 && queueItems.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              실행 중인 Job이 없습니다
+              실행 중인 Job과 대기 중인 작업이 없습니다
             </Text>
           </View>
         )}
@@ -987,6 +1181,15 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 14,
+  },
+  sectionHeader: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,

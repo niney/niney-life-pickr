@@ -111,16 +111,46 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   }
 
   // 재크롤링 실행
-  const handleRecrawlConfirm = async (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }) => {
+  const handleRecrawlConfirm = async (options: { 
+    crawlMenus: boolean
+    crawlReviews: boolean
+    createSummary: boolean
+    useQueue?: boolean
+  }) => {
     if (!selectedRestaurant) return
 
     try {
-      const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options)
+      // ✅ Queue 방식 선택 시
+      if (options.useQueue && options.crawlReviews) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+        const response = await fetch(`${API_URL}/api/crawler/crawl-queued`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            restaurantId: selectedRestaurant.id,
+          }),
+        })
 
-      if (!response.result) {
-        Alert.error('재크롤링 실패', response.message || '재크롤링에 실패했습니다')
+        const data = await response.json()
+
+        if (!response.ok || !data.result) {
+          Alert.error('Queue 추가 실패', data.message || 'Queue에 추가하지 못했습니다')
+          return
+        }
+
+        // 성공 시 alert 제거 (백그라운드 실행)
+        console.log(`[Queue] Job added: position ${data.data.position}`)
+      } else {
+        // ✅ 기존 병렬 처리 방식
+        const response = await apiService.recrawlRestaurant(selectedRestaurant.id, options)
+
+        if (!response.result) {
+          Alert.error('재크롤링 실패', response.message || '재크롤링에 실패했습니다')
+        }
       }
-      // 성공 시 alert 제거 (백그라운드 실행)
     } catch (error) {
       console.error('재크롤링 오류:', error)
       Alert.error('재크롤링 오류', '재크롤링 중 오류가 발생했습니다')

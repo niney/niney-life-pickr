@@ -508,6 +508,259 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
       );
     }
   });
+
+  /**
+   * ✅ POST /api/crawler/crawl-queued
+   * Queue 방식 크롤링 API (리뷰 크롤링만 지원)
+   */
+  fastify.post('/crawl-queued', {
+    schema: {
+      tags: ['crawler'],
+      summary: 'Queue 방식 크롤링 API',
+      description: '리뷰 크롤링을 Queue에 추가하여 순차적으로 처리합니다. 중복 요청은 자동으로 거부됩니다.',
+      body: Type.Object({
+        url: Type.Optional(Type.String({
+          description: '네이버맵 URL 또는 Place ID',
+          examples: [
+            'https://map.naver.com/p/entry/place/1234567890',
+            'https://m.place.naver.com/restaurant/1234567890/home',
+            '1234567890'
+          ]
+        })),
+        restaurantId: Type.Optional(Type.Number({
+          description: '레스토랑 ID (DB에 이미 저장된 경우)'
+        }))
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            queueId: Type.String({ description: 'Queue 고유 ID' }),
+            restaurantId: Type.Number(),
+            position: Type.Number({ description: 'Queue 내 위치' }),
+            status: Type.String({ description: 'Queue 상태 (queued)' })
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        409: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    let { url, restaurantId } = request.body as {
+      url?: string;
+      restaurantId?: number;
+    };
+
+    // URL 또는 restaurantId 중 하나는 필수
+    if (!url && !restaurantId) {
+      return ResponseHelper.validationError(
+        reply,
+        'Either url or restaurantId is required'
+      );
+    }
+
+    try {
+      const restaurantRepository = await import('../db/repositories/restaurant.repository');
+      const jobQueueManager = await import('../services/job-queue-manager.service');
+
+      let targetRestaurantId: number;
+      let placeId: string;
+      let reviewUrl: string;
+
+      // restaurantId 확보
+      if (url) {
+        // Place ID만 입력된 경우 모바일 URL로 변환
+        if (/^\d+$/.test(url.trim())) {
+          url = `https://m.place.naver.com/restaurant/${url.trim()}/home`;
+        }
+
+        // 네이버맵 URL 검증
+        const validDomains = ['map.naver.com', 'm.place.naver.com', 'place.naver.com', 'naver.me'];
+        const isValidUrl = validDomains.some(domain => url!.includes(domain));
+
+        if (!isValidUrl) {
+          return ResponseHelper.validationError(
+            reply,
+            'Invalid Naver Map URL or Place ID'
+          );
+        }
+
+        // 레스토랑 정보 크롤링 및 저장
+        const crawlResult = await restaurantService.crawlRestaurantInfo(url);
+        
+        if (!crawlResult.success || !crawlResult.data) {
+          return ResponseHelper.error(reply, crawlResult.error || 'Crawling failed', 500);
+        }
+
+        const restaurantData = crawlResult.data;
+
+        // DB 저장
+        const restaurantInput = {
+          place_id: restaurantData.placeId || '',
+          name: restaurantData.name,
+          place_name: restaurantData.placeName,
+          category: restaurantData.category,
+          phone: restaurantData.phone,
+          address: restaurantData.address,
+          description: restaurantData.description,
+          business_hours: restaurantData.businessHours,
+          lat: restaurantData.coordinates?.lat || null,
+          lng: restaurantData.coordinates?.lng || null,
+          url: restaurantData.url,
+          crawled_at: restaurantData.crawledAt
+        };
+        
+        targetRestaurantId = await restaurantRepository.default.upsertRestaurant(restaurantInput);
+        placeId = restaurantData.placeId || '';
+        reviewUrl = `https://m.place.naver.com/restaurant/${placeId}/review/visitor?reviewSort=recent`;
+
+      } else {
+        // restaurantId로 조회
+        const restaurant = await restaurantRepository.default.findById(restaurantId!);
+        
+        if (!restaurant) {
+          return ResponseHelper.error(reply, 'Restaurant not found', 404);
+        }
+
+        targetRestaurantId = restaurantId!;
+        placeId = restaurant.place_id;
+        reviewUrl = `https://m.place.naver.com/restaurant/${placeId}/review/visitor?reviewSort=recent`;
+      }
+
+      // Queue에 추가
+      const queueId = jobQueueManager.default.enqueue({
+        type: 'review_crawl',
+        restaurantId: targetRestaurantId,
+        placeId,
+        url: reviewUrl,
+      });
+
+      const stats = jobQueueManager.default.getStats();
+
+      return ResponseHelper.success(reply, {
+        queueId,
+        restaurantId: targetRestaurantId,
+        position: stats.waiting + stats.processing,
+        status: 'queued'
+      }, 'Job added to queue successfully');
+
+    } catch (error: any) {
+      if (error.message.includes('already queued')) {
+        return ResponseHelper.error(reply, error.message, 409);
+      }
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to add job to queue',
+        500
+      );
+    }
+  });
+
+  /**
+   * ✅ POST /api/crawler/queue/:queueId/cancel
+   * Queue 아이템 취소
+   */
+  fastify.post('/queue/:queueId/cancel', {
+    schema: {
+      tags: ['crawler'],
+      summary: 'Queue 아이템 취소',
+      description: 'Queue에 대기 중인 작업을 취소합니다. 이미 처리 중인 작업은 취소할 수 없습니다.',
+      params: Type.Object({
+        queueId: Type.String({ description: 'Queue ID' })
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            queueId: Type.String(),
+            status: Type.String()
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { queueId } = request.params as { queueId: string };
+
+    try {
+      const jobQueueManager = await import('../services/job-queue-manager.service');
+      
+      jobQueueManager.default.cancelQueueItem(queueId);
+
+      return ResponseHelper.success(reply, {
+        queueId,
+        status: 'cancelled'
+      }, 'Queue item cancelled successfully');
+
+    } catch (error: any) {
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to cancel queue item',
+        400
+      );
+    }
+  });
+
+  /**
+   * ✅ GET /api/crawler/queue/stats
+   * Queue 통계 조회
+   */
+  fastify.get('/queue/stats', {
+    schema: {
+      tags: ['crawler'],
+      summary: 'Queue 통계 조회',
+      description: 'Queue의 현재 상태를 조회합니다.',
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            total: Type.Number(),
+            waiting: Type.Number(),
+            processing: Type.Number(),
+            completed: Type.Number(),
+            failed: Type.Number(),
+            cancelled: Type.Number()
+          }),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (_request, reply) => {
+    try {
+      const jobQueueManager = await import('../services/job-queue-manager.service');
+      
+      const stats = jobQueueManager.default.getStats();
+
+      return ResponseHelper.success(reply, stats, 'Queue stats retrieved successfully');
+
+    } catch (error: any) {
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to get queue stats',
+        500
+      );
+    }
+  });
 };
 
 export default crawlerRoutes;
