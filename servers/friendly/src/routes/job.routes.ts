@@ -121,15 +121,25 @@ const jobRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/jobs
    * 모든 Job 조회
+   * 
+   * Job 관리 화면용 전체 Job 목록 조회
+   * - Memory + DB 조합으로 현재 실행 중인 Job과 과거 Job 모두 조회
+   * - isInterrupted 플래그: DB에는 active지만 메모리에 없는 Job (서버 재시작/에러로 중단)
    */
   fastify.get('/', {
     schema: {
       tags: ['jobs'],
       summary: '모든 Job 조회',
-      description: '크롤링 작업 목록을 조회합니다',
+      description: 'Job 관리 화면용 전체 Job 목록 조회 (isInterrupted 플래그 포함)',
       querystring: Type.Object({
-        status: Type.Optional(Type.String({ description: 'Job 상태 필터' })),
-        limit: Type.Optional(Type.Number({ description: '조회 개수', default: 20 }))
+        status: Type.Optional(Type.String({ 
+          description: 'Job 상태 필터 (active, completed, failed, cancelled)',
+          default: 'active'
+        })),
+        limit: Type.Optional(Type.Number({ 
+          description: '조회 개수', 
+          default: 100 
+        }))
       }),
       response: {
         200: Type.Object({
@@ -141,40 +151,47 @@ const jobRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   }, async (request, reply) => {
-    const { status, limit = 20 } = request.query as { status?: string; limit?: number };
+    const { status, limit = 100 } = request.query as { status?: string; limit?: number };
 
-    // In-Memory + DB 조합
-    const memoryJobs = jobManager.getAllJobs(status);
-    
-    // DB에서 최근 Job 조회
-    const dbJobs = status 
-      ? await jobRepository.findAllActive()
-      : await jobRepository.findByRestaurant(0, limit); // 전체 조회는 개선 필요
+    // DB에서 Job 조회
+    let dbJobs;
+    if (status === 'active') {
+      // active Job만 조회
+      dbJobs = await jobRepository.findAllActive();
+    } else if (status) {
+      // 특정 상태만 조회 (findByRestaurant를 활용, 추후 개선 가능)
+      const allJobs = await jobRepository.findByRestaurant(0, limit * 2);
+      dbJobs = allJobs.filter((job: any) => job.status === status);
+    } else {
+      // 전체 조회 (최근 N개)
+      dbJobs = await jobRepository.findByRestaurant(0, limit);
+    }
 
-    // 중복 제거 (Memory 우선)
-    const jobMap = new Map();
-    memoryJobs.forEach(job => jobMap.set(job.jobId, job));
+    // Memory Job과 비교하여 중단 여부 체크
+    const jobs = dbJobs.map((dbJob: any) => {
+      const memoryJob = jobManager.getJob(dbJob.id);
+      const metadata = dbJob.metadata ? JSON.parse(dbJob.metadata) : {};
+      const result = dbJob.result ? JSON.parse(dbJob.result) : undefined;
 
-    dbJobs.forEach((dbJob) => {
-      if (!jobMap.has(dbJob.id)) {
-        const metadata = dbJob.metadata ? JSON.parse(dbJob.metadata) : {};
-        jobMap.set(dbJob.id, {
-          jobId: dbJob.id,
-          restaurantId: dbJob.restaurant_id,
-          placeId: metadata.placeId || '',
-          url: metadata.url || '',
-          status: dbJob.status,
-          progress: {
-            current: dbJob.progress_current,
-            total: dbJob.progress_total,
-            percentage: dbJob.progress_percentage
-          },
-          createdAt: new Date(dbJob.created_at)
-        });
-      }
-    });
-
-    const jobs = Array.from(jobMap.values()).slice(0, limit);
+      return {
+        jobId: dbJob.id,
+        restaurantId: dbJob.restaurant_id,
+        type: dbJob.type,
+        status: dbJob.status,
+        isInterrupted: !memoryJob && dbJob.status === 'active', // ⭐ 중단 플래그
+        progress: {
+          current: dbJob.progress_current || 0,
+          total: dbJob.progress_total || 0,
+          percentage: dbJob.progress_percentage || 0
+        },
+        metadata,
+        result,
+        error: dbJob.error_message,
+        createdAt: dbJob.created_at,
+        startedAt: dbJob.started_at,
+        completedAt: dbJob.completed_at
+      };
+    }).slice(0, limit);
 
     return ResponseHelper.success(reply, {
       total: jobs.length,

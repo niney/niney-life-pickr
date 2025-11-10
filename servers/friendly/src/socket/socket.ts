@@ -126,6 +126,74 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       console.log(`[Socket.io] Client ${socket.id} unsubscribed from restaurant:${restaurantId}`);
     });
 
+    /**
+     * 전체 Job 조회 구독 (Job 관리 화면용)
+     * - restaurant:current_state와 유사하지만 모든 레스토랑의 Job 조회
+     * - HTTP API 대신 Socket 통신으로 초기 데이터 로딩
+     */
+    socket.on('subscribe:all_jobs', async () => {
+      console.log(`[Socket.io] Client ${socket.id} subscribed to all jobs`);
+
+      try {
+        // 1. DB에서 active Job 조회 (모든 레스토랑, 최근 100개)
+        const dbActiveJobs = await jobRepository.findAllActive();
+
+        // 2. Memory Job과 비교하여 중단 여부 체크
+        const jobs = dbActiveJobs.map((dbJob) => {
+          const memoryJob = jobManager.getJob(dbJob.id);
+          const metadata = dbJob.metadata ? JSON.parse(dbJob.metadata) : {};
+
+          return {
+            jobId: dbJob.id,
+            restaurantId: dbJob.restaurant_id,
+            type: dbJob.type,
+            status: dbJob.status,
+            isInterrupted: !memoryJob && dbJob.status === 'active', // ⭐ 중단 플래그
+            progress: {
+              current: metadata.current || 0,
+              total: metadata.total || 0,
+              percentage: metadata.percentage || 0
+            },
+            metadata,
+            error: dbJob.error_message,
+            createdAt: new Date(dbJob.created_at).getTime(),
+            startedAt: dbJob.started_at ? new Date(dbJob.started_at).getTime() : undefined,
+            completedAt: dbJob.completed_at ? new Date(dbJob.completed_at).getTime() : undefined
+          };
+        });
+
+        // 3. 레스토랑 ID 목록 추출 (자동 구독용)
+        const restaurantIds = [...new Set(jobs.map(job => job.restaurantId))];
+
+        // 4. 초기 상태 전송
+        socket.emit('jobs:current_state', {
+          total: jobs.length,
+          jobs,
+          restaurantIds, // 클라이언트가 구독할 레스토랑 ID 목록
+          timestamp: Date.now()
+        });
+
+        console.log(`[Socket.io] Sent all jobs to ${socket.id} - Total: ${jobs.length}, Restaurants: ${restaurantIds.length}`);
+      } catch (error) {
+        console.error(`[Socket.io] Error fetching all jobs:`, error);
+        
+        // 에러 이벤트 전송
+        socket.emit('jobs:error', {
+          message: 'Failed to fetch jobs',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now()
+        });
+      }
+    });
+
+    /**
+     * 전체 Job 구독 해제
+     */
+    socket.on('unsubscribe:all_jobs', () => {
+      console.log(`[Socket.io] Client ${socket.id} unsubscribed from all jobs`);
+      // 특별한 처리 불필요 (Room 기반 아님)
+    });
+
     socket.on('disconnect', () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
     });

@@ -177,6 +177,16 @@ export class JobService {
 
     this.emitSocketEvent(type, params.restaurantId, 'started', eventData);
 
+    // 5. 전역 알림 이벤트 발행 (모든 클라이언트에게 새 Job 알림)
+    const io = getSocketIO();
+    io.emit('job:new', {
+      jobId,
+      type,
+      restaurantId: params.restaurantId,
+      timestamp: Date.now()
+    });
+    console.log(`[JobService] 전역 알림 전송: 새 Job ${jobId} (레스토랑 ${params.restaurantId})`);
+
     return jobId;
   }
 
