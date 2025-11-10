@@ -639,6 +639,29 @@ class ApiService {
       }
     );
   }
+
+  /**
+   * Queue에 크롤링 Job 추가
+   */
+  async addToQueue(params: {
+    url?: string;
+    restaurantId?: number;
+  }): Promise<ApiResponse<{
+    queueId: string;
+    restaurantId: number;
+    position: number;
+    status: string;
+  }>> {
+    return this.request<{
+      queueId: string;
+      restaurantId: number;
+      position: number;
+      status: string;
+    }>('/api/crawler/crawl-queued', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
 }
 
 // 싱글톤 인스턴스 export

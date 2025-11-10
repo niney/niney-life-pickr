@@ -25,11 +25,14 @@ const SearchMainPage: React.FC = () => {
     selectedRestaurantNames,
     extractedPlaceIds,
     isExtracting,
+    isAddingToQueue,
+    queueResults,
     searchRestaurants,
     toggleRestaurantSelection,
     clearSelection,
     selectAll,
-    extractPlaceIds
+    extractPlaceIds,
+    addToQueue,
   } = useRestaurantSearch()
 
   const handleSearch = async (query: string) => {
@@ -43,6 +46,10 @@ const SearchMainPage: React.FC = () => {
 
   const handleExtractPlaceIds = async () => {
     await extractPlaceIds()
+  }
+
+  const handleAddToQueue = async () => {
+    await addToQueue()
   }
 
   return (
@@ -109,9 +116,60 @@ const SearchMainPage: React.FC = () => {
           {/* 추출된 Place IDs 표시 */}
           {extractedPlaceIds.length > 0 && (
             <View style={styles.extractedSection}>
-              <Text style={[styles.extractedTitle, { color: colors.text }]}>
-                추출된 Place IDs ({extractedPlaceIds.filter(r => r.placeId).length}/{extractedPlaceIds.length}개 성공)
-              </Text>
+              <View style={styles.extractedHeader}>
+                <Text style={[styles.extractedTitle, { color: colors.text }]}>
+                  추출된 Place IDs ({extractedPlaceIds.filter(r => r.placeId).length}/{extractedPlaceIds.length}개 성공)
+                </Text>
+                
+                {/* 대기열 추가 버튼 */}
+                <TouchableOpacity 
+                  style={[
+                    styles.queueButton, 
+                    { 
+                      backgroundColor: isAddingToQueue ? colors.textSecondary : colors.primary,
+                      opacity: isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0 ? 0.6 : 1,
+                    }
+                  ]}
+                  onPress={handleAddToQueue}
+                  disabled={isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0}
+                >
+                  <Text style={styles.queueButtonText}>
+                    {isAddingToQueue ? '대기열 추가 중...' : '대기열에 추가 🔄'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Queue 추가 결과 */}
+              {(queueResults.success.length > 0 || queueResults.failed.length > 0) && (
+                <View style={[styles.queueResultPanel, { backgroundColor: colors.background }]}>
+                  {queueResults.success.length > 0 && (
+                    <Text style={[styles.queueResultText, { color: colors.success }]}>
+                      ✅ {queueResults.success.length}개 대기열 추가 성공
+                    </Text>
+                  )}
+                  {queueResults.failed.length > 0 && (
+                    <View>
+                      <Text style={[styles.queueResultText, { color: colors.error }]}>
+                        ❌ {queueResults.failed.length}개 실패
+                      </Text>
+                      <ScrollView style={styles.queueErrorScrollView}>
+                        {queueResults.errors.map((err, idx) => (
+                          <Text 
+                            key={idx} 
+                            style={[styles.queueErrorText, { color: colors.textSecondary }]}
+                          >
+                            • {err.name}: {err.error}
+                          </Text>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                  <Text style={[styles.queueHintText, { color: colors.textSecondary }]}>
+                    💡 Job Monitor에서 진행 상황을 확인하세요
+                  </Text>
+                </View>
+              )}
+
               <ScrollView style={styles.extractedScrollView}>
                 {extractedPlaceIds.map((result, index) => (
                   <View 
@@ -295,10 +353,51 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
+  extractedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   extractedTitle: {
     fontSize: 14,
     fontWeight: '600',
+    flex: 1,
+  },
+  queueButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  queueButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  queueResultPanel: {
+    padding: 12,
+    borderRadius: 8,
     marginBottom: 12,
+  },
+  queueResultText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  queueErrorScrollView: {
+    maxHeight: 100,
+    marginTop: 4,
+  },
+  queueErrorText: {
+    fontSize: 11,
+    marginLeft: 8,
+    marginTop: 2,
+  },
+  queueHintText: {
+    fontSize: 11,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   extractedScrollView: {
     maxHeight: 200,
