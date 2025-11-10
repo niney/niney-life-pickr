@@ -1,7 +1,7 @@
 # Unified Job + Socket.io System
 
 > **Last Updated**: 2025-11-10
-> **Purpose**: Complete documentation of the unified Job + Socket.io real-time system
+> **Purpose**: Complete documentation of the unified Job + Socket.io real-time system with global job:new event
 
 ---
 
@@ -12,13 +12,14 @@
 3. [Unified Job Lifecycle](#3-unified-job-lifecycle)
 4. [Socket.io Room Strategy](#4-socketio-room-strategy)
 5. [Socket Event Types](#5-socket-event-types)
-6. [Job Cancellation System](#6-job-cancellation-system)
-7. [90% Parameter Reduction](#7-90-parameter-reduction)
-8. [Key Implementation Details](#8-key-implementation-details)
-9. [API Endpoints](#9-api-endpoints)
-10. [Client Integration](#10-client-integration)
-11. [Testing Considerations](#11-testing-considerations)
-12. [Related Documentation](#12-related-documentation)
+6. [Global Job Detection](#6-global-job-detection)
+7. [Job Cancellation System](#7-job-cancellation-system)
+8. [90% Parameter Reduction](#8-90-parameter-reduction)
+9. [Key Implementation Details](#9-key-implementation-details)
+10. [API Endpoints](#10-api-endpoints)
+11. [Client Integration](#11-client-integration)
+12. [Testing Considerations](#12-testing-considerations)
+13. [Related Documentation](#13-related-documentation)
 
 ---
 
@@ -30,6 +31,7 @@ The **JobSocketService** provides a unified interface for all job types in the s
 - All job types (`review_crawl`, `review_summary`, `restaurant_crawl`) use a single service
 - Automatic DB storage + Socket event emission
 - Restaurant room-based real-time updates for multi-user collaboration
+- Global `job:new` event for cross-restaurant job detection
 - Job ID tracking for status queries and cancellation
 
 ### 1.2 Job Types
@@ -1697,7 +1699,177 @@ interface JobEventData {
 
 ---
 
-## 6. Job Cancellation System
+## 6. Global Job Detection
+
+### 6.1 Problem Statement
+
+**Challenge**: Room-based Socket events require subscription. Clients only subscribed to specific restaurant rooms won't receive events from other restaurants.
+
+**Example**:
+```
+Client subscribed to: restaurant:123
+New job starts on: restaurant:456
+Result: Client never receives progress events ❌
+```
+
+This creates a visibility problem for monitoring screens that need to track **all jobs across all restaurants**.
+
+### 6.2 Solution: Two-Phase Detection
+
+#### 6.2.1 Phase 1: Global Broadcast
+
+When a new job starts, emit a **global event** to all connected clients:
+
+```typescript
+// In JobSocketService.start()
+async start(params: {
+  jobId?: string;
+  type?: JobType;
+  restaurantId: number;
+  metadata?: Record<string, any>;
+}): Promise<string> {
+  const type = params.type || 'restaurant_crawl';
+  const jobId = params.jobId || uuidv4();
+  
+  // ... create job in memory and DB ...
+  
+  // 4. Emit room-based started event
+  this.emitSocketEvent(type, params.restaurantId, 'started', eventData);
+  
+  // 5. ✅ NEW: Emit global job:new event
+  const io = getSocketIO();
+  io.emit('job:new', {
+    jobId,
+    type,
+    restaurantId: params.restaurantId,
+    timestamp: Date.now()
+  });
+  
+  console.log(`[JobService] Global notification sent: New job ${jobId} (restaurant ${params.restaurantId})`);
+  
+  return jobId;
+}
+```
+
+**Key Points**:
+- `io.emit('job:new', ...)` sends to **all connected clients**
+- Contains minimal info: jobId, type, restaurantId, timestamp
+- Does NOT include full job details (sent via room events)
+
+#### 6.2.2 Phase 2: Auto-Subscribe
+
+Clients receive `job:new` and auto-subscribe to the restaurant room:
+
+```typescript
+// In JobMonitor.tsx
+newSocket.on('job:new', (data: {
+  jobId: string;
+  type: string;
+  restaurantId: number;
+  timestamp: number;
+}) => {
+  console.log('[JobMonitor] New job started:', data);
+  
+  // Check if already subscribed
+  setSubscribedRooms(prev => {
+    if (prev.has(data.restaurantId)) {
+      console.log(`[JobMonitor] Already subscribed: restaurant:${data.restaurantId}`);
+      return prev;
+    }
+    
+    // ✅ Auto-subscribe to new restaurant room
+    socket.emit('subscribe:restaurant', data.restaurantId);
+    console.log(`[JobMonitor] Subscribed to new restaurant room: ${data.restaurantId}`);
+    
+    const newSet = new Set(prev);
+    newSet.add(data.restaurantId);
+    return newSet;
+  });
+});
+```
+
+**Benefits**:
+- ✅ Clients discover new jobs instantly
+- ✅ Auto-subscribe to receive progress events
+- ✅ No polling required
+- ✅ No manual subscription management
+
+### 6.3 Event Flow Example
+
+```
+1. Server: New job starts (restaurant:456)
+   └─ io.to('restaurant:456').emit('review:started', {...})  [Room event]
+   └─ io.emit('job:new', {jobId, type, restaurantId: 456})  [Global event]
+
+2. Client A (subscribed to restaurant:123)
+   ├─ Receives: job:new (global) ✅
+   ├─ Action: socket.emit('subscribe:restaurant', 456)
+   └─ Now receives: review:crawl_progress, review:completed, etc. ✅
+
+3. Client B (subscribed to restaurant:456)
+   ├─ Receives: review:started (room) ✅
+   ├─ Receives: job:new (global) ✅
+   └─ Action: Already subscribed, no-op ✅
+```
+
+### 6.4 Defensive Job Creation
+
+Even with `job:new`, network issues can cause missed events. Progress handlers defensively create jobs:
+
+```typescript
+newSocket.on('review:crawl_progress', (data: any) => {
+  setJobs(prev => {
+    const existingJob = prev.find(job => job.jobId === data.jobId);
+    
+    // ✅ Create job if missing (missed job:new)
+    if (!existingJob) {
+      console.log('[JobMonitor] Creating job from progress event:', data.jobId);
+      return [createJobFromProgress(data, 'review_crawl', { phase: 'crawl' }), ...prev];
+    }
+    
+    // Update existing job
+    return prev.map(job =>
+      job.jobId === data.jobId ? { ...job, /* update */ } : job
+    );
+  });
+});
+```
+
+**Why defensive creation?**
+- Network issues (reconnections, packet loss)
+- Race conditions (progress event before job:new)
+- Resilience (works even if job:new is never sent)
+
+### 6.5 Implementation Checklist
+
+#### Backend (JobSocketService)
+- [x] Emit `job:new` in `start()` method
+- [x] Use `io.emit()` for global broadcast
+- [x] Include minimal data (jobId, type, restaurantId, timestamp)
+- [x] Keep room-based events unchanged
+
+#### Frontend (JobMonitor)
+- [x] Add `job:new` event handler
+- [x] Track subscribed rooms in Set
+- [x] Auto-subscribe to new restaurant rooms
+- [x] Defensive job creation in progress handlers
+- [x] Sequence tracking per job
+- [x] Auto-completion on 100% progress
+
+### 6.6 Benefits Summary
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| Job Discovery | Manual subscription | Auto-discovery via job:new |
+| Visibility | Only subscribed restaurants | All restaurants |
+| Polling | HTTP polling needed | Zero polling (100% Socket) |
+| Latency | Polling interval (1-5s) | Real-time (<100ms) |
+| Server Load | High (polling requests) | Minimal (Socket events) |
+| Resilience | Missed events = lost jobs | Defensive creation = recovery |
+
+---
+
+## 7. Job Cancellation System
 
 ### 6.1 Overview
 
