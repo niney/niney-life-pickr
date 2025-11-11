@@ -68,10 +68,10 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
           examples: ['영등포구청 고기집', '강남 초밥']
         }),
         maxResults: Type.Optional(Type.Number({
-          description: '최대 결과 수 (기본: 50)',
-          default: 50,
+          description: '최대 결과 수 (기본: 1000)',
+          default: 1000,
           minimum: 1,
-          maximum: 100
+          maximum: 1000
         })),
         enableScroll: Type.Optional(Type.Boolean({
           description: '스크롤하여 추가 결과 로드 여부 (기본: true)',
@@ -133,10 +133,10 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
           examples: ['영등포구청 고기집', '강남 초밥']
         }),
         maxResults: Type.Optional(Type.Number({
-          description: '최대 결과 수 (기본: 50)',
-          default: 50,
+          description: '최대 결과 수 (기본: 1000)',
+          default: 1000,
           minimum: 1,
-          maximum: 100
+          maximum: 1000
         })),
         enableScroll: Type.Optional(Type.Boolean({
           description: '스크롤하여 추가 결과 로드 여부 (기본: true)',
@@ -201,6 +201,12 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
           description: '추출할 레스토랑 이름 배열',
           examples: [['육대장', '고기집 1번가', '소문난 고기집']]
         }),
+        maxResults: Type.Optional(Type.Number({
+          description: '최대 결과 수 (기본: 1000) - searchPlaces와 동일하게 설정해야 함',
+          default: 1000,
+          minimum: 1,
+          maximum: 1000
+        })),
         headless: Type.Optional(Type.Boolean({
           description: 'Headless 모드 여부 (기본: true)',
           default: true
@@ -223,9 +229,10 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       try {
-        const { keyword, restaurantNames, headless } = request.body as {
+        const { keyword, restaurantNames, maxResults, headless } = request.body as {
           keyword: string;
           restaurantNames: string[];
+          maxResults?: number;
           headless?: boolean;
         };
 
@@ -238,11 +245,12 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         fastify.log.info(
-          { keyword, count: restaurantNames.length, headless }, 
+          { keyword, count: restaurantNames.length, maxResults, headless },
           'Place ID 추출 요청'
         );
 
         const result = await naverPlaceSearchService.extractPlaceIds(keyword, restaurantNames, {
+          maxResults,
           headless
         });
 

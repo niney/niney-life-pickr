@@ -70,7 +70,7 @@ class NaverPlaceSearchService {
   /**
    * iframe 내에서 자동 스크롤하여 추가 결과 로드 (최적화)
    */
-  private async autoScroll(frame: any, maxResults: number = 50): Promise<void> {
+  private async autoScroll(frame: any, maxResults: number = 1000): Promise<void> {
     await frame.evaluate(async (targetCount: number) => {
       const scrollContainer = document.querySelector('#_pcmap_list_scroll_container');
       if (!scrollContainer) return;
@@ -124,6 +124,61 @@ class NaverPlaceSearchService {
   }
 
   /**
+   * 네이버 플레이스 검색 페이지 설정 및 iframe 반환
+   * @param keyword 검색 키워드
+   * @param headless 헤드리스 모드
+   * @returns { page, searchFrame, browser }
+   */
+  private async setupSearchFrame(
+    keyword: string,
+    headless: boolean = true
+  ): Promise<{
+    page: any;
+    searchFrame: any;
+    browser: Browser;
+  }> {
+    const browser = await this.launchBrowser(headless);
+    const page = await browser.newPage();
+
+    // 네이버 플레이스 검색 URL로 이동
+    const searchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(keyword)}`;
+    await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+    // iframe 대기 및 찾기
+    await page.waitForSelector('iframe#searchIframe', { timeout: 10000 });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // iframe 찾기 (재시도 로직)
+    let searchFrame: any = null;
+    let retries = 0;
+    const maxRetries = 20;
+
+    while (!searchFrame && retries < maxRetries) {
+      const frames = page.frames();
+      searchFrame = frames.find(f => f.name() === 'searchIframe');
+
+      if (!searchFrame) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+    }
+
+    if (!searchFrame) {
+      const frames = page.frames();
+      searchFrame = frames.find(f => f.url().includes('searchIframe'));
+
+      if (!searchFrame) {
+        throw new Error('검색 결과 iframe을 찾을 수 없습니다.');
+      }
+    }
+
+    // 리스트 컨테이너 대기
+    await searchFrame.waitForSelector('#_pcmap_list_scroll_container ul', { timeout: 10000 });
+
+    return { page, searchFrame, browser };
+  }
+
+  /**
    * 네이버 플레이스 검색
    * @param keyword 검색 키워드
    * @param options 검색 옵션
@@ -137,7 +192,7 @@ class NaverPlaceSearchService {
     } = {}
   ): Promise<NaverPlaceSearchResult> {
     const {
-      maxResults = 50,
+      maxResults = 1000,
       enableScroll = true,
       headless = true
     } = options;
@@ -148,49 +203,10 @@ class NaverPlaceSearchService {
       const startTime = Date.now();
       console.log(`🔍 네이버 플레이스 검색 시작: "${keyword}"`);
 
-      browser = await this.launchBrowser(headless);
-      const page = await browser.newPage();
-
-      // 네이버 플레이스 검색 URL로 이동
-      const searchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(keyword)}`;
-      console.log(`📍 검색 URL: ${searchUrl}`);
-
-      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      // iframe 대기 및 찾기 (재시도 로직 추가)
-      await page.waitForSelector('iframe#searchIframe', { timeout: 10000 });
-
-      // iframe이 로드될 때까지 대기
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // iframe을 찾을 때까지 재시도
-      let searchFrame: any = null;
-      let retries = 0;
-      const maxRetries = 20;
-
-      while (!searchFrame && retries < maxRetries) {
-        const frames = page.frames();
-        searchFrame = frames.find(f => f.name() === 'searchIframe');
-
-        if (!searchFrame) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          retries++;
-        }
-      }
-
-      if (!searchFrame) {
-        // iframe을 이름으로 못 찾으면 URL로 시도
-        const frames = page.frames();
-        searchFrame = frames.find(f => f.url().includes('searchIframe'));
-
-        if (!searchFrame) {
-          console.log('📋 사용 가능한 frames:', frames.map(f => ({ name: f.name(), url: f.url() })));
-          throw new Error('검색 결과 iframe을 찾을 수 없습니다.');
-        }
-      }
-
-      // 리스트 컨테이너 대기
-      await searchFrame.waitForSelector('#_pcmap_list_scroll_container ul', { timeout: 10000 });
+      // 검색 페이지 설정 및 iframe 가져오기
+      const setup = await this.setupSearchFrame(keyword, headless);
+      browser = setup.browser;
+      const searchFrame = setup.searchFrame;
 
       // 스크롤을 통한 추가 결과 로드
       if (enableScroll) {
@@ -215,7 +231,6 @@ class NaverPlaceSearchService {
             // 카테고리
             const categoryEl = li.querySelector('.KCMnt');
             placeData.category = categoryEl ? categoryEl.textContent?.trim() : '';
-
             // 광고 여부
             placeData.isAd = !!li.querySelector('.gU6bV._DHlh');
 
@@ -301,16 +316,17 @@ class NaverPlaceSearchService {
    * CHC5F 영역을 클릭하여 URL 변경을 감지하고 Place ID를 추출
    * @param keyword 검색 키워드
    * @param restaurantNames 추출할 레스토랑 이름 배열
-   * @param options 검색 옵션
+   * @param options 검색 옵션 (maxResults는 searchPlaces와 동일하게 설정해야 함)
    */
   async extractPlaceIds(
     keyword: string,
     restaurantNames: string[],
     options: {
+      maxResults?: number;
       headless?: boolean;
     } = {}
   ): Promise<Array<{ name: string; placeId: string | null; url: string | null }>> {
-    const { headless = true } = options;
+    const { maxResults = 1000, headless = true } = options;
 
     let browser: Browser | null = null;
 
@@ -318,47 +334,15 @@ class NaverPlaceSearchService {
       const startTime = Date.now();
       console.log(`🔍 Place ID 추출 시작: ${restaurantNames.length}개 레스토랑`);
 
-      browser = await this.launchBrowser(headless);
-      const page = await browser.newPage();
+      // 검색 페이지 설정 및 iframe 가져오기
+      const setup = await this.setupSearchFrame(keyword, headless);
+      browser = setup.browser;
+      const page = setup.page;
+      const searchFrame = setup.searchFrame;
 
-      // 네이버 플레이스 검색 URL로 이동
-      const searchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(keyword)}`;
-      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      // iframe 대기 및 찾기
-      await page.waitForSelector('iframe#searchIframe', { timeout: 10000 });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // iframe 찾기
-      let searchFrame: any = null;
-      let retries = 0;
-      const maxRetries = 20;
-
-      while (!searchFrame && retries < maxRetries) {
-        const frames = page.frames();
-        searchFrame = frames.find(f => f.name() === 'searchIframe');
-
-        if (!searchFrame) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          retries++;
-        }
-      }
-
-      if (!searchFrame) {
-        const frames = page.frames();
-        searchFrame = frames.find(f => f.url().includes('searchIframe'));
-
-        if (!searchFrame) {
-          throw new Error('검색 결과 iframe을 찾을 수 없습니다.');
-        }
-      }
-
-      // 리스트 컨테이너 대기
-      await searchFrame.waitForSelector('#_pcmap_list_scroll_container ul', { timeout: 10000 });
-
-      // 자동 스크롤로 모든 레스토랑 항목 로드
-      console.log(`📜 검색 결과 자동 스크롤 시작`);
-      await this.autoScroll(searchFrame);
+      // 자동 스크롤로 모든 레스토랑 항목 로드 (searchPlaces와 동일한 maxResults 사용)
+      console.log(`📜 검색 결과 자동 스크롤 시작 (최대 ${maxResults}개 로드)...`);
+      await this.autoScroll(searchFrame, maxResults);
       console.log(`✓ 자동 스크롤 완료`);
 
       // iframe에 포커스 주기 (첫 클릭 성공률 향상)

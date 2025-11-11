@@ -18,10 +18,10 @@ interface RestaurantSearchProps {
 const SearchMainPage: React.FC = () => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
-  const { 
-    searchResult, 
-    isLoading, 
-    error, 
+  const {
+    searchResult,
+    isLoading,
+    error,
     selectedRestaurantNames,
     extractedPlaceIds,
     isExtracting,
@@ -38,7 +38,6 @@ const SearchMainPage: React.FC = () => {
   const handleSearch = async (query: string) => {
     await searchRestaurants({
       keyword: query,
-      maxResults: 50,
       enableScroll: true,
       headless: true
     })
@@ -55,7 +54,7 @@ const SearchMainPage: React.FC = () => {
   return (
     <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
       <SearchForm onSearch={handleSearch} />
-      
+
       {/* 선택된 레스토랑 표시 영역 */}
       {selectedRestaurantNames.length > 0 && (
         <View style={[styles.selectedPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -64,19 +63,19 @@ const SearchMainPage: React.FC = () => {
               선택된 맛집 ({selectedRestaurantNames.length}개)
             </Text>
             <View style={styles.selectedActions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
                 onPress={selectAll}
               >
                 <Text style={styles.actionButtonText}>전체 선택</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.error }]}
                 onPress={clearSelection}
               >
                 <Text style={styles.actionButtonText}>선택 해제</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.success }]}
                 onPress={handleExtractPlaceIds}
                 disabled={isExtracting}
@@ -87,22 +86,22 @@ const SearchMainPage: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-          
-          <ScrollView 
-            horizontal 
+
+          <ScrollView
+            horizontal
             style={styles.selectedScroll}
             showsHorizontalScrollIndicator={false}
           >
             <View style={styles.selectedIdContainer}>
               {selectedRestaurantNames.map((name) => (
-                <View 
-                  key={name} 
+                <View
+                  key={name}
                   style={[styles.selectedIdChip, { backgroundColor: colors.secondary + '20', borderColor: colors.secondary }]}
                 >
                   <Text style={[styles.selectedIdText, { color: colors.secondary }]}>
                     {name}
                   </Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => toggleRestaurantSelection(name)}
                     style={styles.removeButton}
                   >
@@ -112,7 +111,7 @@ const SearchMainPage: React.FC = () => {
               ))}
             </View>
           </ScrollView>
-          
+
           {/* 추출된 Place IDs 표시 */}
           {extractedPlaceIds.length > 0 && (
             <View style={styles.extractedSection}>
@@ -120,12 +119,12 @@ const SearchMainPage: React.FC = () => {
                 <Text style={[styles.extractedTitle, { color: colors.text }]}>
                   추출된 Place IDs ({extractedPlaceIds.filter(r => r.placeId).length}/{extractedPlaceIds.length}개 성공)
                 </Text>
-                
+
                 {/* 대기열 추가 버튼 */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.queueButton, 
-                    { 
+                    styles.queueButton,
+                    {
                       backgroundColor: isAddingToQueue ? colors.textSecondary : colors.primary,
                       opacity: isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0 ? 0.6 : 1,
                     }
@@ -154,8 +153,8 @@ const SearchMainPage: React.FC = () => {
                       </Text>
                       <ScrollView style={styles.queueErrorScrollView}>
                         {queueResults.errors.map((err, idx) => (
-                          <Text 
-                            key={idx} 
+                          <Text
+                            key={idx}
                             style={[styles.queueErrorText, { color: colors.textSecondary }]}
                           >
                             • {err.name}: {err.error}
@@ -172,11 +171,11 @@ const SearchMainPage: React.FC = () => {
 
               <ScrollView style={styles.extractedScrollView}>
                 {extractedPlaceIds.map((result, index) => (
-                  <View 
-                    key={index} 
+                  <View
+                    key={index}
                     style={[
-                      styles.extractedItem, 
-                      { 
+                      styles.extractedItem,
+                      {
                         backgroundColor: result.placeId ? colors.success + '10' : colors.error + '10',
                         borderColor: result.placeId ? colors.success : colors.error
                       }
@@ -186,7 +185,7 @@ const SearchMainPage: React.FC = () => {
                       {result.name}
                     </Text>
                     {result.placeId ? (
-                      <Text 
+                      <Text
                         style={[styles.extractedPlaceId, { color: colors.success }]}
                         selectable
                       >
@@ -200,13 +199,13 @@ const SearchMainPage: React.FC = () => {
                   </View>
                 ))}
               </ScrollView>
-              
+
               {/* 복사용 텍스트 */}
               <View style={styles.copySection}>
                 <Text style={[styles.copyLabel, { color: colors.textSecondary }]}>
                   Place IDs (복사용):
                 </Text>
-                <Text 
+                <Text
                   style={[styles.copyText, { color: colors.text, backgroundColor: colors.background }]}
                   selectable
                 >
@@ -220,7 +219,7 @@ const SearchMainPage: React.FC = () => {
           )}
         </View>
       )}
-      
+
       <SearchResultList
         results={searchResult?.places || []}
         isLoading={isLoading}
@@ -251,7 +250,7 @@ const RestaurantSearch: React.FC<RestaurantSearchProps> = ({ onLogout }) => {
         onClose={() => setDrawerVisible(false)}
         onLogout={handleLogout}
       />
-      
+
       <Routes>
         <Route path="/" element={<SearchMainPage />} />
         <Route path="/:id" element={<SearchResultDetail />} />
