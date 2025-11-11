@@ -356,6 +356,25 @@ class NaverPlaceSearchService {
       // 리스트 컨테이너 대기
       await searchFrame.waitForSelector('#_pcmap_list_scroll_container ul', { timeout: 10000 });
 
+      // 자동 스크롤로 모든 레스토랑 항목 로드
+      console.log(`📜 검색 결과 자동 스크롤 시작`);
+      await this.autoScroll(searchFrame);
+      console.log(`✓ 자동 스크롤 완료`);
+
+      // iframe에 포커스 주기 (첫 클릭 성공률 향상)
+      console.log(`🎯 iframe에 포커스 설정 중...`);
+      await searchFrame.evaluate(() => {
+        // iframe 내부에서 body에 포커스
+        document.body.focus();
+        // 리스트 컨테이너에도 클릭 이벤트 트리거 (활성화)
+        const container = document.querySelector('#_pcmap_list_scroll_container');
+        if (container) {
+          (container as HTMLElement).click();
+        }
+      });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log(`✓ iframe 포커스 설정 완료`);
+
       const results: Array<{ name: string; placeId: string | null; url: string | null }> = [];
 
       // 각 레스토랑에 대해 Place ID 추출
@@ -364,30 +383,116 @@ class NaverPlaceSearchService {
 
         try {
           // a.place_bluelink selector 찾기
-          const selector = await searchFrame.evaluate((name: string) => {
-            const liElements = document.querySelectorAll('#_pcmap_list_scroll_container ul > li');
+          const result = await searchFrame.evaluate((name: string) => {
+            const ulElement = document.querySelector('#_pcmap_list_scroll_container ul');
+            if (!ulElement) {
+              return { selector: null, foundItems: [], matchIndex: -1, totalItems: 0 };
+            }
+
+            // ul의 직접 자식 li만 가져오기 (중첩된 li 제외)
+            const liElements = Array.from(ulElement.children).filter(child => child.tagName === 'LI');
+            const foundItems: string[] = [];
 
             for (let i = 0; i < liElements.length; i++) {
               const li = liElements[i];
               const nameEl = li.querySelector('.TYaxT');
               const itemName = nameEl ? nameEl.textContent?.trim() : '';
+              foundItems.push(itemName || '(empty)');
 
               if (itemName === name) {
-                return `#_pcmap_list_scroll_container ul > li:nth-child(${i + 1}) .CHC5F a.place_bluelink`;
+                return {
+                  selector: `#_pcmap_list_scroll_container ul > li:nth-child(${i + 1}) .CHC5F a.place_bluelink`,
+                  foundItems,
+                  matchIndex: i,
+                  totalItems: liElements.length
+                };
               }
             }
 
-            return null;
+            return {
+              selector: null,
+              foundItems,
+              matchIndex: -1,
+              totalItems: liElements.length
+            };
           }, restaurantName);
+
+          console.log(`    🔍 검색 결과: ${result.totalItems}개 항목 중 ${result.matchIndex >= 0 ? `${result.matchIndex + 1}번째` : '매칭 없음'}`);
+          console.log(`    📋 발견된 항목들:`, result.foundItems);
+
+          const selector = result.selector;
 
           if (selector) {
             console.log(`    📍 Selector: ${selector}`);
 
-            // Puppeteer의 frame.click() 사용
-            await searchFrame.click(selector, { delay: 100 });
+            // 요소를 viewport로 스크롤 (매우 중요!)
+            console.log(`    📜 요소를 viewport로 스크롤 중...`);
+            try {
+              await searchFrame.evaluate((sel: string) => {
+                const el = document.querySelector(sel) as HTMLElement;
+                if (el) {
+                  el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                }
+              }, selector);
+              console.log(`    ✓ 스크롤 완료`);
+            } catch (error) {
+              console.log(`    ⚠️  스크롤 실패:`, (error as Error).message);
+            }
 
-            // 클릭 후 URL 변경 대기
-            await new Promise(resolve => setTimeout(resolve, 800));
+            // 다양한 클릭 방법 시도
+            let clickSuccess = false;
+            const clickMethods = [
+              { name: 'frame.click()', fn: async () => await searchFrame.click(selector, { delay: 100 }) },
+              { name: 'element.click()', fn: async () => {
+                const element = await searchFrame.$(selector);
+                if (element) await element.click({ delay: 100 });
+                else throw new Error('Element not found');
+              }},
+              { name: 'evaluate(click)', fn: async () => {
+                await searchFrame.evaluate((sel: string) => {
+                  const el = document.querySelector(sel) as HTMLElement;
+                  if (el) el.click();
+                  else throw new Error('Element not found in DOM');
+                }, selector);
+              }},
+              { name: 'dispatchEvent', fn: async () => {
+                await searchFrame.evaluate((sel: string) => {
+                  const el = document.querySelector(sel) as HTMLElement;
+                  if (el) {
+                    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                  } else {
+                    throw new Error('Element not found in DOM');
+                  }
+                }, selector);
+              }}
+            ];
+
+            for (const method of clickMethods) {
+              try {
+                console.log(`    🖱️  시도: ${method.name}`);
+                await method.fn();
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // URL 변경 확인
+                const currentUrl = page.url();
+                if (currentUrl.includes('/place/')) {
+                  console.log(`    ✓ 클릭 성공: ${method.name}`);
+                  clickSuccess = true;
+                  break;
+                }
+              } catch (error) {
+                console.log(`    ✗ ${method.name} 실패:`, (error as Error).message);
+              }
+            }
+
+            if (!clickSuccess) {
+              console.log(`    ✗ 모든 클릭 방법 실패`);
+            }
+
+            // 추가 URL 변경 대기
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             // URL에서 Place ID 추출
             const currentUrl = page.url();
