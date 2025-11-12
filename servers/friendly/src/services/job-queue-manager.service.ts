@@ -231,10 +231,10 @@ class JobQueueManager {
         return await this.processReviewCrawl(restaurantId, metadata.placeId, metadata.url);
 
       case 'review_summary':
-        throw new Error('review_summary not yet implemented in queue');
+        return await this.processReviewSummary(restaurantId, metadata);
 
       case 'restaurant_crawl':
-        throw new Error('restaurant_crawl not yet implemented in queue');
+        return await this.processRestaurantCrawl(restaurantId, metadata);
 
       default:
         throw new Error(`Unknown job type: ${type}`);
@@ -281,6 +281,107 @@ class JobQueueManager {
     });
 
     console.log(`[JobQueueManager] Review crawl job completed: ${jobId}`);
+
+    return jobId;
+  }
+
+  /**
+   * 통합 레스토랑 크롤링 처리 (메뉴 + 리뷰 + 요약)
+   */
+  private async processRestaurantCrawl(
+    restaurantId: number,
+    metadata: Record<string, any>
+  ): Promise<string> {
+    const jobService = await import('./job-socket.service');
+    const crawlerExecutor = await import('./crawler-executor.service');
+
+    const {
+      placeId,
+      url,
+      crawlMenus = true,
+      crawlReviews = true,
+      createSummary = false,
+      resetSummary = false
+    } = metadata;
+
+    // Job 시작
+    const jobId = await jobService.default.start({
+      restaurantId,
+      metadata: {
+        step: 'queue_processing',
+        placeId,
+        url,
+        crawlMenus,
+        crawlReviews,
+        createSummary,
+      },
+    });
+
+    console.log(`[JobQueueManager] Restaurant crawl job started: ${jobId}`);
+
+    // 공통 크롤링 워크플로우 실행
+    await crawlerExecutor.default.executeCrawlWorkflow({
+      restaurantId,
+      placeId,
+      standardUrl: url,
+      crawlMenus,
+      crawlReviews,
+      createSummary,
+      resetSummary,
+      jobId
+    });
+
+    // Job 완료
+    await jobService.default.complete(jobId, {
+      step: 'completed',
+      crawlMenus,
+      crawlReviews,
+      createSummary,
+      completedAt: Date.now(),
+    });
+
+    console.log(`[JobQueueManager] Restaurant crawl job completed: ${jobId}`);
+
+    return jobId;
+  }
+
+  /**
+   * 리뷰 요약 생성 처리
+   */
+  private async processReviewSummary(
+    restaurantId: number,
+    metadata: Record<string, any>
+  ): Promise<string> {
+    const jobService = await import('./job-socket.service');
+    const crawlerExecutor = await import('./crawler-executor.service');
+
+    const { resetSummary = false } = metadata;
+
+    // Job 시작
+    const jobId = await jobService.default.start({
+      restaurantId,
+      metadata: {
+        step: 'queue_processing',
+        resetSummary,
+      },
+    });
+
+    console.log(`[JobQueueManager] Review summary job started: ${jobId}`);
+
+    // 리뷰 요약 실행
+    await crawlerExecutor.default.executeReviewSummary(
+      restaurantId,
+      resetSummary,
+      jobId
+    );
+
+    // Job 완료
+    await jobService.default.complete(jobId, {
+      step: 'completed',
+      completedAt: Date.now(),
+    });
+
+    console.log(`[JobQueueManager] Review summary job completed: ${jobId}`);
 
     return jobId;
   }
