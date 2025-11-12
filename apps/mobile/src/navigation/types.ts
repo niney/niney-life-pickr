@@ -4,11 +4,13 @@
  */
 
 import type { RestaurantData } from 'shared/services';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type RootTabParamList = {
   Home: undefined;
-  Restaurant: undefined; // Stack Navigator로 변경
+  Restaurant: NavigatorScreenParams<RestaurantStackParamList>; // Stack Navigator 파라미터 지원
   RestaurantSearch: undefined;
+  JobMonitor: undefined;
   Settings: undefined;
 };
 

@@ -5,10 +5,11 @@ import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
-import { HomeIcon, RestaurantIcon, SearchIcon, SettingsIcon } from '../components/TabBarIcons';
+import { HomeIcon, RestaurantIcon, SearchIcon, JobMonitorIcon, SettingsIcon } from '../components/TabBarIcons';
 import HomeScreen from '../screens/HomeScreen';
 import RestaurantStackNavigator from './RestaurantStackNavigator';
 import RestaurantSearchScreen from '../screens/RestaurantSearchScreen';
+import JobMonitorScreen from '../screens/JobMonitorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import type { RootTabParamList } from './types';
 
@@ -35,6 +36,10 @@ const renderRestaurantIcon = (props: { color: string; size: number }) => (
 
 const renderSearchIcon = (props: { color: string; size: number }) => (
   <SearchIcon size={props.size} color={props.color} />
+);
+
+const renderJobMonitorIcon = (props: { color: string; size: number }) => (
+  <JobMonitorIcon size={props.size} color={props.color} />
 );
 
 const renderSettingsIcon = (props: { color: string; size: number }) => (
@@ -107,6 +112,15 @@ const BottomTabNavigator: React.FC = () => {
           title: '맛집 검색',
           headerShown: false,
           tabBarIcon: renderSearchIcon,
+        }}
+      />
+      <Tab.Screen
+        name="JobMonitor"
+        component={JobMonitorScreen}
+        options={{
+          title: 'Job 관리',
+          headerShown: false,
+          tabBarIcon: renderJobMonitorIcon,
         }}
       />
       <Tab.Screen

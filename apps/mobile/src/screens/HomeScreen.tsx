@@ -58,17 +58,11 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleRestaurantPress = (restaurantId: number) => {
-    // 1. Restaurant 탭으로 먼저 전환 (RestaurantList 활성화)
-    navigation.navigate('Restaurant');
-
-    // 2. 즉시 RestaurantDetail로 navigate
-    // setTimeout을 사용하여 탭 전환이 완료된 후 실행
-    setTimeout(() => {
-      (navigation as any).navigate('Restaurant', {
-        screen: 'RestaurantDetail',
-        params: { restaurantId },
-      });
-    }, 0);
+    // Restaurant Stack의 RestaurantDetail로 직접 네비게이션
+    navigation.navigate('Restaurant', {
+      screen: 'RestaurantDetail',
+      params: { restaurantId },
+    });
   };
 
   const onRefresh = useCallback(async () => {
