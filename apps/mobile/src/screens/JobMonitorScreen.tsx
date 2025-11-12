@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
 import { useNavigation } from '@react-navigation/native';
@@ -113,6 +113,7 @@ const JobMonitorScreen: React.FC = () => {
   // Job State
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [subscribedRooms, setSubscribedRooms] = useState<Set<number>>(new Set());
@@ -184,6 +185,32 @@ const JobMonitorScreen: React.FC = () => {
   const resetSequence = useCallback((jobId: string) => {
     lastSequenceRef.current.delete(jobId);
   }, []);
+
+  /**
+   * Pull-to-Refresh 핸들러
+   * Socket으로 최신 Job 및 Queue 상태를 다시 가져옴
+   */
+  const onRefresh = useCallback(async () => {
+    if (!socket || !socketConnected) return;
+
+    setRefreshing(true);
+
+    try {
+      // Job 리스트 다시 조회
+      socket.emit('subscribe:all_jobs');
+
+      // Queue 리스트 다시 조회
+      socket.emit('subscribe:queue');
+
+      // 1초 후 refreshing 종료 (Socket 이벤트 수신 대기)
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 1000);
+    } catch (error) {
+      console.error('[JobMonitor] Refresh failed:', error);
+      setRefreshing(false);
+    }
+  }, [socket, socketConnected]);
 
   /**
    * 진행률 이벤트로 Job 생성
@@ -672,7 +699,17 @@ const JobMonitorScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <View style={styles.content}>
         {/* 연결 상태 */}
         <View style={styles.statusCardContainer}>
