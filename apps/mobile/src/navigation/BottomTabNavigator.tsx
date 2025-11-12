@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import { HomeIcon, RestaurantIcon, SettingsIcon } from '../components/TabBarIcons';
@@ -15,6 +16,10 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 const BottomTabNavigator: React.FC = () => {
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
+  const insets = useSafeAreaInsets();
+
+  const tabBarHeight = Platform.OS === 'ios' ? 50 : 52;
+  const totalHeight = tabBarHeight + insets.bottom;
 
   return (
     <Tab.Navigator
@@ -36,7 +41,8 @@ const BottomTabNavigator: React.FC = () => {
           elevation: 0,
           backgroundColor: 'transparent',
           borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 88 : 68,
+          height: totalHeight,
+          paddingBottom: insets.bottom,
         },
         tabBarBackground: () => (
           <BlurView
@@ -48,13 +54,9 @@ const BottomTabNavigator: React.FC = () => {
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-          marginBottom: Platform.OS === 'ios' ? 0 : 8,
-        },
+        tabBarShowLabel: false,
         tabBarIconStyle: {
-          marginTop: Platform.OS === 'ios' ? 0 : 8,
+          marginTop: 0,
         },
       }}
     >
