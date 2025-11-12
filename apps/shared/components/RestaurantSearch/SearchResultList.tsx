@@ -76,7 +76,10 @@ const SearchResultList: React.FC<SearchResultListProps> = ({
 
     return (
       <TouchableOpacity
-        style={[styles.item, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.item,
+          theme === 'dark' ? styles.itemDark : styles.itemLight
+        ]}
         onPress={() => onItemPress?.(item.placeId)}
       >
         {/* 체크박스 영역 */}
@@ -214,14 +217,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   listContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
   },
   item: {
     flexDirection: 'row',
     padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
+    borderBottomWidth: 1,
+  },
+  itemLight: {
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'transparent',
+  },
+  itemDark: {
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'transparent',
   },
   checkboxContainer: {
     paddingRight: 12,

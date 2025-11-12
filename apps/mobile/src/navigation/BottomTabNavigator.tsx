@@ -102,9 +102,10 @@ const BottomTabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="RestaurantSearch"
-        component={RestaurantSearchScreen}
+        component={RestaurantSearchScreen }
         options={{
           title: '맛집 검색',
+          headerShown: false,
           tabBarIcon: renderSearchIcon,
         }}
       />

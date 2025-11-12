@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
 import { useRestaurantSearch } from 'shared/hooks';
@@ -42,7 +43,7 @@ const RestaurantSearchScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <SearchForm onSearch={handleSearch} />
 
       {/* 선택된 레스토랑 표시 영역 */}
@@ -201,7 +202,7 @@ const RestaurantSearchScreen: React.FC = () => {
         selectedRestaurantNames={selectedRestaurantNames}
         onToggleSelection={toggleRestaurantSelection}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
