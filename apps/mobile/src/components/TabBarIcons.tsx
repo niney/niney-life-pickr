@@ -58,7 +58,7 @@ export const SettingsIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeLinejoin="round"
     />
     <Path
-      d="M12 3v2M12 19v2M4.2 12H3M21 12h-1.2M6 6l1.4 1.4M16.6 16.6L18 18M6 18l1.4-1.4M16.6 7.4L18 6"
+      d="M10.5 3h3l.5 2.5 2 1 2.5-.5 1.5 2.5-1.5 2 0 2.5 1.5 2-1.5 2.5-2.5-.5-2 1-.5 2.5h-3l-.5-2.5-2-1-2.5.5L4 15.5l1.5-2 0-2.5L4 8.5 5.5 6l2.5.5 2-1L10.5 3z"
       stroke={color}
       strokeWidth={2}
       strokeLinecap="round"
