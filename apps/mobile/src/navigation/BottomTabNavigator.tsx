@@ -93,6 +93,7 @@ const BottomTabNavigator: React.FC = () => {
         component={HomeScreen}
         options={{
           title: '홈',
+          headerShown: false,
           tabBarIcon: renderHomeIcon,
         }}
       />
