@@ -1,23 +1,13 @@
-import React, { useState } from 'react'
-import {Routes, Route, useNavigate} from 'react-router-dom'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
-import { useTheme } from '@shared/contexts'
-import { THEME_COLORS } from '@shared/constants'
-import { useRestaurantSearch } from '@shared/hooks'
-import { SearchForm, SearchResultList } from '@shared/components'
-import Header from './Header'
-import Drawer from './Drawer'
-import SearchResultDetail from './RestaurantSearch/SearchResultDetail'
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useTheme } from 'shared/contexts';
+import { THEME_COLORS } from 'shared/constants';
+import { useRestaurantSearch } from 'shared/hooks';
+import { SearchForm, SearchResultList } from 'shared/components';
 
-interface RestaurantSearchProps {
-  onLogout: () => Promise<void>
-}
-
-// 검색 메인 페이지 컴포넌트
-const SearchMainPage: React.FC = () => {
-  const { theme } = useTheme()
-  const colors = THEME_COLORS[theme]
-  const navigate = useNavigate()
+const RestaurantSearchScreen: React.FC = () => {
+  const { theme } = useTheme();
+  const colors = THEME_COLORS[theme];
   const {
     searchResult,
     isLoading,
@@ -33,32 +23,26 @@ const SearchMainPage: React.FC = () => {
     selectAll,
     extractPlaceIds,
     addToQueue,
-  } = useRestaurantSearch()
+  } = useRestaurantSearch();
 
   const handleSearch = async (query: string) => {
     await searchRestaurants({
       keyword: query,
       enableScroll: true,
       headless: true
-    })
-  }
+    });
+  };
 
   const handleExtractPlaceIds = async () => {
-    await extractPlaceIds()
-  }
+    await extractPlaceIds();
+  };
 
   const handleAddToQueue = async () => {
-    await addToQueue()
-  }
-
-  const handleItemPress = (placeId?: string) => {
-    if (placeId) {
-      navigate(`/restaurant-search/${placeId}`)
-    }
-  }
+    await addToQueue();
+  };
 
   return (
-    <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SearchForm onSearch={handleSearch} />
 
       {/* 선택된 레스토랑 표시 영역 */}
@@ -73,13 +57,13 @@ const SearchMainPage: React.FC = () => {
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
                 onPress={selectAll}
               >
-                <Text style={styles.actionButtonText}>전체 선택</Text>
+                <Text style={styles.actionButtonText}>전체</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.error }]}
                 onPress={clearSelection}
               >
-                <Text style={styles.actionButtonText}>선택 해제</Text>
+                <Text style={styles.actionButtonText}>해제</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.success }]}
@@ -87,7 +71,7 @@ const SearchMainPage: React.FC = () => {
                 disabled={isExtracting}
               >
                 <Text style={styles.actionButtonText}>
-                  {isExtracting ? 'ID 추출 중...' : 'Place ID 추출'}
+                  {isExtracting ? '추출중...' : 'ID추출'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -104,7 +88,7 @@ const SearchMainPage: React.FC = () => {
                   key={name}
                   style={[styles.selectedIdChip, { backgroundColor: colors.secondary + '20', borderColor: colors.secondary }]}
                 >
-                  <Text style={[styles.selectedIdText, { color: colors.secondary }]}>
+                  <Text style={[styles.selectedIdText, { color: colors.secondary }]} numberOfLines={1}>
                     {name}
                   </Text>
                   <TouchableOpacity
@@ -123,7 +107,7 @@ const SearchMainPage: React.FC = () => {
             <View style={styles.extractedSection}>
               <View style={styles.extractedHeader}>
                 <Text style={[styles.extractedTitle, { color: colors.text }]}>
-                  추출된 Place IDs ({extractedPlaceIds.filter(r => r.placeId).length}/{extractedPlaceIds.length}개 성공)
+                  Place IDs ({extractedPlaceIds.filter(r => r.placeId).length}/{extractedPlaceIds.length})
                 </Text>
 
                 {/* 대기열 추가 버튼 */}
@@ -139,7 +123,7 @@ const SearchMainPage: React.FC = () => {
                   disabled={isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0}
                 >
                   <Text style={styles.queueButtonText}>
-                    {isAddingToQueue ? '대기열 추가 중...' : '대기열에 추가 🔄'}
+                    {isAddingToQueue ? '추가중...' : '대기열 🔄'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -149,7 +133,7 @@ const SearchMainPage: React.FC = () => {
                 <View style={[styles.queueResultPanel, { backgroundColor: colors.background }]}>
                   {queueResults.success.length > 0 && (
                     <Text style={[styles.queueResultText, { color: colors.success }]}>
-                      ✅ {queueResults.success.length}개 대기열 추가 성공
+                      ✅ {queueResults.success.length}개 성공
                     </Text>
                   )}
                   {queueResults.failed.length > 0 && (
@@ -170,7 +154,7 @@ const SearchMainPage: React.FC = () => {
                     </View>
                   )}
                   <Text style={[styles.queueHintText, { color: colors.textSecondary }]}>
-                    💡 Job Monitor에서 진행 상황을 확인하세요
+                    💡 맛집 탭에서 진행 상황 확인
                   </Text>
                 </View>
               )}
@@ -187,7 +171,7 @@ const SearchMainPage: React.FC = () => {
                       }
                     ]}
                   >
-                    <Text style={[styles.extractedName, { color: colors.text }]}>
+                    <Text style={[styles.extractedName, { color: colors.text }]} numberOfLines={1}>
                       {result.name}
                     </Text>
                     {result.placeId ? (
@@ -205,22 +189,6 @@ const SearchMainPage: React.FC = () => {
                   </View>
                 ))}
               </ScrollView>
-
-              {/* 복사용 텍스트 */}
-              <View style={styles.copySection}>
-                <Text style={[styles.copyLabel, { color: colors.textSecondary }]}>
-                  Place IDs (복사용):
-                </Text>
-                <Text
-                  style={[styles.copyText, { color: colors.text, backgroundColor: colors.background }]}
-                  selectable
-                >
-                  {extractedPlaceIds
-                    .filter(r => r.placeId)
-                    .map(r => r.placeId)
-                    .join(', ')}
-                </Text>
-              </View>
             </View>
           )}
         </View>
@@ -232,46 +200,18 @@ const SearchMainPage: React.FC = () => {
         error={error}
         selectedRestaurantNames={selectedRestaurantNames}
         onToggleSelection={toggleRestaurantSelection}
-        onItemPress={handleItemPress}
       />
     </View>
-  )
-}
-
-const RestaurantSearch: React.FC<RestaurantSearchProps> = ({ onLogout }) => {
-  const { theme } = useTheme()
-  const [drawerVisible, setDrawerVisible] = useState(false)
-
-  const colors = THEME_COLORS[theme]
-
-  const handleLogout = async () => {
-    await onLogout()
-    window.location.href = '/login'
-  }
-
-  return (
-    <div className="page-container" style={{ backgroundColor: colors.background }}>
-      <Header onMenuPress={() => setDrawerVisible(true)} />
-      <Drawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        onLogout={handleLogout}
-      />
-
-      <Routes>
-        <Route path="/" element={<SearchMainPage />} />
-        <Route path="/:id" element={<SearchResultDetail />} />
-      </Routes>
-    </div>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
-  searchContainer: {
+  container: {
     flex: 1,
   },
   selectedPanel: {
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
@@ -283,21 +223,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   selectedTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   selectedActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   actionButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   selectedScroll: {
@@ -311,16 +251,16 @@ const styles = StyleSheet.create({
   selectedIdChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
     gap: 6,
+    maxWidth: 150,
   },
   selectedIdText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
-    fontFamily: 'monospace',
   },
   removeButton: {
     width: 18,
@@ -329,29 +269,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   removeButtonText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     lineHeight: 18,
-  },
-  copySection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  copyLabel: {
-    fontSize: 12,
-    marginBottom: 6,
-    fontWeight: '500',
-  },
-  copyScrollView: {
-    maxHeight: 60,
-  },
-  copyText: {
-    fontSize: 11,
-    fontFamily: 'monospace',
-    padding: 8,
-    borderRadius: 6,
   },
   extractedSection: {
     marginTop: 16,
@@ -366,19 +286,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   extractedTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
   queueButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
-    marginLeft: 12,
+    marginLeft: 8,
   },
   queueButtonText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
   },
   queueResultPanel: {
@@ -387,46 +307,46 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   queueResultText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
     marginBottom: 4,
   },
   queueErrorScrollView: {
-    maxHeight: 100,
+    maxHeight: 80,
     marginTop: 4,
   },
   queueErrorText: {
-    fontSize: 11,
+    fontSize: 10,
     marginLeft: 8,
     marginTop: 2,
   },
   queueHintText: {
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 8,
     fontStyle: 'italic',
   },
   extractedScrollView: {
-    maxHeight: 200,
+    maxHeight: 150,
   },
   extractedItem: {
-    padding: 12,
+    padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   extractedName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     marginBottom: 4,
   },
   extractedPlaceId: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'monospace',
   },
   extractedError: {
-    fontSize: 12,
+    fontSize: 11,
     fontStyle: 'italic',
   },
-})
+});
 
-export default RestaurantSearch
+export default RestaurantSearchScreen;

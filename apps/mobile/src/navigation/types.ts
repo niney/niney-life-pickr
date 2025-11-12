@@ -8,6 +8,7 @@ import type { RestaurantData } from 'shared/services';
 export type RootTabParamList = {
   Home: undefined;
   Restaurant: undefined; // Stack Navigator로 변경
+  RestaurantSearch: undefined;
   Settings: undefined;
 };
 

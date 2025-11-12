@@ -48,6 +48,18 @@ export const RestaurantIcon: React.FC<IconProps> = ({ size, color }) => (
   </Svg>
 );
 
+export const SearchIcon: React.FC<IconProps> = ({ size, color }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export const SettingsIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
@@ -58,7 +70,7 @@ export const SettingsIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeLinejoin="round"
     />
     <Path
-      d="M10.5 3h3l.5 2.5 2 1 2.5-.5 1.5 2.5-1.5 2 0 2.5 1.5 2-1.5 2.5-2.5-.5-2 1-.5 2.5h-3l-.5-2.5-2-1-2.5.5L4 15.5l1.5-2 0-2.5L4 8.5 5.5 6l2.5.5 2-1L10.5 3z"
+      d="M12 3v2M12 19v2M4.2 12H3M21 12h-1.2M6 6l1.4 1.4M16.6 16.6L18 18M6 18l1.4-1.4M16.6 7.4L18 6"
       stroke={color}
       strokeWidth={2}
       strokeLinecap="round"

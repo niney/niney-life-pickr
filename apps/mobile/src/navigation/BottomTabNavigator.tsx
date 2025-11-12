@@ -5,13 +5,41 @@ import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS } from 'shared/constants';
-import { HomeIcon, RestaurantIcon, SettingsIcon } from '../components/TabBarIcons';
+import { HomeIcon, RestaurantIcon, SearchIcon, SettingsIcon } from '../components/TabBarIcons';
 import HomeScreen from '../screens/HomeScreen';
 import RestaurantStackNavigator from './RestaurantStackNavigator';
+import RestaurantSearchScreen from '../screens/RestaurantSearchScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+
+// Tab bar background component
+const TabBarBackground: React.FC<{ theme: 'light' | 'dark' }> = ({ theme }) => (
+  <BlurView
+    style={styles.blurView}
+    blurType={theme === 'dark' ? 'dark' : 'light'}
+    blurAmount={10}
+    reducedTransparencyFallbackColor={theme === 'dark' ? '#1a1a1a' : '#ffffff'}
+  />
+);
+
+// Tab bar icon components
+const renderHomeIcon = (props: { color: string; size: number }) => (
+  <HomeIcon size={props.size} color={props.color} />
+);
+
+const renderRestaurantIcon = (props: { color: string; size: number }) => (
+  <RestaurantIcon size={props.size} color={props.color} />
+);
+
+const renderSearchIcon = (props: { color: string; size: number }) => (
+  <SearchIcon size={props.size} color={props.color} />
+);
+
+const renderSettingsIcon = (props: { color: string; size: number }) => (
+  <SettingsIcon size={props.size} color={props.color} />
+);
 
 const BottomTabNavigator: React.FC = () => {
   const { theme } = useTheme();
@@ -20,6 +48,8 @@ const BottomTabNavigator: React.FC = () => {
 
   const tabBarHeight = Platform.OS === 'ios' ? 50 : 52;
   const totalHeight = tabBarHeight + insets.bottom;
+
+  const tabBarBackground = React.useCallback(() => <TabBarBackground theme={theme} />, [theme]);
 
   return (
     <Tab.Navigator
@@ -44,14 +74,7 @@ const BottomTabNavigator: React.FC = () => {
           height: totalHeight,
           paddingBottom: insets.bottom,
         },
-        tabBarBackground: () => (
-          <BlurView
-            style={styles.blurView}
-            blurType={theme === 'dark' ? 'dark' : 'light'}
-            blurAmount={10}
-            reducedTransparencyFallbackColor={theme === 'dark' ? '#1a1a1a' : '#ffffff'}
-          />
-        ),
+        tabBarBackground,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarShowLabel: false,
@@ -65,9 +88,7 @@ const BottomTabNavigator: React.FC = () => {
         component={HomeScreen}
         options={{
           title: '홈',
-          tabBarIcon: ({ color, size }) => (
-            <HomeIcon size={size} color={color} />
-          ),
+          tabBarIcon: renderHomeIcon,
         }}
       />
       <Tab.Screen
@@ -76,9 +97,15 @@ const BottomTabNavigator: React.FC = () => {
         options={{
           title: '맛집',
           headerShown: false, // Stack Navigator가 자체 헤더를 가짐
-          tabBarIcon: ({ color, size }) => (
-            <RestaurantIcon size={size} color={color} />
-          ),
+          tabBarIcon: renderRestaurantIcon,
+        }}
+      />
+      <Tab.Screen
+        name="RestaurantSearch"
+        component={RestaurantSearchScreen}
+        options={{
+          title: '맛집 검색',
+          tabBarIcon: renderSearchIcon,
         }}
       />
       <Tab.Screen
@@ -86,9 +113,7 @@ const BottomTabNavigator: React.FC = () => {
         component={SettingsScreen}
         options={{
           title: '설정',
-          tabBarIcon: ({ color, size }) => (
-            <SettingsIcon size={size} color={color} />
-          ),
+          tabBarIcon: renderSettingsIcon,
         }}
       />
     </Tab.Navigator>
