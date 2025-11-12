@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { io, Socket } from 'socket.io-client';
 import { useTheme } from '@shared/contexts';
 import { THEME_COLORS } from '@shared/constants';
+import { getDefaultApiUrl } from '@shared/services';
 import Header from './Header';
 import Drawer from './Drawer';
 import { QueueCard } from './QueueCard';
 import type { QueuedJob, QueueStats } from '../types';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || getDefaultApiUrl();
 
 /**
  * Job 데이터 타입
@@ -944,7 +945,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
    * Queue 아이템 취소
    */
   const handleCancelQueue = async (queueId: string) => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+    const API_URL = getDefaultApiUrl();
 
     try {
       const response = await fetch(`${API_URL}/api/crawler/queue/${queueId}/cancel`, {

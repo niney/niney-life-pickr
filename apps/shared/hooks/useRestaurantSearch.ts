@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { apiService, NaverPlaceSearchResult, RestaurantSearchRequest } from '../services';
+import { apiService } from '../services';
+import type { NaverPlaceSearchResult, RestaurantSearchRequest } from '../services';
 
 export interface QueueResult {
   success: string[];
