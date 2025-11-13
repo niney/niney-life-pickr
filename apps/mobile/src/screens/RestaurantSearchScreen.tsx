@@ -115,10 +115,9 @@ const RestaurantSearchScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.queueButton,
-                    {
-                      backgroundColor: isAddingToQueue ? colors.textSecondary : colors.primary,
-                      opacity: isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0 ? 0.6 : 1,
-                    }
+                    isAddingToQueue ? styles.queueButtonDisabled : styles.queueButtonEnabled,
+                    (isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0) && styles.queueButtonOpacity,
+                    { backgroundColor: isAddingToQueue ? colors.textSecondary : colors.primary }
                   ]}
                   onPress={handleAddToQueue}
                   disabled={isAddingToQueue || extractedPlaceIds.filter(r => r.placeId).length === 0}
@@ -130,11 +129,16 @@ const RestaurantSearchScreen: React.FC = () => {
               </View>
 
               {/* Queue 추가 결과 */}
-              {(queueResults.success.length > 0 || queueResults.failed.length > 0) && (
+              {(queueResults.success.length > 0 || queueResults.failed.length > 0 || queueResults.alreadyExists.length > 0) && (
                 <View style={[styles.queueResultPanel, { backgroundColor: colors.background }]}>
                   {queueResults.success.length > 0 && (
                     <Text style={[styles.queueResultText, { color: colors.success }]}>
-                      ✅ {queueResults.success.length}개 성공
+                      ✅ {queueResults.success.length}개 대기열 추가 성공
+                    </Text>
+                  )}
+                  {queueResults.alreadyExists.length > 0 && (
+                    <Text style={[styles.queueResultText, styles.queueResultWarning]}>
+                      ℹ️ {queueResults.alreadyExists.length}개 이미 등록됨 (건너뜀)
                     </Text>
                   )}
                   {queueResults.failed.length > 0 && (
@@ -297,10 +301,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginLeft: 8,
   },
+  queueButtonDisabled: {},
+  queueButtonEnabled: {},
+  queueButtonOpacity: {
+    opacity: 0.6,
+  },
   queueButtonText: {
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
+  },
+  queueResultWarning: {
+    color: '#FFA500',
   },
   queueResultPanel: {
     padding: 12,

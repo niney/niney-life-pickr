@@ -5,6 +5,7 @@ import type { NaverPlaceSearchResult, RestaurantSearchRequest } from '../service
 export interface QueueResult {
   success: string[];
   failed: string[];
+  alreadyExists: string[];
   errors: { placeId: string; name: string; error: string }[];
 }
 
@@ -38,6 +39,7 @@ export const useRestaurantSearch = (): UseRestaurantSearchResult => {
   const [queueResults, setQueueResults] = useState<QueueResult>({
     success: [],
     failed: [],
+    alreadyExists: [],
     errors: [],
   });
 
@@ -152,12 +154,6 @@ export const useRestaurantSearch = (): UseRestaurantSearchResult => {
     setIsAddingToQueue(true);
     setError(null);
 
-    const results: QueueResult = {
-      success: [],
-      failed: [],
-      errors: [],
-    };
-
     try {
       // 성공한 Place ID만 필터링
       const validPlaceIds = extractedPlaceIds.filter(r => r.placeId);
@@ -167,44 +163,51 @@ export const useRestaurantSearch = (): UseRestaurantSearchResult => {
         return;
       }
 
-      console.log(`[RestaurantSearch] ${validPlaceIds.length}개 Place ID를 대기열에 추가 시작...`);
+      console.log(`[RestaurantSearch] ${validPlaceIds.length}개 Place ID를 대기열에 일괄 추가...`);
 
-      // 순차적으로 Queue에 추가 (rate limiting 고려)
-      for (const result of validPlaceIds) {
-        try {
-          const response = await apiService.addToQueue({
-            url: result.url || undefined,
-          });
+      // 🔥 변경: 일괄 추가 API 사용 (1번 호출로 여러 Queue Item 생성)
+      const response = await apiService.bulkAddToQueue({
+        urls: validPlaceIds.map(r => r.placeId!),
+        crawlMenus: true,
+        crawlReviews: true,
+        createSummary: true
+      });
 
-          if (response.result) {
-            results.success.push(result.placeId!);
-            console.log(`✅ Queue 추가 성공: ${result.name} (${result.placeId})`);
-          } else {
-            const errorMessage = response.message || 'Failed to add to queue';
-            results.failed.push(result.placeId!);
-            results.errors.push({
-              placeId: result.placeId!,
-              name: result.name,
-              error: errorMessage,
-            });
-            console.error(`❌ Queue 추가 실패: ${result.name}`, errorMessage);
-          }
+      if (response.result && response.data) {
+        const { queued, skipped, alreadyExists, results } = response.data;
 
-          // Rate limiting: 100ms 대기
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (error: any) {
-          results.failed.push(result.placeId!);
-          results.errors.push({
-            placeId: result.placeId!,
-            name: result.name,
-            error: error.message || 'Unknown error',
-          });
-          console.error(`❌ Queue 추가 실패: ${result.name}`, error);
-        }
+        // 결과 분류
+        const successList = results
+          .filter(r => r.status === 'queued')
+          .map(r => r.url);
+
+        const failedList = results
+          .filter(r => r.status === 'error' || r.status === 'duplicate')
+          .map(r => r.url);
+
+        const alreadyExistsList = results
+          .filter(r => r.status === 'already_exists')
+          .map(r => r.url);
+
+        const errors = results
+          .filter(r => r.error)
+          .map(r => ({
+            placeId: r.url,
+            name: validPlaceIds.find(p => p.placeId === r.url || p.url === r.url)?.name || '',
+            error: r.error!
+          }));
+
+        setQueueResults({
+          success: successList,
+          failed: failedList,
+          alreadyExists: alreadyExistsList,
+          errors
+        });
+
+        console.log(`[RestaurantSearch] 대기열 추가 완료 - 성공: ${queued}, 이미 존재: ${alreadyExists}, 건너뜀: ${skipped}`);
+      } else {
+        setError(response.message || '대기열 추가 실패');
       }
-
-      setQueueResults(results);
-      console.log(`[RestaurantSearch] 대기열 추가 완료 - 성공: ${results.success.length}, 실패: ${results.failed.length}`);
     } catch (err: any) {
       console.error('Queue 추가 중 오류:', err);
       setError(err.message || '대기열 추가 중 오류가 발생했습니다.');

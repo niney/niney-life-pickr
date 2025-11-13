@@ -525,6 +525,193 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * ✅ POST /api/crawler/bulk-queue
+   * 여러 URL을 Queue에 일괄 추가
+   */
+  fastify.post('/bulk-queue', {
+    schema: {
+      tags: ['crawler'],
+      summary: 'Queue 일괄 추가 API',
+      description: '여러 URL을 Queue에 한번에 추가합니다. 각 URL은 별도의 Queue Item으로 생성됩니다. 이미 DB에 저장된 레스토랑은 건너뜁니다.',
+      body: Type.Object({
+        urls: Type.Array(Type.String(), {
+          description: '네이버맵 URL 또는 Place ID 목록',
+          minItems: 1
+        }),
+        crawlMenus: Type.Optional(Type.Boolean({
+          description: '메뉴 크롤링 여부 (기본: true)',
+          default: true
+        })),
+        crawlReviews: Type.Optional(Type.Boolean({
+          description: '리뷰 크롤링 여부 (기본: true)',
+          default: true
+        })),
+        createSummary: Type.Optional(Type.Boolean({
+          description: '리뷰 요약 생성 여부 (기본: true)',
+          default: true
+        })),
+        resetSummary: Type.Optional(Type.Boolean({
+          description: '기존 요약 삭제 후 재생성 여부 (기본: false)',
+          default: false
+        }))
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            total: Type.Number({ description: '전체 URL 개수' }),
+            queued: Type.Number({ description: 'Queue에 추가된 개수' }),
+            skipped: Type.Number({ description: '중복/에러로 건너뛴 개수' }),
+            alreadyExists: Type.Number({ description: 'DB에 이미 존재하는 개수' }),
+            results: Type.Array(Type.Object({
+              url: Type.String(),
+              queueId: Type.Optional(Type.String()),
+              restaurantId: Type.Optional(Type.Number()),
+              position: Type.Optional(Type.Number()),
+              status: Type.String({ description: 'queued | duplicate | already_exists | error' }),
+              error: Type.Optional(Type.String())
+            }))
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    let {
+      urls,
+      crawlMenus = true,
+      crawlReviews = true,
+      createSummary = true,
+      resetSummary = false
+    } = request.body as {
+      urls: string[];
+      crawlMenus?: boolean;
+      crawlReviews?: boolean;
+      createSummary?: boolean;
+      resetSummary?: boolean;
+    };
+
+    // 검증
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return ResponseHelper.validationError(reply, 'URLs array is required and must not be empty');
+    }
+
+    if (!crawlMenus && !crawlReviews && !createSummary) {
+      return ResponseHelper.validationError(
+        reply,
+        'At least one option (crawlMenus, crawlReviews, or createSummary) must be selected'
+      );
+    }
+
+    try {
+      const jobQueueManager = await import('../services/job-queue-manager.service');
+      const restaurantRepository = await import('../db/repositories/restaurant.repository');
+
+      // Place ID 변환
+      urls = urls.map(url => {
+        const trimmed = url.trim();
+        return /^\d+$/.test(trimmed)
+          ? `https://m.place.naver.com/restaurant/${trimmed}/home`
+          : trimmed;
+      });
+
+      const results = [];
+      let queuedCount = 0;
+      let skippedCount = 0;
+      let alreadyExistsCount = 0;
+
+      console.log(`[BulkQueue] ${urls.length}개 URL 일괄 추가 시작`);
+
+      // 각 URL에 대해 Queue Item 생성
+      for (const url of urls) {
+        try {
+          // 1. URL에서 Place ID 추출
+          const placeIdMatch = url.match(/\/restaurant\/(\d+)/);
+          const placeId = placeIdMatch ? placeIdMatch[1] : null;
+
+          // 2. DB에 이미 존재하는지 체크
+          if (placeId) {
+            const existingRestaurant = await restaurantRepository.default.findByPlaceId(placeId);
+            
+            if (existingRestaurant) {
+              results.push({
+                url,
+                restaurantId: existingRestaurant.id,
+                status: 'already_exists'
+              });
+              alreadyExistsCount++;
+              console.log(`⏭️  [BulkQueue] ${url} → DB에 이미 존재 (restaurantId: ${existingRestaurant.id})`);
+              continue;
+            }
+          }
+
+          // 3. 입력 정규화 (DB 저장 포함)
+          const normalized = await crawlerInputHandler.normalizeInput({ url });
+
+          // 4. Queue에 추가
+          const queueId = jobQueueManager.default.enqueue({
+            type: 'restaurant_crawl',
+            restaurantId: normalized.restaurantId,
+            placeId: normalized.placeId || '',
+            url: normalized.standardUrl || '',
+            metadata: { crawlMenus, crawlReviews, createSummary, resetSummary }
+          });
+
+          const stats = jobQueueManager.default.getStats();
+
+          results.push({
+            url,
+            queueId,
+            restaurantId: normalized.restaurantId,
+            position: stats.waiting + stats.processing,
+            status: 'queued'
+          });
+          queuedCount++;
+
+          console.log(`✅ [BulkQueue] ${url} → Queue 추가 성공 (queueId: ${queueId})`);
+
+        } catch (error: any) {
+          const errorMessage = error.message || 'Unknown error';
+
+          results.push({
+            url,
+            status: errorMessage.includes('already queued') ? 'duplicate' : 'error',
+            error: errorMessage
+          });
+          skippedCount++;
+
+          console.log(`⏭️  [BulkQueue] ${url} → ${errorMessage.includes('already queued') ? '중복' : '에러'}`);
+        }
+      }
+
+      console.log(`[BulkQueue] 완료 - 성공: ${queuedCount}, 이미 존재: ${alreadyExistsCount}, 건너뜀: ${skippedCount}`);
+
+      return ResponseHelper.success(reply, {
+        total: urls.length,
+        queued: queuedCount,
+        skipped: skippedCount,
+        alreadyExists: alreadyExistsCount,
+        results
+      }, `${queuedCount}/${urls.length}개 Queue에 추가됨, ${alreadyExistsCount}개 이미 존재`);
+
+    } catch (error: any) {
+      console.error('[BulkQueue] 에러:', error);
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to add jobs to queue',
+        500
+      );
+    }
+  });
+
+  /**
    * ✅ POST /api/crawler/queue/:queueId/cancel
    * Queue 아이템 취소
    */

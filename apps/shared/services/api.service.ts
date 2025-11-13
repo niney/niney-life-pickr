@@ -641,7 +641,7 @@ class ApiService {
   }
 
   /**
-   * Queue에 크롤링 Job 추가
+   * Queue에 크롤링 Job 추가 (단일)
    */
   async addToQueue(params: {
     url?: string;
@@ -658,6 +658,48 @@ class ApiService {
       position: number;
       status: string;
     }>('/api/crawler/crawl-queued', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
+   * Queue에 크롤링 Job 일괄 추가
+   */
+  async bulkAddToQueue(params: {
+    urls: string[];
+    crawlMenus?: boolean;
+    crawlReviews?: boolean;
+    createSummary?: boolean;
+    resetSummary?: boolean;
+  }): Promise<ApiResponse<{
+    total: number;
+    queued: number;
+    skipped: number;
+    alreadyExists: number;
+    results: Array<{
+      url: string;
+      queueId?: string;
+      restaurantId?: number;
+      position?: number;
+      status: 'queued' | 'duplicate' | 'already_exists' | 'error';
+      error?: string;
+    }>;
+  }>> {
+    return this.request<{
+      total: number;
+      queued: number;
+      skipped: number;
+      alreadyExists: number;
+      results: Array<{
+        url: string;
+        queueId?: string;
+        restaurantId?: number;
+        position?: number;
+        status: 'queued' | 'duplicate' | 'already_exists' | 'error';
+        error?: string;
+      }>;
+    }>('/api/crawler/bulk-queue', {
       method: 'POST',
       body: JSON.stringify(params),
     });

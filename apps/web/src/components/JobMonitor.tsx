@@ -165,6 +165,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
   useEffect(() => {
     console.log('[JobMonitor] Socket 연결 시도...');
 
+    // ✅ ref.current를 effect 본문에서 변수로 복사 (cleanup에서 사용)
+    const completionTracker = completionTrackerRef.current;
+
     const newSocket = io(SOCKET_URL, {
       ...SOCKET_CONFIG,
       transports: ['websocket', 'polling'], // readonly를 mutable로 변환
@@ -174,9 +177,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     newSocket.on('connect', () => {
       console.log('[JobMonitor] Socket 연결 성공:', newSocket.id);
       setSocketConnected(true);
-      
+
       // ✅ 연결 시 자동 정리 시작 (5분 주기)
-      completionTrackerRef.current.startAutoCleanup(5);
+      completionTracker.startAutoCleanup(5);
     });
 
     // Socket 연결 끊김
@@ -790,7 +793,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     // Cleanup: 컴포넌트 unmount 시 Socket 연결 해제
     return () => {
       console.log('[JobMonitor] Socket 연결 해제');
-      completionTrackerRef.current.stopAutoCleanup(); // ✅ 자동 정리 중지
+      completionTracker.stopAutoCleanup(); // ✅ 자동 정리 중지
       newSocket.emit('unsubscribe:all_jobs'); // 전체 Job 구독 해제
       newSocket.close();
     };

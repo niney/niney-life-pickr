@@ -144,12 +144,20 @@ const SearchMainPage: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* Queue 추가 결과 */}
-              {(queueResults.success.length > 0 || queueResults.failed.length > 0) && (
-                <View style={[styles.queueResultPanel, { backgroundColor: colors.background }]}>
+              {/* Queue 결과 표시 */}
+              {(queueResults.success.length > 0 || queueResults.failed.length > 0 || queueResults.alreadyExists.length > 0) && (
+                <View style={[styles.queueResultPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.queueResultText, { color: colors.text, fontWeight: 'bold', marginBottom: 8 }]}>
+                    대기열 추가 결과
+                  </Text>
                   {queueResults.success.length > 0 && (
                     <Text style={[styles.queueResultText, { color: colors.success }]}>
                       ✅ {queueResults.success.length}개 대기열 추가 성공
+                    </Text>
+                  )}
+                  {queueResults.alreadyExists.length > 0 && (
+                    <Text style={[styles.queueResultText, { color: '#FFA500' }]}>
+                      ℹ️ {queueResults.alreadyExists.length}개 이미 등록된 레스토랑 (건너뜀)
                     </Text>
                   )}
                   {queueResults.failed.length > 0 && (
@@ -173,9 +181,7 @@ const SearchMainPage: React.FC = () => {
                     💡 Job Monitor에서 진행 상황을 확인하세요
                   </Text>
                 </View>
-              )}
-
-              <ScrollView style={styles.extractedScrollView}>
+              )}              <ScrollView style={styles.extractedScrollView}>
                 {extractedPlaceIds.map((result, index) => (
                   <View
                     key={index}
