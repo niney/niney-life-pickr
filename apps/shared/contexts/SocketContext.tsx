@@ -4,8 +4,11 @@ import {
   Alert,
   type ProgressData,
   type SummaryProgress,
-  type ReviewSummaryStatus
+  type ReviewSummaryStatus,
+  SocketSequenceManager,
+  JobCompletionTracker
 } from '../utils'
+import { SOCKET_CONFIG } from '../constants'
 import { getDefaultApiUrl } from '../services'
 
 interface SocketContextValue {
@@ -61,82 +64,15 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   }>({})
   const currentRestaurantIdRef = useRef<string | null>(null)
 
-  // ✅ Sequence 번호 추적 (순서 보장)
-  const lastCrawlSequenceRef = useRef<number>(0)
-  const lastDbSequenceRef = useRef<number>(0)
-  const lastImageSequenceRef = useRef<number>(0)
-  const lastSummarySequenceRef = useRef<number>(0)
-
-  // ✅ 완료된 Job ID와 타임스탬프 추적 (5분 후 자동 삭제) - 타입별 분리
-  const completedCrawlJobsRef = useRef<Map<string, number>>(new Map())
-  const completedSummaryJobsRef = useRef<Map<string, number>>(new Map())
-  const JOB_RETENTION_MS = 5 * 60 * 1000 // 5분
-
-  // ✅ 현재 작업 Job ID 추적
-  const currentCrawlJobIdRef = useRef<string | null>(null)
-  const currentSummaryJobIdRef = useRef<string | null>(null)
-
-  // ✅ Crawl Job 관리 함수
-  const cleanupCompletedCrawlJobs = () => {
-    const now = Date.now()
-    const jobsToDelete: string[] = []
-
-    completedCrawlJobsRef.current.forEach((timestamp, jobId) => {
-      if (now - timestamp > JOB_RETENTION_MS) {
-        jobsToDelete.push(jobId)
-      }
-    })
-
-    jobsToDelete.forEach(jobId => {
-      completedCrawlJobsRef.current.delete(jobId)
-      console.log(`[Socket.io] Cleaned up old crawl job: ${jobId}`)
-    })
-  }
-
-  const isCrawlJobCompleted = (jobId: string): boolean => {
-    cleanupCompletedCrawlJobs()
-    return completedCrawlJobsRef.current.has(jobId)
-  }
-
-  const markCrawlJobAsCompleted = (jobId: string) => {
-    completedCrawlJobsRef.current.set(jobId, Date.now())
-    console.log(`[Socket.io] Marked crawl job as completed: ${jobId}`)
-  }
-
-  // ✅ Summary Job 관리 함수
-  const cleanupCompletedSummaryJobs = () => {
-    const now = Date.now()
-    const jobsToDelete: string[] = []
-
-    completedSummaryJobsRef.current.forEach((timestamp, jobId) => {
-      if (now - timestamp > JOB_RETENTION_MS) {
-        jobsToDelete.push(jobId)
-      }
-    })
-
-    jobsToDelete.forEach(jobId => {
-      completedSummaryJobsRef.current.delete(jobId)
-      console.log(`[Socket.io] Cleaned up old summary job: ${jobId}`)
-    })
-  }
-
-  const isSummaryJobCompleted = (jobId: string): boolean => {
-    cleanupCompletedSummaryJobs()
-    return completedSummaryJobsRef.current.has(jobId)
-  }
-
-  const markSummaryJobAsCompleted = (jobId: string) => {
-    completedSummaryJobsRef.current.set(jobId, Date.now())
-    console.log(`[Socket.io] Marked summary job as completed: ${jobId}`)
-  }
+  // ✅ 공통 유틸 인스턴스
+  const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager())
+  const completionTrackerRef = useRef<JobCompletionTracker>(new JobCompletionTracker(5))
 
   // Socket.io 연결 초기화 (앱 전체에서 단 한 번)
   useEffect(() => {
     console.log('[Socket.io] Connecting to:', resolvedServerUrl)
 
-    const socket = io(resolvedServerUrl, {
-      transports: ['websocket', 'polling']
-    })
+    const socket = io(resolvedServerUrl, SOCKET_CONFIG as any)
 
     socket.on('connect', () => {
       console.log('[Socket.io] Connected:', socket.id)
@@ -208,22 +144,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       // 리뷰 크롤링: review:crawl_progress, review:db_progress, review:image_progress가 없으면 초기화
       if (!activeEvents.has('review:crawl_progress')) {
         setCrawlProgress(null)
-        lastCrawlSequenceRef.current = 0
       }
       if (!activeEvents.has('review:db_progress')) {
         setDbProgress(null)
-        lastDbSequenceRef.current = 0
       }
       if (!activeEvents.has('review:image_progress')) {
         setImageProgress(null)
-        lastImageSequenceRef.current = 0
       }
 
       // 리뷰 요약: review_summary:progress가 없으면 초기화
       if (!activeEvents.has('review_summary:progress')) {
         setReviewSummaryStatus({ status: 'idle' })
         setSummaryProgress(null)
-        lastSummarySequenceRef.current = 0
       }
 
       console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}], Interrupted: ${data.interruptedCount > 0}`)
@@ -234,28 +166,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] Crawl Progress:', data)
 
       const jobId = data.jobId
-
-      // ✅ jobId가 있으면 완료 체크
-      if (jobId) {
-        if (isCrawlJobCompleted(jobId)) {
-          console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
-          return
-        }
-
-        // 새로운 Job이면 현재 jobId 업데이트
-        if (currentCrawlJobIdRef.current !== jobId) {
-          currentCrawlJobIdRef.current = jobId
-          console.log(`[Socket.io] New crawl job started: ${jobId}`)
-        }
-      }
-
-      // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
       const sequence = data.sequence || data.current || 0
-      if (sequence < lastCrawlSequenceRef.current) {
-        console.warn(`[Socket.io] Outdated crawl progress ignored: ${sequence} < ${lastCrawlSequenceRef.current}`)
+
+      // ✅ Sequence 체크
+      if (!sequenceManagerRef.current.check(`crawl-${jobId || 'default'}`, sequence)) return
+
+      // ✅ 완료 Job 체크
+      if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
+        console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
         return
       }
-      lastCrawlSequenceRef.current = sequence
 
       // 크롤링 진행률 업데이트 (웹 페이지에서 리뷰 수집 중)
       setCrawlProgress({
@@ -270,20 +190,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] DB Progress:', data)
 
       const jobId = data.jobId
+      const sequence = data.sequence || data.current || 0
 
-      // ✅ jobId가 있으면 완료 체크 (100% 완료 처리 전)
-      if (jobId && isCrawlJobCompleted(jobId)) {
+      // ✅ Sequence 체크
+      if (!sequenceManagerRef.current.check(`db-${jobId || 'default'}`, sequence)) return
+
+      // ✅ 완료 Job 체크
+      if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
         console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
         return
       }
-
-      // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
-      const sequence = data.sequence || data.current || 0
-      if (sequence < lastDbSequenceRef.current) {
-        console.warn(`[Socket.io] Outdated db progress ignored: ${sequence} < ${lastDbSequenceRef.current}`)
-        return
-      }
-      lastDbSequenceRef.current = sequence
 
       // DB 저장 진행률 업데이트
       setDbProgress({
@@ -296,17 +212,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       if (data.percentage === 100 || data.current === data.total) {
         // ✅ jobId가 있으면 완료로 마킹
         if (jobId) {
-          markCrawlJobAsCompleted(jobId)
-          currentCrawlJobIdRef.current = null
+          completionTrackerRef.current.markCompleted(jobId)
         }
 
         // 모든 진행률 초기화
         setCrawlProgress(null)
         setDbProgress(null)
         setImageProgress(null)
-        lastCrawlSequenceRef.current = 0
-        lastDbSequenceRef.current = 0
-        lastImageSequenceRef.current = 0
+        sequenceManagerRef.current.reset(`crawl-${jobId || 'default'}`)
+        sequenceManagerRef.current.reset(`db-${jobId || 'default'}`)
+        sequenceManagerRef.current.reset(`image-${jobId || 'default'}`)
 
         // 완료 콜백 호출
         if (callbacksRef.current.onReviewCrawlCompleted) {
@@ -323,20 +238,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] Image Progress:', data)
 
       const jobId = data.jobId
+      const sequence = data.sequence || data.current || 0
 
-      // ✅ jobId가 있으면 완료 체크
-      if (jobId && isCrawlJobCompleted(jobId)) {
+      // ✅ Sequence 체크
+      if (!sequenceManagerRef.current.check(`image-${jobId || 'default'}`, sequence)) return
+
+      // ✅ 완료 Job 체크
+      if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
         console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
         return
       }
-
-      // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
-      const sequence = data.sequence || data.current || 0
-      if (sequence < lastImageSequenceRef.current) {
-        console.warn(`[Socket.io] Outdated image progress ignored: ${sequence} < ${lastImageSequenceRef.current}`)
-        return
-      }
-      lastImageSequenceRef.current = sequence
 
       // 이미지 처리 진행률 업데이트
       setImageProgress({
@@ -354,16 +265,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료로 마킹 (에러도 종료 상태)
       if (jobId) {
-        markCrawlJobAsCompleted(jobId)
-        currentCrawlJobIdRef.current = null
+        completionTrackerRef.current.markCompleted(jobId)
       }
 
       setCrawlProgress(null)
       setDbProgress(null)
       setImageProgress(null)
-      lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
-      lastDbSequenceRef.current = 0 // ✅ Sequence 초기화
-      lastImageSequenceRef.current = 0 // ✅ Sequence 초기화
+      // Sequence 초기화
+      sequenceManagerRef.current.reset(`crawl-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(`db-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(`image-${jobId || 'default'}`)
       Alert.error('크롤링 실패', errorMessage)
 
       // 콜백 호출
@@ -382,8 +293,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료로 마킹 (중단도 종료 상태)
       if (jobId) {
-        markCrawlJobAsCompleted(jobId)
-        currentCrawlJobIdRef.current = null
+        completionTrackerRef.current.markCompleted(jobId)
       }
 
       // 중단 상태 설정
@@ -393,9 +303,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setCrawlProgress(null)
       setDbProgress(null)
       setImageProgress(null)
-      lastCrawlSequenceRef.current = 0
-      lastDbSequenceRef.current = 0
-      lastImageSequenceRef.current = 0
+      sequenceManagerRef.current.reset(`crawl-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(`db-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(`image-${jobId || 'default'}`)
 
       // 콜백 호출 (에러 콜백 재사용)
       if (callbacksRef.current.onReviewCrawlError) {
@@ -411,28 +321,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       console.log('[Socket.io] Summary Progress:', data)
 
       const jobId = data.jobId
-
-      // ✅ jobId가 있으면 완료 체크 (100% 완료 처리 전)
-      if (jobId) {
-        if (isSummaryJobCompleted(jobId)) {
-          console.warn(`[Socket.io] Ignored - summary job ${jobId} already completed`)
-          return
-        }
-
-        // 새로운 Job이면 현재 jobId 업데이트
-        if (currentSummaryJobIdRef.current !== jobId) {
-          currentSummaryJobIdRef.current = jobId
-          console.log(`[Socket.io] New summary job started: ${jobId}`)
-        }
-      }
-
-      // ✅ Sequence 체크: 이전 데이터보다 최신인 경우만 업데이트
       const sequence = data.sequence || data.current || 0
-      if (sequence < lastSummarySequenceRef.current) {
-        console.warn(`[Socket.io] Outdated summary progress ignored: ${sequence} < ${lastSummarySequenceRef.current}`)
+
+      // ✅ Sequence 체크
+      if (!sequenceManagerRef.current.check(`summary-${jobId || 'default'}`, sequence)) return
+
+      // ✅ 완료 Job 체크
+      if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
+        console.warn(`[Socket.io] Ignored - summary job ${jobId} already completed`)
         return
       }
-      lastSummarySequenceRef.current = sequence
 
       // 진행 중 상태로 설정
       setReviewSummaryStatus({ status: 'active' })
@@ -450,13 +348,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       if (data.percentage === 100 || data.current === data.total) {
         // ✅ jobId가 있으면 완료로 마킹
         if (jobId) {
-          markSummaryJobAsCompleted(jobId)
-          currentSummaryJobIdRef.current = null
+          completionTrackerRef.current.markCompleted(jobId)
         }
 
         setReviewSummaryStatus({ status: 'completed' })
         setSummaryProgress(null)
-        lastSummarySequenceRef.current = 0
+        sequenceManagerRef.current.reset(`summary-${jobId || 'default'}`)
 
         // 콜백 호출
         if (callbacksRef.current.onReviewSummaryCompleted) {
@@ -475,13 +372,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료로 마킹 (에러도 종료 상태)
       if (jobId) {
-        markSummaryJobAsCompleted(jobId)
-        currentSummaryJobIdRef.current = null
+        completionTrackerRef.current.markCompleted(jobId)
       }
 
       setReviewSummaryStatus({ status: 'failed', error: errorMessage })
       setSummaryProgress(null)
-      lastSummarySequenceRef.current = 0 // ✅ Sequence 초기화
+      sequenceManagerRef.current.reset(`summary-${jobId || 'default'}`)
       Alert.error('요약 실패', errorMessage)
     })
 
@@ -492,8 +388,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // ✅ jobId가 있으면 완료로 마킹 (중단도 종료 상태)
       if (jobId) {
-        markSummaryJobAsCompleted(jobId)
-        currentSummaryJobIdRef.current = null
+        completionTrackerRef.current.markCompleted(jobId)
       }
 
       // 상태 초기화 (에러 메시지 포함)
@@ -502,7 +397,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         error: data.reason || 'Server restarted - job was interrupted'
       })
       setSummaryProgress(null)
-      lastSummarySequenceRef.current = 0
+      sequenceManagerRef.current.reset(`summary-${jobId || 'default'}`)
     })
 
     // 레스토랑 크롤링 중단 (서버 재시작/에러로 인한 중단)
@@ -513,14 +408,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setMenuProgress(null)
     })
 
-    // ✅ 주기적으로 오래된 완료 Job 정리 (5분마다)
-    const cleanupInterval = setInterval(() => {
-      cleanupCompletedCrawlJobs()
-      cleanupCompletedSummaryJobs()
-    }, JOB_RETENTION_MS)
+    // ✅ 자동 정리 시작
+    completionTrackerRef.current.startAutoCleanup(5)
 
     return () => {
-      clearInterval(cleanupInterval)
+      completionTrackerRef.current.stopAutoCleanup()
       socket.off('restaurant:menu_progress')
       socket.off('restaurant:current_state')
       socket.off('review:crawl_progress')
@@ -586,10 +478,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setCrawlProgress(null)
     setDbProgress(null)
     setImageProgress(null)
-    setIsCrawlInterrupted(false) // 중단 상태 초기화
-    lastCrawlSequenceRef.current = 0 // ✅ Sequence 초기화
-    lastDbSequenceRef.current = 0 // ✅ Sequence 초기화
-    lastImageSequenceRef.current = 0 // ✅ Sequence 초기화
+    setIsCrawlInterrupted(false)
+    // Sequence 초기화는 공통 유틸에서 관리 (clear는 전체 초기화이므로 생략)
   }, [])
 
   // 요약 상태 초기화

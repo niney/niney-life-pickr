@@ -8,8 +8,17 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { io, Socket } from 'socket.io-client';
 import { useTheme } from 'shared/contexts';
-import { THEME_COLORS } from 'shared/constants';
+import { THEME_COLORS, SOCKET_CONFIG } from 'shared/constants';
 import { getDefaultApiUrl } from 'shared/services';
+import { SocketSequenceManager, JobCompletionTracker } from 'shared/utils';
+import type {
+  ProgressEventData,
+  CompletionEventData,
+  ErrorEventData,
+  CancellationEventData,
+  JobNewEventData,
+  MenuProgressEventData,
+} from 'shared/types';
 import type { RootTabParamList, RestaurantStackParamList } from '../navigation/types';
 
 // JobMonitor는 Tab에 있고, Restaurant Detail은 Restaurant Stack에 있음
@@ -65,42 +74,6 @@ interface QueueStats {
   cancelled: number;
 }
 
-// Socket 이벤트 데이터 타입들
-interface ProgressEventData {
-  jobId: string;
-  restaurantId: number;
-  sequence?: number;
-  current: number;
-  total: number;
-  percentage: number;
-  timestamp?: number;
-}
-
-interface CompletionEventData {
-  jobId: string;
-  timestamp: number;
-}
-
-interface ErrorEventData {
-  jobId: string;
-  error: string;
-}
-
-interface CancellationEventData {
-  jobId: string;
-}
-
-interface JobNewEventData {
-  jobId: string;
-  type: string;
-  restaurantId: number;
-  timestamp: number;
-}
-
-interface MenuProgressEventData extends ProgressEventData {
-  metadata?: Record<string, string | number>;
-}
-
 /**
  * JobMonitorScreen - Mobile
  * 실시간 Job 진행 상황 모니터링
@@ -129,31 +102,12 @@ const JobMonitorScreen: React.FC = () => {
     cancelled: 0,
   });
 
-  // Sequence 추적
-  const lastSequenceRef = useRef<Map<string, number>>(new Map());
+  // 공통 유틸 인스턴스
+  const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager());
+  const completionTrackerRef = useRef<JobCompletionTracker>(new JobCompletionTracker(5));
 
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<Socket | null>(null);
-
-  /**
-   * Sequence 체크
-   */
-  const checkSequence = useCallback((jobId: string, newSequence: number): boolean => {
-    const lastSequence = lastSequenceRef.current.get(jobId) || 0;
-    if (newSequence < lastSequence) {
-      console.warn(`[JobMonitor] Outdated event ignored - Job: ${jobId}`);
-      return false;
-    }
-    lastSequenceRef.current.set(jobId, newSequence);
-    return true;
-  }, []);
-
-  /**
-   * Sequence 초기화
-   */
-  const resetSequence = useCallback((jobId: string) => {
-    lastSequenceRef.current.delete(jobId);
-  }, []);
 
   /**
    * Pull-to-Refresh 핸들러
@@ -207,19 +161,98 @@ const JobMonitorScreen: React.FC = () => {
   }, []);
 
   /**
+   * Progress 이벤트 공통 핸들러
+   */
+  const handleProgressEvent = useCallback((
+    data: ProgressEventData | MenuProgressEventData,
+    jobType: Job['type'],
+    metadata?: Record<string, string | number>
+  ) => {
+    const sequence = data.sequence || data.current || 0;
+    if (!sequenceManagerRef.current.check(data.jobId, sequence)) return;
+
+    setJobs(prev => {
+      const existingJob = prev.find(job => job.jobId === data.jobId);
+      
+      if (!existingJob) {
+        return [createJobFromProgress(data, jobType, metadata), ...prev];
+      }
+      
+      return prev.map(job =>
+        job.jobId === data.jobId
+          ? {
+              ...job,
+              progress: {
+                current: data.current,
+                total: data.total,
+                percentage: data.percentage
+              },
+              metadata: { ...job.metadata, ...metadata }
+            }
+          : job
+      );
+    });
+
+    // 완료 처리
+    if (data.percentage === 100 || data.current === data.total) {
+      setTimeout(() => {
+        setJobs(prev => prev.map(job =>
+          job.jobId === data.jobId && job.status === 'active'
+            ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
+            : job
+        ));
+        sequenceManagerRef.current.reset(data.jobId);
+      }, 3000);
+    }
+  }, [createJobFromProgress]);
+
+  /**
+   * 완료 이벤트 공통 핸들러
+   */
+  const handleCompletionEvent = useCallback((data: CompletionEventData) => {
+    sequenceManagerRef.current.reset(data.jobId);
+    setJobs(prev => prev.map(job =>
+      job.jobId === data.jobId
+        ? {
+            ...job,
+            status: 'completed',
+            completedAt: new Date(data.timestamp).toISOString()
+          }
+        : job
+    ));
+  }, []);
+
+  /**
+   * 에러 이벤트 공통 핸들러
+   */
+  const handleErrorEvent = useCallback((data: ErrorEventData) => {
+    sequenceManagerRef.current.reset(data.jobId);
+    setJobs(prev => prev.map(job =>
+      job.jobId === data.jobId
+        ? { ...job, status: 'failed', error: data.error }
+        : job
+    ));
+  }, []);
+
+  /**
+   * 취소 이벤트 공통 핸들러
+   */
+  const handleCancellationEvent = useCallback((data: CancellationEventData) => {
+    sequenceManagerRef.current.reset(data.jobId);
+    setJobs(prev => prev.map(job =>
+      job.jobId === data.jobId
+        ? { ...job, status: 'cancelled' }
+        : job
+    ));
+  }, []);
+
+  /**
    * Socket 연결 및 이벤트 리스너 등록
    */
   useEffect(() => {
     console.log('[JobMonitor] Socket 연결 시도...');
 
-    const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-    });
+    const newSocket = io(SOCKET_URL, SOCKET_CONFIG as any);
 
     newSocket.on('connect', () => {
       console.log('[JobMonitor] Socket 연결 성공');
@@ -307,222 +340,35 @@ const JobMonitorScreen: React.FC = () => {
       });
     });
 
-    // review:crawl_progress
+    // Progress 이벤트 - 공통 핸들러 사용
     newSocket.on('review:crawl_progress', (data: ProgressEventData) => {
-      const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) return;
-
-      setJobs(prev => {
-        const existingJob = prev.find(job => job.jobId === data.jobId);
-        if (!existingJob) {
-          return [createJobFromProgress(data, 'review_crawl', { phase: 'crawl' }), ...prev];
-        }
-        return prev.map(job =>
-          job.jobId === data.jobId
-            ? {
-                ...job,
-                progress: { current: data.current, total: data.total, percentage: data.percentage },
-                metadata: { ...job.metadata, phase: 'crawl' }
-              }
-            : job
-        );
-      });
-
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
-              : job
-          ));
-          resetSequence(data.jobId);
-        }, 3000);
-      }
+      handleProgressEvent(data, 'review_crawl', { phase: 'crawl' });
     });
 
-    // review:db_progress
     newSocket.on('review:db_progress', (data: ProgressEventData) => {
-      const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) return;
-
-      setJobs(prev => {
-        const existingJob = prev.find(job => job.jobId === data.jobId);
-        if (!existingJob) {
-          return [createJobFromProgress(data, 'review_crawl', { phase: 'db' }), ...prev];
-        }
-        return prev.map(job =>
-          job.jobId === data.jobId
-            ? {
-                ...job,
-                progress: { current: data.current, total: data.total, percentage: data.percentage },
-                metadata: { ...job.metadata, phase: 'db' }
-              }
-            : job
-        );
-      });
-
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
-              : job
-          ));
-          resetSequence(data.jobId);
-        }, 3000);
-      }
+      handleProgressEvent(data, 'review_crawl', { phase: 'db' });
     });
 
-    // review:image_progress
     newSocket.on('review:image_progress', (data: ProgressEventData) => {
-      const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) return;
-
-      setJobs(prev => {
-        const existingJob = prev.find(job => job.jobId === data.jobId);
-        if (!existingJob) {
-          return [createJobFromProgress(data, 'review_crawl', { phase: 'image' }), ...prev];
-        }
-        return prev.map(job =>
-          job.jobId === data.jobId
-            ? {
-                ...job,
-                progress: { current: data.current, total: data.total, percentage: data.percentage },
-                metadata: { ...job.metadata, phase: 'image' }
-              }
-            : job
-        );
-      });
-
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
-              : job
-          ));
-          resetSequence(data.jobId);
-        }, 3000);
-      }
+      handleProgressEvent(data, 'review_crawl', { phase: 'image' });
     });
 
-    // review:completed
-    newSocket.on('review:completed', (data: CompletionEventData) => {
-      resetSequence(data.jobId);
-      setJobs(prev => prev.map(job =>
-        job.jobId === data.jobId
-          ? { ...job, status: 'completed', completedAt: new Date(data.timestamp).toISOString() }
-          : job
-      ));
-    });
+    // 완료/에러/취소 이벤트 - 공통 핸들러 사용
+    newSocket.on('review:completed', handleCompletionEvent);
+    newSocket.on('review:error', handleErrorEvent);
+    newSocket.on('review:cancelled', handleCancellationEvent);
 
-    // review:error
-    newSocket.on('review:error', (data: ErrorEventData) => {
-      resetSequence(data.jobId);
-      setJobs(prev => prev.map(job =>
-        job.jobId === data.jobId
-          ? { ...job, status: 'failed', error: data.error }
-          : job
-      ));
-    });
-
-    // review:cancelled
-    newSocket.on('review:cancelled', (data: CancellationEventData) => {
-      resetSequence(data.jobId);
-      setJobs(prev => prev.map(job =>
-        job.jobId === data.jobId
-          ? { ...job, status: 'cancelled' }
-          : job
-      ));
-    });
-
-    // review_summary:progress
+    // Summary 이벤트 - 공통 핸들러 사용
     newSocket.on('review_summary:progress', (data: ProgressEventData) => {
-      const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) return;
-
-      setJobs(prev => {
-        const existingJob = prev.find(job => job.jobId === data.jobId);
-        if (!existingJob) {
-          return [createJobFromProgress(data, 'review_summary'), ...prev];
-        }
-        return prev.map(job =>
-          job.jobId === data.jobId
-            ? {
-                ...job,
-                progress: { current: data.current, total: data.total, percentage: data.percentage }
-              }
-            : job
-        );
-      });
-
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
-              : job
-          ));
-          resetSequence(data.jobId);
-        }, 3000);
-      }
+      handleProgressEvent(data, 'review_summary');
     });
 
-    // review_summary:completed
-    newSocket.on('review_summary:completed', (data: CompletionEventData) => {
-      resetSequence(data.jobId);
-      setJobs(prev => prev.map(job =>
-        job.jobId === data.jobId
-          ? { ...job, status: 'completed', completedAt: new Date(data.timestamp).toISOString() }
-          : job
-      ));
-    });
+    newSocket.on('review_summary:completed', handleCompletionEvent);
+    newSocket.on('review_summary:error', handleErrorEvent);
 
-    // review_summary:error
-    newSocket.on('review_summary:error', (data: ErrorEventData) => {
-      resetSequence(data.jobId);
-      setJobs(prev => prev.map(job =>
-        job.jobId === data.jobId
-          ? { ...job, status: 'failed', error: data.error }
-          : job
-      ));
-    });
-
-    // restaurant:menu_progress
+    // Restaurant 이벤트 - 공통 핸들러 사용
     newSocket.on('restaurant:menu_progress', (data: MenuProgressEventData) => {
-      const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) return;
-
-      setJobs(prev => {
-        const existingJob = prev.find(job => job.jobId === data.jobId);
-        if (!existingJob) {
-          return [createJobFromProgress(data, 'restaurant_crawl', data.metadata), ...prev];
-        }
-        return prev.map(job =>
-          job.jobId === data.jobId
-            ? {
-                ...job,
-                progress: {
-                  current: data.current || 0,
-                  total: data.total || 0,
-                  percentage: data.percentage || 0
-                },
-                metadata: { ...job.metadata, ...data.metadata }
-              }
-            : job
-        );
-      });
-
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
-              : job
-          ));
-          resetSequence(data.jobId);
-        }, 3000);
-      }
+      handleProgressEvent(data, 'restaurant_crawl', data.metadata);
     });
 
     // Queue 이벤트
@@ -596,7 +442,7 @@ const JobMonitorScreen: React.FC = () => {
       newSocket.close();
       socketRef.current = null;
     };
-  }, [checkSequence, resetSequence, createJobFromProgress]);
+  }, [handleProgressEvent, handleCompletionEvent, handleErrorEvent, handleCancellationEvent]);
 
   /**
    * UI 헬퍼 함수

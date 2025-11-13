@@ -12,3 +12,7 @@ export type {
   SummaryProgress,
   ReviewSummaryStatus
 } from './socket.utils';
+
+// Socket 관리 유틸리티
+export { SocketSequenceManager } from './socket-sequence-manager';
+export { JobCompletionTracker } from './job-completion-tracker';
