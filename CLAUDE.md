@@ -50,6 +50,7 @@ cd apps/mobile && npm start
 - **[WEB-HOME](./docs/claude/01-web/WEB-HOME.md)** - Home 화면
 - **[WEB-LOGIN](./docs/claude/01-web/WEB-LOGIN.md)** - Login 화면
 - **[WEB-RESTAURANT](./docs/claude/01-web/WEB-RESTAURANT.md)** - Restaurant 화면
+- **[WEB-JOB-MONITOR](./docs/claude/01-web/WEB-JOB-MONITOR.md)** - ⭐ Job 모니터링 화면
 - **[WEB-PATTERNS](./docs/claude/01-web/WEB-PATTERNS.md)** - RN Web 제약사항
 - **[WEB-TESTING](./docs/claude/01-web/WEB-TESTING.md)** - Playwright E2E
 
@@ -60,6 +61,7 @@ cd apps/mobile && npm start
 - **[MOBILE-LOGIN](./docs/claude/02-mobile/MOBILE-LOGIN.md)** - Login 화면
 - **[MOBILE-RESTAURANT-LIST](./docs/claude/02-mobile/MOBILE-RESTAURANT-LIST.md)** - 레스토랑 목록
 - **[MOBILE-RESTAURANT-DETAIL](./docs/claude/02-mobile/MOBILE-RESTAURANT-DETAIL.md)** - 레스토랑 상세
+- **[MOBILE-JOB-MONITOR](./docs/claude/02-mobile/MOBILE-JOB-MONITOR.md)** - ⭐ Job 모니터링 화면
 - **[MOBILE-SETTINGS](./docs/claude/02-mobile/MOBILE-SETTINGS.md)** - 설정 화면
 - **[MOBILE-COMPONENTS](./docs/claude/02-mobile/MOBILE-COMPONENTS.md)** - RecrawlModal, TabBarIcons
 - **[MOBILE-TESTING](./docs/claude/02-mobile/MOBILE-TESTING.md)** - Maestro E2E
@@ -70,8 +72,8 @@ cd apps/mobile && npm start
 - **[SHARED-HOOKS](./docs/claude/03-shared/SHARED-HOOKS.md)** - useAuth, useLogin
 - **[SHARED-CONTEXTS](./docs/claude/03-shared/SHARED-CONTEXTS.md)** - ThemeContext, SocketContext
 - **[SHARED-SERVICES](./docs/claude/03-shared/SHARED-SERVICES.md)** - API Service
-- **[SHARED-UTILS](./docs/claude/03-shared/SHARED-UTILS.md)** - Alert, Storage, Socket Utils
-- **[SHARED-CONSTANTS](./docs/claude/03-shared/SHARED-CONSTANTS.md)** - 상수 관리
+- **[SHARED-UTILS](./docs/claude/03-shared/SHARED-UTILS.md)** - ⭐ Alert, Storage, JobCompletionTracker, SocketSequenceManager
+- **[SHARED-CONSTANTS](./docs/claude/03-shared/SHARED-CONSTANTS.md)** - ⭐ APP_INFO, AUTH, THEME, SOCKET_CONFIG
 
 ### ⚙️ 04. Friendly (servers/friendly)
 - **[FRIENDLY-OVERVIEW](./docs/claude/04-friendly/FRIENDLY-OVERVIEW.md)** - Fastify 구조
@@ -101,6 +103,8 @@ cd apps/mobile && npm start
 
 ### 주요 기능별
 - **실시간 통신**: [FRIENDLY-JOB-SOCKET](./docs/claude/04-friendly/FRIENDLY-JOB-SOCKET.md) + [SHARED-CONTEXTS](./docs/claude/03-shared/SHARED-CONTEXTS.md)
+- **Job 모니터링**: [WEB-JOB-MONITOR](./docs/claude/01-web/WEB-JOB-MONITOR.md) + [MOBILE-JOB-MONITOR](./docs/claude/02-mobile/MOBILE-JOB-MONITOR.md)
+- **Job 유틸**: [SHARED-UTILS](./docs/claude/03-shared/SHARED-UTILS.md#4-job-management-utilities) (JobCompletionTracker, SocketSequenceManager)
 - **인증**: [FRIENDLY-AUTH](./docs/claude/04-friendly/FRIENDLY-AUTH.md) + [SHARED-HOOKS](./docs/claude/03-shared/SHARED-HOOKS.md)
 - **크롤링**: [FRIENDLY-CRAWLER](./docs/claude/04-friendly/FRIENDLY-CRAWLER.md)
 - **테마**: [WEB-THEME](./docs/claude/01-web/WEB-THEME.md)
@@ -141,7 +145,12 @@ cd servers/friendly && npm run db:reset
 
 ---
 
-**문서 버전**: 2.0 (Refactored)
-**최종 업데이트**: 2025-10-24
-**이전 버전**: CLAUDE.md.backup (841줄, 단일 파일)
-**새 버전**: 43개 모듈별 문서
+**문서 버전**: 2.1
+**최종 업데이트**: 2025-11-13
+**변경 사항**:
+- MOBILE-JOB-MONITOR.md 신규 추가 (Mobile Job 모니터링 화면)
+- SHARED-UTILS.md 업데이트 (JobCompletionTracker, SocketSequenceManager)
+- SHARED-CONSTANTS.md 업데이트 (SOCKET_CONFIG)
+- SHARED-CONTEXTS.md 업데이트 (SocketContext 리팩토링 반영)
+- WEB-JOB-MONITOR.md 업데이트 (공통 유틸 적용)
+**이전 버전**: 2.0 (43개 문서) → 2.1 (44개 문서)

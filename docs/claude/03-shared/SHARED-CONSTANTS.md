@@ -12,9 +12,10 @@
 3. [AUTH_CONSTANTS](#3-auth_constants)
 4. [THEME_COLORS](#4-theme_colors)
 5. [HEADER_HEIGHT](#5-header_height)
-6. [Barrel Export Pattern](#6-barrel-export-pattern)
-7. [Usage Examples](#7-usage-examples)
-8. [Related Documentation](#8-related-documentation)
+6. [SOCKET_CONFIG](#6-socket_config)
+7. [Barrel Export Pattern](#7-barrel-export-pattern)
+8. [Usage Examples](#8-usage-examples)
+9. [Related Documentation](#9-related-documentation)
 
 ---
 
@@ -28,10 +29,11 @@ The constants module provides centralized, domain-separated constants for app-wi
 
 ```
 apps/shared/constants/
-├── app.constants.ts     # App metadata (4 lines)
-├── auth.constants.ts    # Authentication strings (27 lines)
-├── theme.constants.ts   # Theme color palettes (31 lines)
-└── index.ts             # Barrel exports (8 lines)
+├── app.constants.ts       # App metadata (4 lines)
+├── auth.constants.ts      # Authentication strings (27 lines)
+├── theme.constants.ts     # Theme color palettes (31 lines)
+├── socket-config.ts       # Socket.io configuration (14 lines)
+└── index.ts               # Barrel exports (9 lines)
 ```
 
 ### Design Principles
@@ -346,9 +348,265 @@ const contentHeight = windowHeight - HEADER_HEIGHT;
 
 ---
 
-## 6. Barrel Export Pattern
+## 6. SOCKET_CONFIG
 
-### 6.1 Index File
+### 6.1 Overview
+
+Socket.io client connection configuration used by JobMonitorScreen, SocketContext, and Web JobMonitor.
+
+**File**: `apps/shared/constants/socket-config.ts`
+
+**Lines**: 14
+
+### 6.2 Definition
+
+```typescript
+export const SOCKET_CONFIG = {
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000,
+  autoConnect: true,
+  forceNew: false,
+} as const;
+```
+
+### 6.3 Configuration Fields
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| **transports** | `['websocket', 'polling']` | Connection transport methods (websocket first, polling fallback) |
+| **reconnection** | `true` | Enable automatic reconnection on disconnect |
+| **reconnectionAttempts** | `10` | Maximum reconnection attempts before giving up |
+| **reconnectionDelay** | `1000` | Initial delay (ms) before first reconnection attempt |
+| **reconnectionDelayMax** | `5000` | Maximum delay (ms) between reconnection attempts |
+| **timeout** | `20000` | Connection timeout (ms) - 20 seconds |
+| **autoConnect** | `true` | Automatically connect on Socket.io client creation |
+| **forceNew** | `false` | Reuse existing connection if available |
+
+### 6.4 Transport Strategy
+
+#### Websocket (Primary)
+- **Pros**:
+  - Low latency bidirectional communication
+  - Minimal overhead
+  - Real-time performance
+- **Cons**:
+  - May be blocked by corporate firewalls
+  - Not supported by some proxies
+
+#### Polling (Fallback)
+- **Pros**:
+  - Works with all firewalls/proxies
+  - HTTP-based (always allowed)
+- **Cons**:
+  - Higher latency
+  - More network overhead
+  - Less efficient
+
+**Auto-fallback**: Socket.io automatically falls back to polling if websocket fails.
+
+### 6.5 Reconnection Strategy
+
+#### Exponential Backoff
+
+```
+Attempt 1: 1000ms delay
+Attempt 2: 2000ms delay
+Attempt 3: 4000ms delay
+Attempt 4: 5000ms delay (capped at reconnectionDelayMax)
+Attempt 5-10: 5000ms delay
+```
+
+#### Behavior
+
+- **10 attempts**: Tries for ~55 seconds total before giving up
+- **Visual feedback**: `socketConnected` state updates UI
+- **User action**: Manual retry available via refresh button
+
+### 6.6 Usage
+
+#### In SocketContext (Shared)
+
+```typescript
+import { io, Socket } from 'socket.io-client';
+import { SOCKET_CONFIG } from 'shared/constants';
+import { getDefaultApiUrl } from 'shared/services';
+
+const serverUrl = getDefaultApiUrl();
+
+const socket = io(serverUrl, SOCKET_CONFIG);
+
+socket.on('connect', () => {
+  console.log('[Socket.io] Connected:', socket.id);
+  setIsConnected(true);
+});
+
+socket.on('disconnect', () => {
+  console.log('[Socket.io] Disconnected');
+  setIsConnected(false);
+});
+```
+
+#### In JobMonitorScreen (Mobile)
+
+```typescript
+import { io, Socket } from 'socket.io-client';
+import { SOCKET_CONFIG } from 'shared/constants';
+import { getDefaultApiUrl } from 'shared/services';
+
+const SOCKET_URL = getDefaultApiUrl();
+
+useEffect(() => {
+  console.log('[JobMonitor] Connecting to:', SOCKET_URL);
+
+  const socket = io(SOCKET_URL, SOCKET_CONFIG);
+
+  socket.on('connect', () => {
+    console.log('[JobMonitor] Socket connected:', socket.id);
+    setSocketConnected(true);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('[JobMonitor] Socket disconnected:', reason);
+    setSocketConnected(false);
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('[JobMonitor] Connection error:', error.message);
+  });
+
+  socket.on('reconnect_attempt', (attemptNumber) => {
+    console.log(`[JobMonitor] Reconnection attempt ${attemptNumber}/10`);
+  });
+
+  socketRef.current = socket;
+
+  return () => {
+    socket.close();
+  };
+}, []);
+```
+
+#### In Web JobMonitor
+
+```typescript
+import { io, Socket } from 'socket.io-client';
+import { SOCKET_CONFIG } from '@shared/constants';
+import { getDefaultApiUrl } from '@shared/services';
+
+const SOCKET_URL = getDefaultApiUrl();
+
+useEffect(() => {
+  const newSocket = io(SOCKET_URL, SOCKET_CONFIG);
+
+  newSocket.on('connect', () => {
+    console.log('[JobMonitor] Socket connected:', newSocket.id);
+    setSocketConnected(true);
+  });
+
+  newSocket.on('disconnect', () => {
+    console.log('[JobMonitor] Socket disconnected');
+    setSocketConnected(false);
+  });
+
+  setSocket(newSocket);
+
+  return () => {
+    newSocket.emit('unsubscribe:all_jobs');
+    newSocket.close();
+  };
+}, []);
+```
+
+### 6.7 Connection Lifecycle
+
+```
+1. Socket.io Client Created
+   ↓ (autoConnect: true)
+2. Attempt websocket connection
+   ↓ (if blocked)
+3. Fallback to polling
+   ↓
+4. Connected (emit 'connect' event)
+   ↓
+5. Bidirectional communication
+   ↓ (network failure)
+6. Disconnected (emit 'disconnect' event)
+   ↓ (reconnection: true)
+7. Reconnection attempt 1 (1s delay)
+   ↓ (failed)
+8. Reconnection attempt 2 (2s delay)
+   ↓ (failed)
+...
+10. Reconnection attempt 10 (5s delay)
+    ↓ (failed)
+11. Give up (manual retry required)
+```
+
+### 6.8 Error Handling
+
+#### Connection Errors
+
+```typescript
+socket.on('connect_error', (error) => {
+  console.error('[Socket] Connection error:', error.message);
+  // UI: Show "Connection failed" message
+});
+```
+
+#### Reconnection Failed
+
+```typescript
+socket.on('reconnect_failed', () => {
+  console.error('[Socket] Reconnection failed after 10 attempts');
+  Alert.error('연결 실패', '서버에 연결할 수 없습니다. 새로고침해주세요.');
+});
+```
+
+#### Manual Reconnection
+
+```typescript
+const handleReconnect = () => {
+  socket.connect(); // Manual reconnect
+};
+
+// UI: Show "Retry" button when socketConnected === false
+```
+
+### 6.9 Benefits of Centralized Config
+
+1. **Consistency**: Same settings across Web, Mobile, and SocketContext
+2. **Easy Updates**: Change config in one place → applies everywhere
+3. **Testing**: Can override config for testing environments
+4. **Documentation**: Single source of truth for Socket settings
+
+### 6.10 Environment-Specific Config (Future)
+
+**Planned Enhancement**:
+```typescript
+// socket-config.ts
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+export const SOCKET_CONFIG = {
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: isDevelopment ? 3 : 10, // Fewer attempts in dev
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: isDevelopment ? 3000 : 5000,
+  timeout: 20000,
+  autoConnect: true,
+  forceNew: false,
+} as const;
+```
+
+---
+
+## 7. Barrel Export Pattern
+
+### 7.1 Index File
 
 **File**: `apps/shared/constants/index.ts`
 
@@ -361,9 +619,12 @@ export { AUTH_CONSTANTS } from './auth.constants';
 
 // Theme related constants
 export { THEME_COLORS, HEADER_HEIGHT } from './theme.constants';
+
+// Socket.io configuration
+export { SOCKET_CONFIG } from './socket-config';
 ```
 
-### 6.2 Benefits
+### 7.2 Benefits
 
 1. **Single Import Line**: Import multiple constants from one path
    ```typescript
@@ -376,9 +637,9 @@ export { THEME_COLORS, HEADER_HEIGHT } from './theme.constants';
 
 ---
 
-## 7. Usage Examples
+## 8. Usage Examples
 
-### 7.1 Login Screen (Mobile)
+### 8.1 Login Screen (Mobile)
 
 **File**: `apps/mobile/src/screens/LoginScreen.tsx`
 
@@ -429,7 +690,7 @@ const LoginScreen: React.FC = () => {
 };
 ```
 
-### 7.2 Header Component (Web)
+### 8.2 Header Component (Web)
 
 **File**: `apps/web/src/components/Header.tsx`
 
@@ -468,22 +729,25 @@ const styles = StyleSheet.create({
 
 ---
 
-## 8. Related Documentation
+## 9. Related Documentation
 
 ### Shared Documentation
 - **[SHARED-OVERVIEW.md](./SHARED-OVERVIEW.md)**: Shared module architecture
-- **[SHARED-CONTEXTS.md](./SHARED-CONTEXTS.md)**: ThemeContext (uses THEME_COLORS)
+- **[SHARED-CONTEXTS.md](./SHARED-CONTEXTS.md)**: ThemeContext (uses THEME_COLORS), SocketContext (uses SOCKET_CONFIG)
 - **[SHARED-HOOKS.md](./SHARED-HOOKS.md)**: useLogin hook (uses AUTH_CONSTANTS)
 - **[SHARED-COMPONENTS.md](./SHARED-COMPONENTS.md)**: Button, InputField (use AUTH_CONSTANTS)
+- **[SHARED-UTILS.md](./SHARED-UTILS.md)**: JobCompletionTracker, SocketSequenceManager
 
 ### Web Documentation
 - **[WEB-THEME.md](../01-web/WEB-THEME.md)**: Web theme implementation
 - **[WEB-HEADER-DRAWER.md](../01-web/WEB-HEADER-DRAWER.md)**: Header component (uses HEADER_HEIGHT)
 - **[WEB-LOGIN.md](../01-web/WEB-LOGIN.md)**: Web login (uses APP_INFO_CONSTANTS, AUTH_CONSTANTS)
+- **[WEB-JOB-MONITOR.md](../01-web/WEB-JOB-MONITOR.md)**: Job monitoring (uses SOCKET_CONFIG)
 
 ### Mobile Documentation
 - **[MOBILE-LOGIN.md](../02-mobile/MOBILE-LOGIN.md)**: Mobile login screen (uses constants)
 - **[MOBILE-HOME.md](../02-mobile/MOBILE-HOME.md)**: Home screen (uses THEME_COLORS)
+- **[MOBILE-JOB-MONITOR.md](../02-mobile/MOBILE-JOB-MONITOR.md)**: Job monitoring (uses SOCKET_CONFIG)
 
 ### Core Documentation
 - **[ARCHITECTURE.md](../00-core/ARCHITECTURE.md)**: Overall architecture
@@ -561,5 +825,7 @@ console.log(FEATURE_CONSTANTS.KEY); // 'value'
 
 ---
 
-**Document Version**: 1.0.0
-**Covers Files**: `app.constants.ts`, `auth.constants.ts`, `theme.constants.ts`, domain-separated constants
+**Document Version**: 1.1.0
+**최종 업데이트**: 2025-11-13
+**변경 사항**: SOCKET_CONFIG 추가 (Socket.io 연결 설정)
+**Covers Files**: `app.constants.ts`, `auth.constants.ts`, `theme.constants.ts`, `socket-config.ts`

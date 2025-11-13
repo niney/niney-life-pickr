@@ -1,6 +1,6 @@
 # Shared Contexts
 
-> **Last Updated**: 2025-11-10
+> **Last Updated**: 2025-11-13
 > **Purpose**: React Context providers for theme management and real-time Socket.io communication
 
 ---
@@ -385,12 +385,13 @@ function App() {
 #### 2.4.2 Socket.io Client Setup
 
 ```typescript
+import { SOCKET_CONFIG } from 'shared/constants';
+
 useEffect(() => {
   console.log('[Socket.io] Connecting to:', resolvedServerUrl)
 
-  const socket = io(resolvedServerUrl, {
-    transports: ['websocket', 'polling']
-  })
+  // ✅ Use centralized Socket configuration
+  const socket = io(resolvedServerUrl, SOCKET_CONFIG)
 
   socket.on('connect', () => {
     console.log('[Socket.io] Connected:', socket.id)
@@ -410,9 +411,15 @@ useEffect(() => {
 }, [resolvedServerUrl])
 ```
 
-**Transports**:
-- **websocket**: Primary transport (fast, bidirectional)
-- **polling**: Fallback for environments that don't support WebSocket
+**Configuration** (from `SOCKET_CONFIG`):
+- **transports**: `['websocket', 'polling']` - Websocket first, polling fallback
+- **reconnection**: `true` - Auto-reconnect on disconnect
+- **reconnectionAttempts**: `10` - Max retry attempts
+- **reconnectionDelay**: `1000ms` - Initial retry delay
+- **reconnectionDelayMax**: `5000ms` - Max retry delay
+- **timeout**: `20000ms` - Connection timeout
+
+See **[SHARED-CONSTANTS.md](./SHARED-CONSTANTS.md#6-socket_config)** for detailed configuration.
 
 ### 2.5 Restaurant Room Management
 
@@ -483,56 +490,41 @@ useEffect(() => {
 
 ### 2.6 Job Tracking System
 
-#### 2.6.1 Completed Job Tracking
+#### 2.6.1 Overview
 
-The SocketContext tracks completed jobs to prevent duplicate processing of events from the same job.
+SocketContext uses **`JobCompletionTracker`** utility class to prevent duplicate event processing during Socket reconnections.
 
-**Data Structures**:
+**Import**:
 ```typescript
-const completedCrawlJobsRef = useRef<Map<string, number>>(new Map())
-const completedSummaryJobsRef = useRef<Map<string, number>>(new Map())
-const JOB_RETENTION_MS = 5 * 60 * 1000 // 5 minutes
+import { JobCompletionTracker } from 'shared/utils';
 ```
 
-**Key-Value**:
-- **Key**: Job ID (UUID)
-- **Value**: Timestamp (Date.now()) when job was completed
-
-#### 2.6.2 Job Completion Marking
+#### 2.6.2 Tracker Initialization
 
 ```typescript
-const markCrawlJobAsCompleted = (jobId: string) => {
-  completedCrawlJobsRef.current.set(jobId, Date.now())
-  console.log(`[Socket.io] Marked crawl job as completed: ${jobId}`)
-}
+const completedCrawlJobsRef = useRef(new JobCompletionTracker(5)); // 5-minute retention
+const completedSummaryJobsRef = useRef(new JobCompletionTracker(5));
 
-const markSummaryJobAsCompleted = (jobId: string) => {
-  completedSummaryJobsRef.current.set(jobId, Date.now())
-  console.log(`[Socket.io] Marked summary job as completed: ${jobId}`)
-}
+useEffect(() => {
+  // Start auto-cleanup for both trackers
+  completedCrawlJobsRef.current.startAutoCleanup(5);
+  completedSummaryJobsRef.current.startAutoCleanup(5);
+
+  return () => {
+    completedCrawlJobsRef.current.stopAutoCleanup();
+    completedSummaryJobsRef.current.stopAutoCleanup();
+  };
+}, []);
 ```
 
 #### 2.6.3 Job Completion Checking
 
 ```typescript
-const isCrawlJobCompleted = (jobId: string): boolean => {
-  cleanupCompletedCrawlJobs()
-  return completedCrawlJobsRef.current.has(jobId)
-}
-
-const isSummaryJobCompleted = (jobId: string): boolean => {
-  cleanupCompletedSummaryJobs()
-  return completedSummaryJobsRef.current.has(jobId)
-}
-```
-
-**Usage in Event Listeners**:
-```typescript
 socket.on('review:db_progress', (data: any) => {
   const jobId = data.jobId
 
-  // Ignore if job already completed
-  if (jobId && isCrawlJobCompleted(jobId)) {
+  // ✅ Check if job already completed using tracker
+  if (jobId && completedCrawlJobsRef.current.isCompleted(jobId)) {
     console.warn(`[Socket.io] Ignored - crawl job ${jobId} already completed`)
     return
   }
@@ -541,79 +533,93 @@ socket.on('review:db_progress', (data: any) => {
 })
 ```
 
-#### 2.6.4 Auto-cleanup of Old Jobs
+#### 2.6.4 Marking Job as Completed
 
 ```typescript
-const cleanupCompletedCrawlJobs = () => {
-  const now = Date.now()
-  const jobsToDelete: string[] = []
+socket.on('review:completed', (data: any) => {
+  const jobId = data.jobId
 
-  completedCrawlJobsRef.current.forEach((timestamp, jobId) => {
-    if (now - timestamp > JOB_RETENTION_MS) {
-      jobsToDelete.push(jobId)
-    }
-  })
+  // ✅ Mark job as completed
+  if (jobId) {
+    completedCrawlJobsRef.current.markCompleted(jobId);
+  }
 
-  jobsToDelete.forEach(jobId => {
-    completedCrawlJobsRef.current.delete(jobId)
-    console.log(`[Socket.io] Cleaned up old crawl job: ${jobId}`)
-  })
-}
-
-// Periodic cleanup every 5 minutes
-const cleanupInterval = setInterval(() => {
-  cleanupCompletedCrawlJobs()
-  cleanupCompletedSummaryJobs()
-}, JOB_RETENTION_MS)
+  // Update UI...
+})
 ```
 
 **Benefits**:
-- Prevents duplicate event processing
-- Auto-cleanup prevents memory leaks
-- Separate tracking for crawl and summary jobs
+- ✅ **Automatic cleanup**: 5-minute retention with auto-cleanup
+- ✅ **Memory efficient**: Minimal footprint (jobId + timestamp)
+- ✅ **Prevents duplicates**: Ignores re-delivered completed events
+- ✅ **Separate tracking**: Crawl and summary jobs tracked independently
+
+See **[SHARED-UTILS.md](./SHARED-UTILS.md#42-jobcompletiontracker)** for detailed API documentation.
 
 ### 2.7 Sequence Number Tracking
 
-#### 2.7.1 Purpose
+#### 2.7.1 Overview
 
-Sequence numbers guarantee that progress updates are processed in order, preventing out-of-order UI updates.
+SocketContext uses **`SocketSequenceManager`** utility class to ensure events are processed in order, preventing UI regressions.
 
-#### 2.7.2 Implementation
+**Import**:
+```typescript
+import { SocketSequenceManager } from 'shared/utils';
+```
+
+#### 2.7.2 Manager Initialization
 
 ```typescript
-const lastCrawlSequenceRef = useRef<number>(0)
-const lastDbSequenceRef = useRef<number>(0)
-const lastImageSequenceRef = useRef<number>(0)
-const lastSummarySequenceRef = useRef<number>(0)
+const crawlSequenceRef = useRef(new SocketSequenceManager());
+const dbSequenceRef = useRef(new SocketSequenceManager());
+const imageSequenceRef = useRef(new SocketSequenceManager());
+const summarySequenceRef = useRef(new SocketSequenceManager());
 ```
 
 #### 2.7.3 Sequence Checking
 
 ```typescript
 socket.on('review:crawl_progress', (data: any) => {
-  const sequence = data.sequence || data.current || 0
+  const sequence = data.sequence || data.current || 0;
+  const jobId = data.jobId;
 
-  // Ignore outdated events
-  if (sequence < lastCrawlSequenceRef.current) {
-    console.warn(`[Socket.io] Outdated crawl progress ignored: ${sequence} < ${lastCrawlSequenceRef.current}`)
-    return
+  // ✅ Check sequence using manager
+  if (!crawlSequenceRef.current.check(jobId, sequence)) {
+    console.warn(`[Socket.io] Outdated crawl progress ignored`);
+    return;
   }
 
-  lastCrawlSequenceRef.current = sequence
-
-  // Process event...
+  // Process event (guaranteed to be in order)
   setCrawlProgress({
     current: data.current || 0,
     total: data.total || 0,
     percentage: data.percentage || 0
-  })
+  });
 })
 ```
 
+#### 2.7.4 Cleanup on Completion
+
+```typescript
+socket.on('review:completed', (data: any) => {
+  const jobId = data.jobId;
+
+  // ✅ Reset sequence tracking
+  crawlSequenceRef.current.reset(jobId);
+  dbSequenceRef.current.reset(jobId);
+  imageSequenceRef.current.reset(jobId);
+
+  // Update UI...
+});
+```
+
 **Benefits**:
-- Prevents UI from going backwards (e.g., 80% → 50%)
-- Handles network delays and out-of-order delivery
-- Per-phase tracking (crawl, db, image, summary)
+- ✅ **Prevents UI regression**: Progress never goes backwards (80% → 50%)
+- ✅ **Handles network latency**: Out-of-order events filtered correctly
+- ✅ **Per-phase tracking**: Separate managers for crawl, db, image, summary
+- ✅ **Automatic cleanup**: `reset()` on completion prevents memory leaks
+
+See **[SHARED-UTILS.md](./SHARED-UTILS.md#43-socketsequencemanager)** for detailed API documentation.
 
 ### 2.8 Event Listeners
 
@@ -1276,6 +1282,10 @@ function RestaurantDetail({ restaurantId }: { restaurantId: number }) {
 
 ---
 
-**문서 버전**: 1.0
-**작성일**: 2025-10-23
+**문서 버전**: 1.1
+**최종 업데이트**: 2025-11-13
+**변경 사항**:
+- SocketContext에 JobCompletionTracker, SocketSequenceManager 적용 반영
+- SOCKET_CONFIG 사용 추가
+- Job 추적 및 Sequence 관리 섹션 업데이트
 **관리**: Claude Code Documentation Team
