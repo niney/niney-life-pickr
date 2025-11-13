@@ -2,8 +2,17 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { useTheme } from '@shared/contexts';
-import { THEME_COLORS } from '@shared/constants';
+import { THEME_COLORS, SOCKET_CONFIG } from '@shared/constants';
 import { getDefaultApiUrl } from '@shared/services';
+import { SocketSequenceManager, JobCompletionTracker } from '@shared/utils';
+import type {
+  ProgressEventData,
+  CompletionEventData,
+  ErrorEventData,
+  CancellationEventData,
+  JobNewEventData,
+  MenuProgressEventData,
+} from '@shared/types';
 import Header from './Header';
 import Drawer from './Drawer';
 import { QueueCard } from './QueueCard';
@@ -31,42 +40,6 @@ interface Job {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-}
-
-// Socket 이벤트 데이터 타입들
-interface ProgressEventData {
-  jobId: string;
-  restaurantId: number;
-  sequence?: number;
-  current: number;
-  total: number;
-  percentage: number;
-  timestamp?: number;
-}
-
-interface CompletionEventData {
-  jobId: string;
-  timestamp: number;
-}
-
-interface ErrorEventData {
-  jobId: string;
-  error: string;
-}
-
-interface CancellationEventData {
-  jobId: string;
-}
-
-interface JobNewEventData {
-  jobId: string;
-  type: string;
-  restaurantId: number;
-  timestamp: number;
-}
-
-interface MenuProgressEventData extends ProgressEventData {
-  metadata?: Record<string, string | number>;
 }
 
 /**
@@ -117,8 +90,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     cancelled: 0,
   });
 
-  // ✅ Sequence 번호 추적 (순서 보장) - Job별로 관리
-  const lastSequenceRef = useRef<Map<string, number>>(new Map());
+  // ✅ Sequence 및 Completion 추적 (공통 유틸)
+  const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager());
+  const completionTrackerRef = useRef<JobCompletionTracker>(new JobCompletionTracker());
 
   // ==================== Socket 기반 초기 로딩 (HTTP 제거) ====================
 
@@ -192,16 +166,17 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     console.log('[JobMonitor] Socket 연결 시도...');
 
     const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      ...SOCKET_CONFIG,
+      transports: ['websocket', 'polling'], // readonly를 mutable로 변환
     });
 
     // Socket 연결 성공
     newSocket.on('connect', () => {
       console.log('[JobMonitor] Socket 연결 성공:', newSocket.id);
       setSocketConnected(true);
+      
+      // ✅ 연결 시 자동 정리 시작 (5분 주기)
+      completionTrackerRef.current.startAutoCleanup(5);
     });
 
     // Socket 연결 끊김
@@ -257,7 +232,13 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) {
+      if (!sequenceManagerRef.current.check(data.jobId, sequence)) {
+        return;
+      }
+
+      // ✅ 이미 완료된 Job 무시
+      if (completionTrackerRef.current.isCompleted(data.jobId)) {
+        console.warn(`[JobMonitor] Ignoring completed job: ${data.jobId}`);
         return;
       }
 
@@ -297,7 +278,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
                 }
               : job
           ));
-          resetSequence(data.jobId);
+          completionTrackerRef.current.markCompleted(data.jobId);
+          sequenceManagerRef.current.reset(data.jobId);
         }, 3000);
       }
     });
@@ -316,7 +298,13 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) {
+      if (!sequenceManagerRef.current.check(data.jobId, sequence)) {
+        return;
+      }
+
+      // ✅ 이미 완료된 Job 무시
+      if (completionTrackerRef.current.isCompleted(data.jobId)) {
+        console.warn(`[JobMonitor] Ignoring completed job: ${data.jobId}`);
         return;
       }
 
@@ -356,7 +344,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
                 }
               : job
           ));
-          resetSequence(data.jobId);
+          completionTrackerRef.current.markCompleted(data.jobId);
+          sequenceManagerRef.current.reset(data.jobId);
         }, 3000);
       }
     });
@@ -375,7 +364,13 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) {
+      if (!sequenceManagerRef.current.check(data.jobId, sequence)) {
+        return;
+      }
+
+      // ✅ 이미 완료된 Job 무시
+      if (completionTrackerRef.current.isCompleted(data.jobId)) {
+        console.warn(`[JobMonitor] Ignoring completed job: ${data.jobId}`);
         return;
       }
 
@@ -415,7 +410,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
                 }
               : job
           ));
-          resetSequence(data.jobId);
+          completionTrackerRef.current.markCompleted(data.jobId);
+          sequenceManagerRef.current.reset(data.jobId);
         }, 3000);
       }
     });
@@ -431,8 +427,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     newSocket.on('review:completed', (data: CompletionEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 완료:', data);
 
-      // ✅ Sequence 초기화
-      resetSequence(data.jobId);
+      // ✅ 완료 Job 등록 및 Sequence 초기화
+      completionTrackerRef.current.markCompleted(data.jobId);
+      sequenceManagerRef.current.reset(data.jobId);
 
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
@@ -456,8 +453,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     newSocket.on('review:error', (data: ErrorEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 실패:', data);
 
-      // ✅ Sequence 초기화
-      resetSequence(data.jobId);
+      // ✅ 완료 Job 등록 및 Sequence 초기화
+      completionTrackerRef.current.markCompleted(data.jobId);
+      sequenceManagerRef.current.reset(data.jobId);
 
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
@@ -480,8 +478,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     newSocket.on('review:cancelled', (data: CancellationEventData) => {
       console.log('[JobMonitor] 리뷰 크롤링 취소:', data);
 
-      // ✅ Sequence 초기화
-      resetSequence(data.jobId);
+      // ✅ 완료 Job 등록 및 Sequence 초기화
+      completionTrackerRef.current.markCompleted(data.jobId);
+      sequenceManagerRef.current.reset(data.jobId);
 
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
@@ -503,7 +502,13 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) {
+      if (!sequenceManagerRef.current.check(data.jobId, sequence)) {
+        return;
+      }
+
+      // ✅ 이미 완료된 Job 무시
+      if (completionTrackerRef.current.isCompleted(data.jobId)) {
+        console.warn(`[JobMonitor] Ignoring completed job: ${data.jobId}`);
         return;
       }
 
@@ -542,7 +547,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
                 }
               : job
           ));
-          resetSequence(data.jobId);
+          completionTrackerRef.current.markCompleted(data.jobId);
+          sequenceManagerRef.current.reset(data.jobId);
         }, 3000);
       }
     });
@@ -553,8 +559,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     newSocket.on('review_summary:completed', (data: CompletionEventData) => {
       console.log('[JobMonitor] 리뷰 요약 완료:', data);
 
-      // ✅ Sequence 초기화
-      resetSequence(data.jobId);
+      // ✅ 완료 Job 등록 및 Sequence 초기화
+      completionTrackerRef.current.markCompleted(data.jobId);
+      sequenceManagerRef.current.reset(data.jobId);
 
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
@@ -573,8 +580,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     newSocket.on('review_summary:error', (data: ErrorEventData) => {
       console.log('[JobMonitor] 리뷰 요약 실패:', data);
 
-      // ✅ Sequence 초기화
-      resetSequence(data.jobId);
+      // ✅ 완료 Job 등록 및 Sequence 초기화
+      completionTrackerRef.current.markCompleted(data.jobId);
+      sequenceManagerRef.current.reset(data.jobId);
 
       setJobs(prev => prev.map(job =>
         job.jobId === data.jobId
@@ -601,7 +609,13 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
 
       // ✅ Sequence 체크: 구 버전 이벤트 무시
       const sequence = data.sequence || data.current || 0;
-      if (!checkSequence(data.jobId, sequence)) {
+      if (!sequenceManagerRef.current.check(data.jobId, sequence)) {
+        return;
+      }
+
+      // ✅ 이미 완료된 Job 무시
+      if (completionTrackerRef.current.isCompleted(data.jobId)) {
+        console.warn(`[JobMonitor] Ignoring completed job: ${data.jobId}`);
         return;
       }
 
@@ -641,7 +655,8 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
                 }
               : job
           ));
-          resetSequence(data.jobId);
+          completionTrackerRef.current.markCompleted(data.jobId);
+          sequenceManagerRef.current.reset(data.jobId);
         }, 3000);
       }
     });
@@ -775,6 +790,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     // Cleanup: 컴포넌트 unmount 시 Socket 연결 해제
     return () => {
       console.log('[JobMonitor] Socket 연결 해제');
+      completionTrackerRef.current.stopAutoCleanup(); // ✅ 자동 정리 중지
       newSocket.emit('unsubscribe:all_jobs'); // 전체 Job 구독 해제
       newSocket.close();
     };
@@ -802,30 +818,6 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
   }, [socket, socketConnected, isLoading, subscribeToAllJobs]);
 
   // ==================== UI 헬퍼 함수 ====================
-
-  /**
-   * Sequence 체크 - 구 버전 이벤트 무시
-   * @returns true면 처리, false면 무시
-   */
-  const checkSequence = useCallback((jobId: string, newSequence: number): boolean => {
-    const lastSequence = lastSequenceRef.current.get(jobId) || 0;
-
-    if (newSequence < lastSequence) {
-      console.warn(`[JobMonitor] Outdated event ignored - Job: ${jobId}, ${newSequence} < ${lastSequence}`);
-      return false;
-    }
-
-    lastSequenceRef.current.set(jobId, newSequence);
-    return true;
-  }, []);
-
-  /**
-   * Sequence 초기화 (Job 완료/실패 시)
-   */
-  const resetSequence = useCallback((jobId: string) => {
-    lastSequenceRef.current.delete(jobId);
-    console.log(`[JobMonitor] Sequence reset for Job: ${jobId}`);
-  }, []);
 
   /**
    * 진행률 이벤트 수신 시 Job이 없으면 새로 생성
