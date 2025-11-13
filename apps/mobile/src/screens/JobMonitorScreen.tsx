@@ -132,39 +132,8 @@ const JobMonitorScreen: React.FC = () => {
   // Sequence 추적
   const lastSequenceRef = useRef<Map<string, number>>(new Map());
 
-  /**
-   * Socket으로 초기 Job 리스트 조회
-   */
-  const subscribeToAllJobs = useCallback(() => {
-    if (!socket) return;
-
-    console.log('[JobMonitor] 전체 Job 구독 시작...');
-    socket.emit('subscribe:all_jobs');
-
-    socket.once('jobs:current_state', (data: {
-      total: number;
-      jobs: Job[];
-      restaurantIds: number[];
-      timestamp: number;
-    }) => {
-      console.log('[JobMonitor] 초기 Job 리스트 수신:', data);
-      setJobs(data.jobs);
-      setIsLoading(false);
-
-      // 모든 레스토랑 Room 구독
-      data.restaurantIds.forEach((restaurantId) => {
-        if (!subscribedRooms.has(restaurantId)) {
-          socket.emit('subscribe:restaurant', restaurantId);
-          setSubscribedRooms(prev => new Set(prev).add(restaurantId));
-        }
-      });
-    });
-
-    socket.once('jobs:error', (error: { message: string; error: string }) => {
-      console.error('[JobMonitor] Job 로딩 실패:', error);
-      setIsLoading(false);
-    });
-  }, [socket, subscribedRooms]);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   /**
    * Sequence 체크
@@ -246,17 +215,84 @@ const JobMonitorScreen: React.FC = () => {
     const newSocket = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
 
     newSocket.on('connect', () => {
       console.log('[JobMonitor] Socket 연결 성공');
       setSocketConnected(true);
+      setIsLoading(false);
+
+      // 연결 후 즉시 데이터 조회
+      newSocket.emit('subscribe:all_jobs');
+      newSocket.emit('subscribe:queue');
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('[JobMonitor] Socket 연결 끊김');
+    // jobs:current_state - 초기 Job 리스트 수신
+    newSocket.on('jobs:current_state', (data: {
+      total: number;
+      jobs: Job[];
+      restaurantIds: number[];
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] 초기 Job 리스트 수신:', data);
+      setJobs(data.jobs);
+
+      // 모든 레스토랑 Room 구독
+      data.restaurantIds.forEach((restaurantId) => {
+        if (!subscribedRooms.has(restaurantId)) {
+          newSocket.emit('subscribe:restaurant', restaurantId);
+          setSubscribedRooms(prev => new Set(prev).add(restaurantId));
+        }
+      });
+    });
+
+    // jobs:error - Job 로딩 실패
+    newSocket.on('jobs:error', (error: { message: string; error: string }) => {
+      console.error('[JobMonitor] Job 로딩 실패:', error);
+    });
+
+    newSocket.on('disconnect', (reason: string) => {
+      console.log('[JobMonitor] Socket 연결 끊김:', reason);
+      setSocketConnected(false);
+
+      // 의도치 않은 끊김이면 재연결 시도
+      if (reason === 'io server disconnect') {
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (socketRef.current && !socketRef.current.connected) {
+            console.log('[JobMonitor] Socket 재연결 시도...');
+            socketRef.current.connect();
+          }
+        }, 1000);
+      }
+    });
+
+    // 재연결 이벤트
+    newSocket.on('reconnect', (attemptNumber: number) => {
+      console.log('[JobMonitor] Socket 재연결 성공:', attemptNumber);
+      // 재연결 후 데이터 갱신
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('subscribe:all_jobs');
+        socketRef.current.emit('subscribe:queue');
+      }
+    });
+
+    newSocket.on('reconnect_attempt', (attemptNumber: number) => {
+      console.log('[JobMonitor] Socket 재연결 시도:', attemptNumber);
+    });
+
+    newSocket.on('reconnect_error', (error: Error) => {
+      console.error('[JobMonitor] Socket 재연결 실패:', error);
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('[JobMonitor] Socket 재연결 완전 실패');
       setSocketConnected(false);
     });
 
@@ -550,23 +586,17 @@ const JobMonitorScreen: React.FC = () => {
     });
 
     setSocket(newSocket);
+    socketRef.current = newSocket;
 
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       newSocket.emit('unsubscribe:all_jobs');
       newSocket.close();
+      socketRef.current = null;
     };
   }, [checkSequence, resetSequence, createJobFromProgress]);
-
-  /**
-   * 초기 Job 로딩
-   */
-  useEffect(() => {
-    if (socket && socketConnected && isLoading) {
-      subscribeToAllJobs();
-      socket.emit('subscribe:queue');
-      setIsLoading(false);
-    }
-  }, [socket, socketConnected, isLoading, subscribeToAllJobs]);
 
   /**
    * UI 헬퍼 함수
