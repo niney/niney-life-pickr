@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -548,17 +548,33 @@ const JobMonitorScreen: React.FC = () => {
 
   /**
    * 레스토랑 상세 화면으로 이동
-   * Restaurant Stack의 RestaurantDetail로 네비게이션
+   * CommonActions를 사용하여 스택 구조를 명시적으로 재구성
+   * RestaurantList를 스택에 포함시켜 뒤로가기 지원
    */
-  const handleOpenRestaurant = (restaurantId: number) => {
-    // Tab Navigator에서 Restaurant Stack으로 전환 후 RestaurantDetail로 이동
-    navigation.navigate('Restaurant', {
-      screen: 'RestaurantDetail',
-      params: {
-        restaurantId,
-      },
-    });
-  };
+  const handleOpenRestaurant = useCallback((restaurantId: number) => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Restaurant',
+            state: {
+              routes: [
+                { name: 'RestaurantList' },
+                {
+                  name: 'RestaurantDetail',
+                  params: {
+                    restaurantId,
+                  },
+                },
+              ],
+              index: 1,
+            },
+          },
+        ],
+      })
+    );
+  }, [navigation]);
 
   if (isLoading) {
     return (

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -58,13 +58,40 @@ const HomeScreen: React.FC = () => {
     }));
   };
 
-  const handleRestaurantPress = (restaurantId: number) => {
-    // Restaurant Stack의 RestaurantDetail로 직접 네비게이션
-    navigation.navigate('Restaurant', {
-      screen: 'RestaurantDetail',
-      params: { restaurantId },
-    });
-  };
+  /**
+   * 레스토랑 상세로 이동
+   * CommonActions를 사용하여 스택 구조를 명시적으로 재구성
+   * RestaurantList를 스택에 포함시켜 뒤로가기 지원
+   * restaurant 객체를 함께 전달하여 헤더명이 즉시 표시되도록 함
+   */
+  const handleRestaurantPress = useCallback((
+    restaurantId: number,
+    restaurant?: { id: number; name: string; category: string | null; address: string | null }
+  ) => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Restaurant',
+            state: {
+              routes: [
+                { name: 'RestaurantList' },
+                {
+                  name: 'RestaurantDetail',
+                  params: {
+                    restaurantId,
+                    restaurant: restaurant,
+                  },
+                },
+              ],
+              index: 1,
+            },
+          },
+        ],
+      })
+    );
+  }, [navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -111,7 +138,7 @@ const HomeScreen: React.FC = () => {
               <TouchableOpacity
                 key={ranking.rank}
                 style={[styles.rankingItem, { borderColor: colors.border }]}
-                onPress={() => handleRestaurantPress(ranking.restaurant.id)}
+                onPress={() => handleRestaurantPress(ranking.restaurant.id, ranking.restaurant)}
                 activeOpacity={0.7}
               >
                 <View style={styles.rankRow}>
