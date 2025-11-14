@@ -194,6 +194,28 @@ class JobRepository {
   }
 
   /**
+   * 모든 활성 Job 조회 (Restaurant 정보 포함)
+   * Socket 통신용 - Restaurant 이름, 카테고리, 주소 정보 함께 조회
+   */
+  async findAllActiveWithRestaurant(): Promise<Array<JobDB & {
+    restaurant_name: string | null;
+    restaurant_category: string | null;
+    restaurant_address: string | null;
+  }>> {
+    return db.all(`
+      SELECT 
+        j.*,
+        r.name as restaurant_name,
+        r.category as restaurant_category,
+        r.address as restaurant_address
+      FROM jobs j
+      LEFT JOIN restaurants r ON j.restaurant_id = r.id
+      WHERE j.status = 'active'
+      ORDER BY j.created_at DESC
+    `);
+  }
+
+  /**
    * 레스토랑의 Job 히스토리 조회
    */
   async findByRestaurant(

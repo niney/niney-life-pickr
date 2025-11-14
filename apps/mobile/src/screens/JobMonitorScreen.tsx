@@ -36,6 +36,12 @@ const SOCKET_URL = getDefaultApiUrl();
 interface Job {
   jobId: string;
   restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
   type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
   status: 'active' | 'completed' | 'failed' | 'cancelled';
   isInterrupted: boolean;
@@ -550,8 +556,12 @@ const JobMonitorScreen: React.FC = () => {
    * 레스토랑 상세 화면으로 이동
    * CommonActions를 사용하여 스택 구조를 명시적으로 재구성
    * RestaurantList를 스택에 포함시켜 뒤로가기 지원
+   * restaurant 객체를 함께 전달하여 헤더명이 즉시 표시되도록 함
    */
-  const handleOpenRestaurant = useCallback((restaurantId: number) => {
+  const handleOpenRestaurant = useCallback((
+    restaurantId: number,
+    restaurant?: { id: number; name: string; category: string | null; address: string | null }
+  ) => {
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
@@ -565,6 +575,7 @@ const JobMonitorScreen: React.FC = () => {
                   name: 'RestaurantDetail',
                   params: {
                     restaurantId,
+                    restaurant: restaurant,
                   },
                 },
               ],
@@ -699,9 +710,9 @@ const JobMonitorScreen: React.FC = () => {
               <Text style={[styles.jobId, { color: colors.textSecondary }]}>
                 #{job.jobId.slice(0, 8)}
               </Text>
-              <TouchableOpacity onPress={() => handleOpenRestaurant(job.restaurantId)}>
+              <TouchableOpacity onPress={() => handleOpenRestaurant(job.restaurantId, job.restaurant)}>
                 <Text style={[styles.restaurantId, { color: colors.primary }]}>
-                  레스토랑 #{job.restaurantId}
+                  {job.restaurant?.name || `레스토랑 #${job.restaurantId}`}
                 </Text>
               </TouchableOpacity>
               {job.status === 'active' && getPhaseLabel(job) && (

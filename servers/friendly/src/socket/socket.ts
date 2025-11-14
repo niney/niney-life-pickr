@@ -135,8 +135,8 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       console.log(`[Socket.io] Client ${socket.id} subscribed to all jobs`);
 
       try {
-        // 1. DB에서 active Job 조회 (모든 레스토랑, 최근 100개)
-        const dbActiveJobs = await jobRepository.findAllActive();
+        // 1. DB에서 active Job 조회 (Restaurant 정보 포함)
+        const dbActiveJobs = await jobRepository.findAllActiveWithRestaurant();
 
         // 2. Memory Job과 비교하여 중단 여부 체크
         const jobs = dbActiveJobs.map((dbJob) => {
@@ -146,6 +146,12 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
           return {
             jobId: dbJob.id,
             restaurantId: dbJob.restaurant_id,
+            restaurant: dbJob.restaurant_name ? {
+              id: dbJob.restaurant_id,
+              name: dbJob.restaurant_name,
+              category: dbJob.restaurant_category,
+              address: dbJob.restaurant_address,
+            } : undefined,
             type: dbJob.type,
             status: dbJob.status,
             isInterrupted: !memoryJob && dbJob.status === 'active', // ⭐ 중단 플래그

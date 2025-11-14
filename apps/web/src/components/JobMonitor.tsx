@@ -27,6 +27,12 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || getDefaultApiUrl();
 interface Job {
   jobId: string;
   restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
   type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
   status: 'active' | 'completed' | 'failed' | 'cancelled';
   isInterrupted: boolean; // 서버 재시작 등으로 중단된 Job
@@ -1060,15 +1066,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
             </View>
 
             {/* 레스토랑 정보 */}
-            <TouchableOpacity
-              onPress={() => window.open(`/restaurant/${job.restaurantId}`, '_blank')}
-              style={styles.restaurantInfo}
-            >
-              <Text style={[styles.restaurantLabel, { color: colors.textSecondary }]}>
-                레스토랑
-              </Text>
+            <TouchableOpacity onPress={() => window.open(`/restaurant/${job.restaurantId}`, '_blank')}>
               <Text style={[styles.restaurantId, { color: colors.primary }]}>
-                #{job.restaurantId} →
+                {job.restaurant?.name || `레스토랑 #${job.restaurantId}`}
               </Text>
             </TouchableOpacity>
 
@@ -1246,15 +1246,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  restaurantLabel: {
-    fontSize: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   restaurantId: {
     fontSize: 14,
     fontWeight: '500',
+    marginBottom: 8,
   },
   phaseContainer: {
     marginBottom: 12,
