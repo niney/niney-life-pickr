@@ -76,6 +76,17 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
   const colors = THEME_COLORS[theme];
   const [drawerVisible, setDrawerVisible] = useState(false);
 
+  // ==================== 반응형 체크 ====================
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // ==================== Job State 관리 ====================
 
   const [jobs, setJobs] = useState<Job[]>([]); // Job 리스트
@@ -1016,154 +1027,318 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* ==================== 대기열 섹션 ==================== */}
-        {queueItems.length > 0 && (
-          <>
-            <View style={[styles.sectionHeader, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                📋 대기열 ({queueStats.waiting} 대기 / {queueStats.processing} 처리 중)
-              </Text>
-            </View>
-
-            {queueItems.map(item => (
-              <QueueCard
-                key={item.queueId}
-                item={item}
-                onCancel={handleCancelQueue}
-              />
-            ))}
-          </>
-        )}
-
-        {/* ==================== 실행 중 Job 섹션 ==================== */}
-        <View style={[styles.sectionHeader, { backgroundColor: colors.surface, marginTop: queueItems.length > 0 ? 24 : 0 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            ▶️ 실행 중 Job ({jobs.length})
-          </Text>
-        </View>
-
-        {/* Job 카드 리스트 */}
-        {jobs.map(job => (
-          <View
-            key={job.jobId}
-            style={[
-              styles.jobCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: job.isInterrupted ? '#f59e0b' : colors.border,
-                borderLeftWidth: 4,
-                borderLeftColor: getStatusColor(job)
-              }
-            ]}
-          >
-            {/* 카드 헤더 */}
-            <View style={styles.cardHeader}>
-              <View style={styles.cardHeaderLeft}>
-                <Text style={[styles.jobType, { color: colors.text }]}>
-                  {getTypeLabel(job.type)}
-                </Text>
-                <Text style={[styles.jobId, { color: colors.textSecondary }]}>
-                  #{job.jobId.slice(0, 8)}
+        {/* 데스크탑 2열 레이아웃 */}
+        {!isMobile ? (
+          <View style={styles.desktopLayout}>
+            {/* 왼쪽: 대기열 */}
+            <View style={styles.desktopColumn}>
+              <View style={[styles.sectionHeader, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  📋 대기열 ({queueStats.waiting} 대기 / {queueStats.processing} 처리 중)
                 </Text>
               </View>
-              <Text style={[styles.statusBadge, { color: getStatusColor(job) }]}>
-                {getStatusText(job)}
-              </Text>
-            </View>
 
-            {/* 레스토랑 정보 */}
-            <TouchableOpacity onPress={() => window.open(`/restaurant/${job.restaurantId}`, '_blank')}>
-              <Text style={[styles.restaurantId, { color: colors.primary }]}>
-                {job.restaurant?.name || `레스토랑 #${job.restaurantId}`}
-              </Text>
-            </TouchableOpacity>
-
-            {/* 진행 상태 */}
-            {job.status === 'active' && getPhaseLabel(job) !== '' && (
-              <View style={styles.phaseContainer}>
-                <Text style={[styles.phaseText, { color: colors.textSecondary }]}>
-                  {getPhaseLabel(job)}
-                </Text>
-              </View>
-            )}
-
-            {/* 진행률 */}
-            {job.progress.total > 0 && (
-              <View style={styles.progressSection}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
-                    진행률
-                  </Text>
-                  <Text style={[styles.progressText, { color: colors.text }]}>
-                    {job.progress.percentage}% ({job.progress.current}/{job.progress.total})
+              {queueItems.length > 0 ? (
+                queueItems.map(item => (
+                  <QueueCard
+                    key={item.queueId}
+                    item={item}
+                    onCancel={handleCancelQueue}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    대기 중인 작업이 없습니다
                   </Text>
                 </View>
-                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+              )}
+            </View>
+
+            {/* 오른쪽: 실행 중 Job */}
+            <View style={styles.desktopColumn}>
+              <View style={[styles.sectionHeader, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  ▶️ 실행 중 Job ({jobs.length})
+                </Text>
+              </View>
+
+              {jobs.length > 0 ? (
+                jobs.map(job => (
                   <View
+                    key={job.jobId}
                     style={[
-                      styles.progressFill,
+                      styles.jobCard,
                       {
-                        width: `${job.progress.percentage}%`,
-                        backgroundColor: getStatusColor(job)
+                        backgroundColor: colors.surface,
+                        borderColor: job.isInterrupted ? '#f59e0b' : colors.border,
+                        borderLeftWidth: 4,
+                        borderLeftColor: getStatusColor(job)
                       }
                     ]}
-                  />
-                </View>
-              </View>
-            )}
+                  >
+                    {/* 카드 헤더 */}
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardHeaderLeft}>
+                        <Text style={[styles.jobType, { color: colors.text }]}>
+                          {getTypeLabel(job.type)}
+                        </Text>
+                        <Text style={[styles.jobId, { color: colors.textSecondary }]}>
+                          #{job.jobId.slice(0, 8)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.statusBadge, { color: getStatusColor(job) }]}>
+                        {getStatusText(job)}
+                      </Text>
+                    </View>
 
-            {/* 에러 메시지 */}
-            {job.error && (
-              <View style={[styles.errorContainer, { backgroundColor: '#fee2e2' }]}>
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  {job.error}
-                </Text>
-              </View>
-            )}
+                    {/* 레스토랑 정보 */}
+                    <TouchableOpacity onPress={() => window.open(`/restaurant/${job.restaurantId}`, '_blank')}>
+                      <Text style={[styles.restaurantId, { color: colors.primary }]}>
+                        {job.restaurant?.name || `레스토랑 #${job.restaurantId}`}
+                      </Text>
+                    </TouchableOpacity>
 
-            {/* 타임스탬프 */}
-            <View style={styles.timestamps}>
-              {job.startedAt && (
-                <View style={styles.timestampItem}>
-                  <Text style={[styles.timestampLabel, { color: colors.textSecondary }]}>
-                    시작
-                  </Text>
-                  <Text style={[styles.timestampValue, { color: colors.text }]}>
-                    {new Date(job.startedAt).toLocaleString('ko-KR', {
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
-                </View>
-              )}
-              {job.completedAt && (
-                <View style={styles.timestampItem}>
-                  <Text style={[styles.timestampLabel, { color: colors.textSecondary }]}>
-                    완료
-                  </Text>
-                  <Text style={[styles.timestampValue, { color: colors.text }]}>
-                    {new Date(job.completedAt).toLocaleString('ko-KR', {
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {/* 진행 상태 */}
+                    {job.status === 'active' && getPhaseLabel(job) !== '' && (
+                      <View style={styles.phaseContainer}>
+                        <Text style={[styles.phaseText, { color: colors.textSecondary }]}>
+                          {getPhaseLabel(job)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* 진행률 */}
+                    {job.progress.total > 0 && (
+                      <View style={styles.progressSection}>
+                        <View style={styles.progressHeader}>
+                          <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
+                            진행률
+                          </Text>
+                          <Text style={[styles.progressText, { color: colors.text }]}>
+                            {job.progress.percentage}% ({job.progress.current}/{job.progress.total})
+                          </Text>
+                        </View>
+                        <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${job.progress.percentage}%`,
+                                backgroundColor: getStatusColor(job)
+                              }
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    )}
+
+                    {/* 에러 메시지 */}
+                    {job.error && (
+                      <View style={[styles.errorContainer, { backgroundColor: '#fee2e2' }]}>
+                        <Text style={[styles.errorText, { color: colors.error }]}>
+                          {job.error}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* 타임스탬프 */}
+                    <View style={styles.timestamps}>
+                      {job.startedAt && (
+                        <View style={styles.timestampItem}>
+                          <Text style={[styles.timestampLabel, { color: colors.textSecondary }]}>
+                            시작
+                          </Text>
+                          <Text style={[styles.timestampValue, { color: colors.text }]}>
+                            {new Date(job.startedAt).toLocaleString('ko-KR', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                      {job.completedAt && (
+                        <View style={styles.timestampItem}>
+                          <Text style={[styles.timestampLabel, { color: colors.textSecondary }]}>
+                            완료
+                          </Text>
+                          <Text style={[styles.timestampValue, { color: colors.text }]}>
+                            {new Date(job.completedAt).toLocaleString('ko-KR', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    실행 중인 Job이 없습니다
                   </Text>
                 </View>
               )}
             </View>
           </View>
-        ))}
+        ) : (
+          /* 모바일 1열 레이아웃 */
+          <>
+            {/* ==================== 대기열 섹션 ==================== */}
+            {queueItems.length > 0 && (
+              <>
+                <View style={[styles.sectionHeader, { backgroundColor: colors.surface }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    📋 대기열 ({queueStats.waiting} 대기 / {queueStats.processing} 처리 중)
+                  </Text>
+                </View>
 
-        {/* 빈 상태 */}
-        {jobs.length === 0 && queueItems.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              실행 중인 Job과 대기 중인 작업이 없습니다
-            </Text>
-          </View>
+                {queueItems.map(item => (
+                  <QueueCard
+                    key={item.queueId}
+                    item={item}
+                    onCancel={handleCancelQueue}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* ==================== 실행 중 Job 섹션 ==================== */}
+            <View style={[styles.sectionHeader, { backgroundColor: colors.surface, marginTop: queueItems.length > 0 ? 24 : 0 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                ▶️ 실행 중 Job ({jobs.length})
+              </Text>
+            </View>
+
+            {/* Job 카드 리스트 */}
+            {jobs.map(job => (
+              <View
+                key={job.jobId}
+                style={[
+                  styles.jobCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: job.isInterrupted ? '#f59e0b' : colors.border,
+                    borderLeftWidth: 4,
+                    borderLeftColor: getStatusColor(job)
+                  }
+                ]}
+              >
+                {/* 카드 헤더 */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderLeft}>
+                    <Text style={[styles.jobType, { color: colors.text }]}>
+                      {getTypeLabel(job.type)}
+                    </Text>
+                    <Text style={[styles.jobId, { color: colors.textSecondary }]}>
+                      #{job.jobId.slice(0, 8)}
+                    </Text>
+                  </View>
+                  <Text style={[styles.statusBadge, { color: getStatusColor(job) }]}>
+                    {getStatusText(job)}
+                  </Text>
+                </View>
+
+                {/* 레스토랑 정보 */}
+                <TouchableOpacity onPress={() => window.open(`/restaurant/${job.restaurantId}`, '_blank')}>
+                  <Text style={[styles.restaurantId, { color: colors.primary }]}>
+                    {job.restaurant?.name || `레스토랑 #${job.restaurantId}`}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 진행 상태 */}
+                {job.status === 'active' && getPhaseLabel(job) !== '' && (
+                  <View style={styles.phaseContainer}>
+                    <Text style={[styles.phaseText, { color: colors.textSecondary }]}>
+                      {getPhaseLabel(job)}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 진행률 */}
+                {job.progress.total > 0 && (
+                  <View style={styles.progressSection}>
+                    <View style={styles.progressHeader}>
+                      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
+                        진행률
+                      </Text>
+                      <Text style={[styles.progressText, { color: colors.text }]}>
+                        {job.progress.percentage}% ({job.progress.current}/{job.progress.total})
+                      </Text>
+                    </View>
+                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            width: `${job.progress.percentage}%`,
+                            backgroundColor: getStatusColor(job)
+                          }
+                        ]}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {/* 에러 메시지 */}
+                {job.error && (
+                  <View style={[styles.errorContainer, { backgroundColor: '#fee2e2' }]}>
+                    <Text style={[styles.errorText, { color: colors.error }]}>
+                      {job.error}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 타임스탬프 */}
+                <View style={styles.timestamps}>
+                  {job.startedAt && (
+                    <View style={styles.timestampItem}>
+                      <Text style={[styles.timestampLabel, { color: colors.textSecondary }]}>
+                        시작
+                      </Text>
+                      <Text style={[styles.timestampValue, { color: colors.text }]}>
+                        {new Date(job.startedAt).toLocaleString('ko-KR', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+                  {job.completedAt && (
+                    <View style={styles.timestampItem}>
+                      <Text style={[styles.timestampLabel, { color: colors.textSecondary }]}>
+                        완료
+                      </Text>
+                      <Text style={[styles.timestampValue, { color: colors.text }]}>
+                        {new Date(job.completedAt).toLocaleString('ko-KR', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ))}
+
+            {/* 빈 상태 */}
+            {jobs.length === 0 && queueItems.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  실행 중인 Job과 대기 중인 작업이 없습니다
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -1327,5 +1502,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+  },
+  // 데스크탑 레이아웃
+  desktopLayout: {
+    flexDirection: 'row',
+    gap: 20,
+    alignItems: 'flex-start',
+  },
+  desktopColumn: {
+    flex: 1,
+    minWidth: 0, // flex 자식이 넘칠 때 줄바꿈 방지
   },
 });
