@@ -23,13 +23,18 @@ const MapTab: React.FC<MapTabProps> = ({ placeId, onOpenNaverMap, isMobile = fal
     )
   }
 
+  // 플랫폼별 네이버 지도 URL
+  const mapUrl = isMobile
+    ? `https://m.place.naver.com/restaurant/${placeId}/location`  // 모바일
+    : `https://map.naver.com/p/entry/place/${placeId}`            // 데스크톱
+
   return (
     <View style={styles.container}>
       <iframe
-        src={`https://m.place.naver.com/restaurant/${placeId}/location`}
+        src={mapUrl}
         style={{
           width: '100%',
-          height: isMobile ? 'calc(100vh - 200px)' : '600px',
+          height: 'calc(100vh - 285px)',
           border: 'none',
           borderRadius: '12px',
         }}

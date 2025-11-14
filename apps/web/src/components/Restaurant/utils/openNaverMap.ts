@@ -20,6 +20,6 @@ export const openNaverMap = (placeId: string) => {
     }, 1500)
   } else {
     // 데스크톱: 바로 웹으로
-    window.open(`https://m.place.naver.com/restaurant/${placeId}/location`, '_blank')
+    window.open(`https://map.naver.com/p/entry/place/${placeId}`, '_blank')
   }
 }
