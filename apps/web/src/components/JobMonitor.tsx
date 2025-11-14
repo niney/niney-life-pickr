@@ -693,6 +693,12 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       queueId: string;
       type: string;
       restaurantId: number;
+      restaurant?: {
+        id: number;
+        name: string;
+        category: string | null;
+        address: string | null;
+      };
       position: number;
       timestamp: number;
     }) => {

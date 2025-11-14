@@ -62,6 +62,12 @@ interface QueuedJob {
   jobId: string | null;
   type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
   restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
   metadata: Record<string, string | number | boolean>;
   queueStatus: 'waiting' | 'processing' | 'completed' | 'failed' | 'cancelled';
   queuedAt: string;
@@ -388,7 +394,20 @@ const JobMonitorScreen: React.FC = () => {
       setQueueStats(data.stats);
     });
 
-    newSocket.on('queue:job_added', () => {
+    newSocket.on('queue:job_added', (data: {
+      queueId: string;
+      type: string;
+      restaurantId: number;
+      restaurant?: {
+        id: number;
+        name: string;
+        category: string | null;
+        address: string | null;
+      };
+      position: number;
+      timestamp: number;
+    }) => {
+      console.log('[JobMonitor] Queue에 Job 추가:', data);
       newSocket.emit('subscribe:queue');
     });
 
@@ -661,9 +680,9 @@ const JobMonitorScreen: React.FC = () => {
                   <Text style={[styles.queueId, { color: colors.textSecondary }]}>
                     #{item.queueId.slice(0, 8)}
                   </Text>
-                  <TouchableOpacity onPress={() => handleOpenRestaurant(item.restaurantId)}>
+                  <TouchableOpacity onPress={() => handleOpenRestaurant(item.restaurantId, item.restaurant)}>
                     <Text style={[styles.restaurantId, { color: colors.primary }]}>
-                      레스토랑 #{item.restaurantId}
+                      {item.restaurant?.name || `레스토랑 #${item.restaurantId}`}
                     </Text>
                   </TouchableOpacity>
                   {item.error && (

@@ -6,6 +6,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getSocketIO } from '../socket/socket';
 import { QueuedJob, QueueStats, EnqueueJobParams } from '../types/queue.types';
+import { restaurantRepository } from '../db/repositories/restaurant.repository';
 
 class JobQueueManager {
   private queue: QueuedJob[] = [];
@@ -18,7 +19,7 @@ class JobQueueManager {
   /**
    * Queue에 Job 추가
    */
-  enqueue(params: EnqueueJobParams): string {
+  async enqueue(params: EnqueueJobParams): Promise<string> {
     const { type, restaurantId, placeId, url, metadata = {} } = params;
 
     // 1. 중복 체크 (같은 restaurantId + waiting/processing 상태)
@@ -53,12 +54,21 @@ class JobQueueManager {
     // 3. Queue에 추가
     this.queue.push(queuedJob);
 
-    // 4. Socket 이벤트 발행 (queue:job_added)
+    // 4. 레스토랑 정보 조회
+    const restaurant = await restaurantRepository.findById(restaurantId);
+
+    // 5. Socket 이벤트 발행 (queue:job_added) - 레스토랑 정보 포함
     const io = getSocketIO();
     io.emit('queue:job_added', {
       queueId: queuedJob.queueId,
       type: queuedJob.type,
       restaurantId: queuedJob.restaurantId,
+      restaurant: restaurant ? {
+        id: restaurant.id,
+        name: restaurant.name,
+        category: restaurant.category,
+        address: restaurant.address,
+      } : undefined,
       position: this.getWaitingCount() + this.getProcessingCount(),
       timestamp: Date.now(),
     });
@@ -67,7 +77,7 @@ class JobQueueManager {
       `[JobQueueManager] Job added to queue: ${queuedJob.queueId} (type: ${type}, restaurant: ${restaurantId}, position: ${this.queue.length})`
     );
 
-    // 5. Worker 시작 (idle 상태면)
+    // 6. Worker 시작 (idle 상태면)
     this.startWorker();
 
     return queuedJob.queueId;
@@ -75,6 +85,30 @@ class JobQueueManager {
 
   /**
    * Queue 조회 (Socket 통신용)
+   * - 위치 정보 포함
+   * - 레스토랑 정보 포함
+   */
+  async getQueueWithRestaurants(): Promise<QueuedJob[]> {
+    const queueWithRestaurants = await Promise.all(
+      this.queue.map(async (job, index) => {
+        const restaurant = await restaurantRepository.findById(job.restaurantId);
+        return {
+          ...job,
+          restaurant: restaurant ? {
+            id: restaurant.id,
+            name: restaurant.name,
+            category: restaurant.category,
+            address: restaurant.address,
+          } : undefined,
+          position: index + 1, // ✅ 동적 위치 계산
+        };
+      })
+    );
+    return queueWithRestaurants;
+  }
+
+  /**
+   * Queue 조회 (레거시, 레스토랑 정보 없음)
    * - 위치 정보 포함
    */
   getQueue(): QueuedJob[] {

@@ -22,6 +22,12 @@ export interface QueuedJob {
   // ✅ 크롤링 파라미터
   type: JobType;
   restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
   metadata: {
     placeId: string;
     url: string;

@@ -490,7 +490,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
       const { restaurantId: targetRestaurantId, placeId, standardUrl } = normalized;
 
       // Queue에 추가 (통합 크롤링)
-      const queueId = jobQueueManager.default.enqueue({
+      const queueId = await jobQueueManager.default.enqueue({
         type: 'restaurant_crawl',
         restaurantId: targetRestaurantId,
         placeId: placeId || '',
@@ -656,7 +656,7 @@ const crawlerRoutes: FastifyPluginAsync = async (fastify) => {
           const normalized = await crawlerInputHandler.normalizeInput({ url });
 
           // 4. Queue에 추가
-          const queueId = jobQueueManager.default.enqueue({
+          const queueId = await jobQueueManager.default.enqueue({
             type: 'restaurant_crawl',
             restaurantId: normalized.restaurantId,
             placeId: normalized.placeId || '',

@@ -120,7 +120,7 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
       }
     });
 
-    // Restaurant ID 구독 해제
+    // Restaurant ID 구독 해제22222
     socket.on('unsubscribe:restaurant', (restaurantId: string) => {
       socket.leave(`restaurant:${restaurantId}`);
       console.log(`[Socket.io] Client ${socket.id} unsubscribed from restaurant:${restaurantId}`);
@@ -182,7 +182,7 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
         console.log(`[Socket.io] Sent all jobs to ${socket.id} - Total: ${jobs.length}, Restaurants: ${restaurantIds.length}`);
       } catch (error) {
         console.error(`[Socket.io] Error fetching all jobs:`, error);
-        
+
         // 에러 이벤트 전송
         socket.emit('jobs:error', {
           message: 'Failed to fetch jobs',
@@ -210,9 +210,9 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
 
       try {
         const jobQueueManager = await import('../services/job-queue-manager.service');
-        
-        // Queue 조회
-        const queue = jobQueueManager.default.getQueue();
+
+        // Queue 조회 (레스토랑 정보 포함)
+        const queue = await jobQueueManager.default.getQueueWithRestaurants();
         const stats = jobQueueManager.default.getStats();
 
         // 초기 상태 전송

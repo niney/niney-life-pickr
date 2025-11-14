@@ -99,13 +99,9 @@ export const QueueCard: React.FC<QueueCardProps> = ({ item, onCancel }) => {
       {/* Restaurant Info */}
       <TouchableOpacity
         onPress={() => window.open(`/restaurant/${item.restaurantId}`, '_blank')}
-        style={styles.restaurantInfo}
       >
-        <Text style={[styles.restaurantLabel, { color: colors.textSecondary }]}>
-          레스토랑
-        </Text>
         <Text style={[styles.restaurantId, { color: colors.primary }]}>
-          #{item.restaurantId} →
+          {item.restaurant?.name || `레스토랑 #${item.restaurantId}`}
         </Text>
       </TouchableOpacity>
 
@@ -214,18 +210,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  restaurantInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  restaurantLabel: {
-    fontSize: 13,
-  },
   restaurantId: {
     fontSize: 14,
     fontWeight: '500',
+    marginBottom: 8,
   },
   jobIdContainer: {
     flexDirection: 'row',

@@ -14,6 +14,12 @@ export interface QueuedJob {
   jobId: string | null;
   type: JobType;
   restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
   metadata: {
     placeId: string;
     url: string;
