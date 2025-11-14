@@ -10,7 +10,7 @@ import { io, Socket } from 'socket.io-client';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS, SOCKET_CONFIG } from 'shared/constants';
 import { getDefaultApiUrl } from 'shared/services';
-import { SocketSequenceManager, JobCompletionTracker } from 'shared/utils';
+import { SocketSequenceManager } from 'shared/utils';
 import type {
   ProgressEventData,
   CompletionEventData,
@@ -116,7 +116,6 @@ const JobMonitorScreen: React.FC = () => {
 
   // 공통 유틸 인스턴스
   const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager());
-  const completionTrackerRef = useRef<JobCompletionTracker>(new JobCompletionTracker(5));
 
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -288,10 +287,13 @@ const JobMonitorScreen: React.FC = () => {
 
       // 모든 레스토랑 Room 구독
       data.restaurantIds.forEach((restaurantId) => {
-        if (!subscribedRooms.has(restaurantId)) {
+        setSubscribedRooms(prev => {
+          if (prev.has(restaurantId)) return prev;
           newSocket.emit('subscribe:restaurant', restaurantId);
-          setSubscribedRooms(prev => new Set(prev).add(restaurantId));
-        }
+          const newSet = new Set(prev);
+          newSet.add(restaurantId);
+          return newSet;
+        });
       });
     });
 
@@ -643,7 +645,10 @@ const JobMonitorScreen: React.FC = () => {
           />
           <View style={styles.statusContent}>
             <View style={styles.statusRow}>
-              <Text style={{ color: socketConnected ? '#22c55e' : '#ef4444' }}>
+              <Text style={[
+                styles.connectionStatusText,
+                { color: socketConnected ? '#22c55e' : '#ef4444' }
+              ]}>
                 {socketConnected ? '🟢 실시간 연결' : '🔴 연결 끊김'}
               </Text>
               <Text style={[styles.jobCount, { color: colors.text }]}>
@@ -668,7 +673,7 @@ const JobMonitorScreen: React.FC = () => {
                   blurAmount={20}
                   reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
                 />
-                <View style={[styles.cardContent, { borderLeftColor: getQueueStatusColor(item.queueStatus), borderLeftWidth: 4 }]}>
+                <View style={[styles.cardContent, styles.cardBorderLeft, { borderLeftColor: getQueueStatusColor(item.queueStatus) }]}>
                   <View style={styles.cardHeader}>
                     <Text style={[styles.typeLabel, { color: colors.text }]}>
                       {getQueueTypeLabel(item.type)}
@@ -686,7 +691,7 @@ const JobMonitorScreen: React.FC = () => {
                     </Text>
                   </TouchableOpacity>
                   {item.error && (
-                    <Text style={[styles.errorText, { color: '#ef4444' }]}>
+                    <Text style={[styles.errorText, styles.errorTextRed]}>
                       ❌ {item.error}
                     </Text>
                   )}
@@ -705,7 +710,11 @@ const JobMonitorScreen: React.FC = () => {
         )}
 
         {/* 실행 중 Job 섹션 */}
-        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: queueItems.length > 0 ? 24 : 0 }]}>
+        <Text style={[
+          styles.sectionTitle,
+          { color: colors.text },
+          queueItems.length > 0 && styles.sectionTitleWithMargin
+        ]}>
           ▶️ 실행 중 Job ({jobs.length})
         </Text>
 
@@ -717,7 +726,7 @@ const JobMonitorScreen: React.FC = () => {
               blurAmount={20}
               reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
             />
-            <View style={[styles.cardContent, { borderLeftColor: getStatusColor(job), borderLeftWidth: 4 }]}>
+            <View style={[styles.cardContent, styles.cardBorderLeft, { borderLeftColor: getStatusColor(job) }]}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.typeLabel, { color: colors.text }]}>
                   {getTypeLabel(job.type)}
@@ -758,7 +767,7 @@ const JobMonitorScreen: React.FC = () => {
                 </View>
               )}
               {job.error && (
-                <Text style={[styles.errorText, { color: '#ef4444' }]}>
+                <Text style={[styles.errorText, styles.errorTextRed]}>
                   ❌ {job.error}
                 </Text>
               )}
@@ -827,10 +836,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  connectionStatusText: {
+    fontSize: 14,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
+  },
+  sectionTitleWithMargin: {
+    marginTop: 24,
   },
   cardContainer: {
     overflow: 'hidden',
@@ -846,6 +861,9 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     padding: 16,
+  },
+  cardBorderLeft: {
+    borderLeftWidth: 4,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -899,6 +917,9 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     marginTop: 8,
+  },
+  errorTextRed: {
+    color: '#ef4444',
   },
   cancelButton: {
     marginTop: 12,

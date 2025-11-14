@@ -89,7 +89,7 @@ class JobQueueManager {
    * - 레스토랑 정보 포함
    */
   async getQueueWithRestaurants(): Promise<QueuedJob[]> {
-    const queueWithRestaurants = await Promise.all(
+    return await Promise.all(
       this.queue.map(async (job, index) => {
         const restaurant = await restaurantRepository.findById(job.restaurantId);
         return {
@@ -104,7 +104,6 @@ class JobQueueManager {
         };
       })
     );
-    return queueWithRestaurants;
   }
 
   /**

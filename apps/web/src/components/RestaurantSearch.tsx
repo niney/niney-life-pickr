@@ -18,7 +18,7 @@ const SearchMainPage: React.FC = () => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const navigate = useNavigate()
-  
+
   // ==================== 반응형 체크 ====================
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
@@ -73,7 +73,7 @@ const SearchMainPage: React.FC = () => {
     <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
       {/* 데스크탑: 2열 레이아웃, 모바일: 1열 레이아웃 */}
       <View style={isMobile ? styles.mobileLayout : styles.desktopLayout}>
-        
+
         {/* ========== 좌측 영역: 검색 + 선택 패널 ========== */}
         <View style={[styles.leftColumn, isMobile && styles.mobileColumn]}>
           <SearchForm onSearch={handleSearch} />
@@ -252,7 +252,7 @@ const SearchMainPage: React.FC = () => {
 
         {/* ========== 우측 영역: 검색 결과 리스트 ========== */}
         <View style={[
-          styles.rightColumn, 
+          styles.rightColumn,
           isMobile && styles.mobileColumn,
           !isMobile && { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 20 }
         ]}>
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    // @ts-ignore - React Native Web supports these properties
+    // @ts-expect-error - React Native Web supports these properties
     maxHeight: '80vh',
     overflowY: 'auto',
   },
@@ -481,16 +481,14 @@ const styles = StyleSheet.create({
     minWidth: 320,
     maxWidth: 450,
     paddingRight: 20,
-    // @ts-ignore - React Native Web supports these properties
     overflowY: 'auto',
-    // @ts-ignore - React Native Web supports calc
+    // @ts-expect-error - React Native Web supports calc
     maxHeight: 'calc(100vh - 80px)', // Header 높이 고려
   },
   rightColumn: {
     flex: 1,
-    // @ts-ignore - React Native Web supports these properties
     overflowY: 'auto',
-    // @ts-ignore - React Native Web supports calc
+    // @ts-expect-error - React Native Web supports calc
     maxHeight: 'calc(100vh - 80px)', // Header 높이 고려
   },
   mobileColumn: {
