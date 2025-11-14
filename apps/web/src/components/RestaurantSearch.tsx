@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {Routes, Route, useNavigate} from 'react-router-dom'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import { useTheme } from '@shared/contexts'
@@ -18,6 +18,18 @@ const SearchMainPage: React.FC = () => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
   const navigate = useNavigate()
+  
+  // ==================== 반응형 체크 ====================
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const {
     searchResult,
     isLoading,
@@ -59,45 +71,50 @@ const SearchMainPage: React.FC = () => {
 
   return (
     <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
-      <SearchForm onSearch={handleSearch} />
+      {/* 데스크탑: 2열 레이아웃, 모바일: 1열 레이아웃 */}
+      <View style={isMobile ? styles.mobileLayout : styles.desktopLayout}>
+        
+        {/* ========== 좌측 영역: 검색 + 선택 패널 ========== */}
+        <View style={[styles.leftColumn, isMobile && styles.mobileColumn]}>
+          <SearchForm onSearch={handleSearch} />
 
-      {/* 선택된 레스토랑 표시 영역 */}
-      {selectedRestaurantNames.length > 0 && (
-        <View style={[styles.selectedPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.selectedHeader}>
-            <Text style={[styles.selectedTitle, { color: colors.text }]}>
-              선택된 맛집 ({selectedRestaurantNames.length}개)
-            </Text>
-            <View style={styles.selectedActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                onPress={selectAll}
-              >
-                <Text style={styles.actionButtonText}>전체 선택</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.error }]}
-                onPress={clearSelection}
-              >
-                <Text style={styles.actionButtonText}>선택 해제</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.success }]}
-                onPress={handleExtractPlaceIds}
-                disabled={isExtracting}
-              >
-                <Text style={styles.actionButtonText}>
-                  {isExtracting ? 'ID 추출 중...' : 'Place ID 추출'}
+          {/* 선택된 레스토랑 표시 영역 */}
+          {selectedRestaurantNames.length > 0 && (
+            <View style={[styles.selectedPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.selectedHeader}>
+                <Text style={[styles.selectedTitle, { color: colors.text }]}>
+                  선택된 맛집 ({selectedRestaurantNames.length}개)
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                <View style={styles.selectedActions}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                    onPress={selectAll}
+                  >
+                    <Text style={styles.actionButtonText}>전체 선택</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.error }]}
+                    onPress={clearSelection}
+                  >
+                    <Text style={styles.actionButtonText}>선택 해제</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.success }]}
+                    onPress={handleExtractPlaceIds}
+                    disabled={isExtracting}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {isExtracting ? 'ID 추출 중...' : 'Place ID 추출'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-          <ScrollView
-            horizontal
-            style={styles.selectedScroll}
-            showsHorizontalScrollIndicator={false}
-          >
+              <ScrollView
+                horizontal
+                style={styles.selectedScroll}
+                showsHorizontalScrollIndicator={false}
+              >
             <View style={styles.selectedIdContainer}>
               {selectedRestaurantNames.map((name) => (
                 <View
@@ -229,17 +246,26 @@ const SearchMainPage: React.FC = () => {
               </View>
             </View>
           )}
+            </View>
+          )}
         </View>
-      )}
 
-      <SearchResultList
-        results={searchResult?.places || []}
-        isLoading={isLoading}
-        error={error}
-        selectedRestaurantNames={selectedRestaurantNames}
-        onToggleSelection={toggleRestaurantSelection}
-        onItemPress={handleItemPress}
-      />
+        {/* ========== 우측 영역: 검색 결과 리스트 ========== */}
+        <View style={[
+          styles.rightColumn, 
+          isMobile && styles.mobileColumn,
+          !isMobile && { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 20 }
+        ]}>
+          <SearchResultList
+            results={searchResult?.places || []}
+            isLoading={isLoading}
+            error={error}
+            selectedRestaurantNames={selectedRestaurantNames}
+            onToggleSelection={toggleRestaurantSelection}
+            onItemPress={handleItemPress}
+          />
+        </View>
+      </View>
     </View>
   )
 }
@@ -278,9 +304,16 @@ const styles = StyleSheet.create({
   },
   selectedPanel: {
     margin: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    marginLeft: 0,
+    marginRight: 0,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+    // @ts-ignore - React Native Web supports these properties
+    maxHeight: '80vh',
+    overflowY: 'auto',
   },
   selectedHeader: {
     flexDirection: 'row',
@@ -432,6 +465,37 @@ const styles = StyleSheet.create({
   extractedError: {
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  // ==================== 데스크탑 레이아웃 ====================
+  mobileLayout: {
+    flex: 1,
+  },
+  desktopLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 20,
+    padding: 16,
+  },
+  leftColumn: {
+    width: '35%',
+    minWidth: 320,
+    maxWidth: 450,
+    paddingRight: 20,
+    // @ts-ignore - React Native Web supports these properties
+    overflowY: 'auto',
+    // @ts-ignore - React Native Web supports calc
+    maxHeight: 'calc(100vh - 80px)', // Header 높이 고려
+  },
+  rightColumn: {
+    flex: 1,
+    // @ts-ignore - React Native Web supports these properties
+    overflowY: 'auto',
+    // @ts-ignore - React Native Web supports calc
+    maxHeight: 'calc(100vh - 80px)', // Header 높이 고려
+  },
+  mobileColumn: {
+    width: '100%',
+    maxWidth: '100%',
   },
 })
 
