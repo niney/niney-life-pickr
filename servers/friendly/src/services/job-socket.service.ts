@@ -88,13 +88,11 @@ export class JobService {
       this.lastSaveTimestamps.set(jobId, now);
 
       // DB에 진행률 저장 (event_name + metadata 업데이트)
+      // 중복 제거: current, total, percentage는 progress 객체로만 전송
       await jobRepository.updateMetadata(
         jobId,
         eventName, // 이벤트 이름
         {
-          current: progress.current,
-          total: progress.total,
-          percentage,
           lastUpdated: now,
           ...progress.metadata
         }

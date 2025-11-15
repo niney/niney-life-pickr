@@ -4,7 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { useTheme } from '@shared/contexts';
 import { THEME_COLORS, SOCKET_CONFIG } from '@shared/constants';
 import { getDefaultApiUrl } from '@shared/services';
-import { SocketSequenceManager, JobCompletionTracker } from '@shared/utils';
+import { SocketSequenceManager, JobCompletionTracker, extractUniqueRestaurantIds } from '@shared/utils';
 import type {
   ProgressEventData,
   CompletionEventData,
@@ -134,7 +134,6 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     socket.once('jobs:current_state', (data: {
       total: number;
       jobs: Job[];
-      restaurantIds: number[];
       timestamp: number;
     }) => {
       console.log('[JobMonitor] 초기 Job 리스트 수신:', data);
@@ -143,8 +142,11 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       setJobs(data.jobs);
       setIsLoading(false);
 
+      // 레스토랑 ID 목록 추출 (중복 제거)
+      const restaurantIds = extractUniqueRestaurantIds(data.jobs);
+
       // 모든 레스토랑 Room 구독
-      data.restaurantIds.forEach((restaurantId) => {
+      restaurantIds.forEach((restaurantId) => {
         if (!subscribedRooms.has(restaurantId)) {
           socket.emit('subscribe:restaurant', restaurantId);
           setSubscribedRooms(prev => new Set(prev).add(restaurantId));
@@ -152,7 +154,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
         }
       });
 
-      console.log(`[JobMonitor] ${data.jobs.length}개 Job 로딩 완료, ${data.restaurantIds.length}개 Room 구독`);
+      console.log(`[JobMonitor] ${data.jobs.length}개 Job 로딩 완료, ${restaurantIds.length}개 Room 구독`);
     });
 
     // 에러 처리
@@ -287,21 +289,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       });
 
       // ✅ 100% 완료 시 자동 완료 처리 (3초 후)
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? {
-                  ...job,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              : job
-          ));
-          completionTrackerRef.current.markCompleted(data.jobId);
-          sequenceManagerRef.current.reset(data.jobId);
-        }, 3000);
-      }
+      scheduleAutoCompletion(data.jobId, data.current, data.total, data.percentage);
     });
 
     /**
@@ -353,21 +341,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       });
 
       // ✅ 100% 완료 시 자동 완료 처리 (3초 후)
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? {
-                  ...job,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              : job
-          ));
-          completionTrackerRef.current.markCompleted(data.jobId);
-          sequenceManagerRef.current.reset(data.jobId);
-        }, 3000);
-      }
+      scheduleAutoCompletion(data.jobId, data.current, data.total, data.percentage);
     });
 
     /**
@@ -419,21 +393,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       });
 
       // ✅ 100% 완료 시 자동 완료 처리 (3초 후)
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? {
-                  ...job,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              : job
-          ));
-          completionTrackerRef.current.markCompleted(data.jobId);
-          sequenceManagerRef.current.reset(data.jobId);
-        }, 3000);
-      }
+      scheduleAutoCompletion(data.jobId, data.current, data.total, data.percentage);
     });
 
     /**
@@ -556,21 +516,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       });
 
       // ✅ 100% 완료 시 자동 완료 처리 (3초 후)
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? {
-                  ...job,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              : job
-          ));
-          completionTrackerRef.current.markCompleted(data.jobId);
-          sequenceManagerRef.current.reset(data.jobId);
-        }, 3000);
-      }
+      scheduleAutoCompletion(data.jobId, data.current, data.total, data.percentage);
     });
 
     /**
@@ -664,21 +610,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       });
 
       // ✅ 100% 완료 시 자동 완료 처리 (3초 후)
-      if (data.percentage === 100 || data.current === data.total) {
-        setTimeout(() => {
-          setJobs(prev => prev.map(job =>
-            job.jobId === data.jobId && job.status === 'active'
-              ? {
-                  ...job,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              : job
-          ));
-          completionTrackerRef.current.markCompleted(data.jobId);
-          sequenceManagerRef.current.reset(data.jobId);
-        }, 3000);
-      }
+      scheduleAutoCompletion(data.jobId, data.current || 0, data.total || 0, data.percentage || 0);
     });
 
     // ==================== Queue 이벤트 리스너 ====================
@@ -870,6 +802,34 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
       createdAt: new Date(data.timestamp || Date.now()).toISOString(),
       startedAt: new Date(data.timestamp || Date.now()).toISOString()
     };
+  }, []);
+
+  /**
+   * 100% 완료 시 자동 완료 처리 스케줄링
+   * - 3초 후 Job을 'completed' 상태로 변경
+   * - CompletionTracker와 SequenceManager 정리
+   */
+  const scheduleAutoCompletion = useCallback((
+    jobId: string,
+    current: number,
+    total: number,
+    percentage: number
+  ) => {
+    if (percentage === 100 || current === total) {
+      setTimeout(() => {
+        setJobs(prev => prev.map(job =>
+          job.jobId === jobId && job.status === 'active'
+            ? {
+                ...job,
+                status: 'completed',
+                completedAt: new Date().toISOString()
+              }
+            : job
+        ));
+        completionTrackerRef.current.markCompleted(jobId);
+        sequenceManagerRef.current.reset(jobId);
+      }, 3000);
+    }
   }, []);
 
   /**

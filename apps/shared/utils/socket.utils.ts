@@ -36,3 +36,14 @@ export interface ReviewSummaryStatus {
   status: 'idle' | 'active' | 'completed' | 'failed' | 'interrupted';
   error?: string;
 }
+
+/**
+ * Job 배열에서 유니크한 레스토랑 ID 목록 추출
+ * - Set을 사용하여 중복 제거
+ * - Restaurant Room 구독 등에 사용
+ */
+export const extractUniqueRestaurantIds = <T extends { restaurantId: number }>(
+  jobs: T[]
+): number[] => {
+  return [...new Set(jobs.map((job) => job.restaurantId))];
+};

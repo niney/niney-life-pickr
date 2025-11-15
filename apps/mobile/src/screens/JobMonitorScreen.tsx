@@ -10,7 +10,7 @@ import { io, Socket } from 'socket.io-client';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS, SOCKET_CONFIG } from 'shared/constants';
 import { getDefaultApiUrl } from 'shared/services';
-import { SocketSequenceManager } from 'shared/utils';
+import { SocketSequenceManager, extractUniqueRestaurantIds } from 'shared/utils';
 import type {
   ProgressEventData,
   CompletionEventData,
@@ -279,14 +279,16 @@ const JobMonitorScreen: React.FC = () => {
     newSocket.on('jobs:current_state', (data: {
       total: number;
       jobs: Job[];
-      restaurantIds: number[];
       timestamp: number;
     }) => {
       console.log('[JobMonitor] 초기 Job 리스트 수신:', data);
       setJobs(data.jobs);
 
+      // 레스토랑 ID 목록 추출 (중복 제거)
+      const restaurantIds = extractUniqueRestaurantIds(data.jobs);
+
       // 모든 레스토랑 Room 구독
-      data.restaurantIds.forEach((restaurantId) => {
+      restaurantIds.forEach((restaurantId) => {
         setSubscribedRooms(prev => {
           if (prev.has(restaurantId)) return prev;
           newSocket.emit('subscribe:restaurant', restaurantId);

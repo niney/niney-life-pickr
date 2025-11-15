@@ -168,18 +168,14 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
           };
         });
 
-        // 3. 레스토랑 ID 목록 추출 (자동 구독용)
-        const restaurantIds = [...new Set(jobs.map(job => job.restaurantId))];
-
-        // 4. 초기 상태 전송
+        // 3. 초기 상태 전송 (restaurantIds는 클라이언트에서 추출)
         socket.emit('jobs:current_state', {
           total: jobs.length,
           jobs,
-          restaurantIds, // 클라이언트가 구독할 레스토랑 ID 목록
           timestamp: Date.now()
         });
 
-        console.log(`[Socket.io] Sent all jobs to ${socket.id} - Total: ${jobs.length}, Restaurants: ${restaurantIds.length}`);
+        console.log(`[Socket.io] Sent all jobs to ${socket.id} - Total: ${jobs.length}`);
       } catch (error) {
         console.error(`[Socket.io] Error fetching all jobs:`, error);
 
