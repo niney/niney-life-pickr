@@ -10,6 +10,7 @@ import {
 } from '../utils'
 import { SOCKET_CONFIG } from '../constants'
 import { getDefaultApiUrl } from '../services'
+import type { QueuedJob, ActiveJob, QueueStats } from '../types'
 
 interface SocketContextValue {
   socket: Socket | null
@@ -21,6 +22,9 @@ interface SocketContextValue {
   isCrawlInterrupted: boolean
   reviewSummaryStatus: ReviewSummaryStatus
   summaryProgress: SummaryProgress | null
+  queueItems: QueuedJob[]
+  activeJobs: ActiveJob[]
+  queueStats: QueueStats
   joinRestaurantRoom: (restaurantId: string) => void
   leaveRestaurantRoom: (restaurantId: string) => void
   setRestaurantCallbacks: (callbacks: {
@@ -31,6 +35,8 @@ interface SocketContextValue {
   }) => void
   resetCrawlStatus: () => void
   resetSummaryStatus: () => void
+  getRestaurantQueueStatus: (restaurantId: number) => QueuedJob | null
+  getRestaurantJobStatus: (restaurantId: number) => ActiveJob | null
 }
 
 const SocketContext = createContext<SocketContextValue | undefined>(undefined)
@@ -56,6 +62,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     status: 'idle'
   })
   const [summaryProgress, setSummaryProgress] = useState<SummaryProgress | null>(null)
+  const [queueItems, setQueueItems] = useState<QueuedJob[]>([])
+  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([])
+  const [queueStats, setQueueStats] = useState<QueueStats>({
+    total: 0,
+    waiting: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+  })
   const callbacksRef = useRef<{
     onMenuCrawlCompleted?: (data: { restaurantId: string }) => void
     onReviewCrawlCompleted?: (data: { restaurantId: string; totalReviews: number }) => void
@@ -77,6 +93,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     socket.on('connect', () => {
       console.log('[Socket.io] Connected:', socket.id)
       setIsConnected(true)
+
+      // ✅ Queue 및 전체 Job 구독
+      socket.emit('subscribe:queue')
+      socket.emit('subscribe:all_jobs')
+      console.log('[Socket.io] Subscribed to queue and all jobs')
     })
 
     socket.on('disconnect', () => {
@@ -408,6 +429,127 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setMenuProgress(null)
     })
 
+    // ==================== Queue 이벤트 ====================
+
+    // Queue 초기 상태
+    socket.on('queue:current_state', (data: {
+      total: number
+      queue: QueuedJob[]
+      stats: QueueStats
+      timestamp: number
+    }) => {
+      console.log('[Socket.io] Queue current state:', data)
+      setQueueItems(data.queue)
+      setQueueStats(data.stats)
+    })
+
+    // Queue에 Job 추가됨
+    socket.on('queue:job_added', () => {
+      // 최신 Queue 상태 재조회
+      socket.emit('subscribe:queue')
+    })
+
+    // Queue Item 처리 시작
+    socket.on('queue:job_started', (data: {
+      queueId: string
+      type: string
+      restaurantId: number
+      timestamp: number
+    }) => {
+      console.log('[Socket.io] Queue job started:', data)
+      setQueueItems(prev => prev.map(item =>
+        item.queueId === data.queueId
+          ? { ...item, queueStatus: 'processing', startedAt: new Date().toISOString() }
+          : item
+      ))
+    })
+
+    // Queue Item 완료
+    socket.on('queue:job_completed', (data: {
+      queueId: string
+      jobId: string
+      type: string
+      restaurantId: number
+      timestamp: number
+    }) => {
+      console.log('[Socket.io] Queue job completed:', data)
+      setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId))
+      setQueueStats(prev => ({
+        ...prev,
+        processing: Math.max(0, prev.processing - 1),
+      }))
+    })
+
+    // Queue Item 실패
+    socket.on('queue:job_failed', (data: {
+      queueId: string
+      jobId?: string
+      type: string
+      restaurantId: number
+      error: string
+      timestamp: number
+    }) => {
+      console.error('[Socket.io] Queue job failed:', data)
+      setQueueItems(prev => prev.map(item =>
+        item.queueId === data.queueId
+          ? {
+              ...item,
+              queueStatus: 'failed',
+              completedAt: new Date().toISOString(),
+              error: data.error,
+            }
+          : item
+      ))
+
+      // 3초 후 Queue에서 제거
+      setTimeout(() => {
+        setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId))
+        setQueueStats(prev => ({
+          ...prev,
+          processing: Math.max(0, prev.processing - 1),
+        }))
+      }, 3000)
+    })
+
+    // Queue Item 취소됨
+    socket.on('queue:job_cancelled', (data: {
+      queueId: string
+      restaurantId: number
+      timestamp: number
+    }) => {
+      console.log('[Socket.io] Queue job cancelled:', data)
+      setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId))
+      setQueueStats(prev => ({
+        ...prev,
+        waiting: Math.max(0, prev.waiting - 1),
+      }))
+    })
+
+    // ==================== Job 이벤트 ====================
+
+    // 전체 Job 초기 상태
+    socket.on('jobs:current_state', (data: {
+      total: number
+      jobs: ActiveJob[]
+      restaurantIds: number[]
+      timestamp: number
+    }) => {
+      console.log('[Socket.io] Jobs current state:', data)
+      setActiveJobs(data.jobs)
+    })
+
+    // 새 Job 시작 알림
+    socket.on('job:new', (data: {
+      jobId: string
+      type: string
+      restaurantId: number
+      timestamp: number
+    }) => {
+      console.log('[Socket.io] New job started:', data)
+      // 전체 Job 상태 재조회
+      socket.emit('subscribe:all_jobs')
+    })
+
     // ✅ 자동 정리 시작
     completionTrackerRef.current.startAutoCleanup(5)
 
@@ -424,6 +566,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       socket.off('review_summary:error')
       socket.off('review_summary:interrupted')
       socket.off('restaurant_crawl:interrupted')
+      socket.off('queue:current_state')
+      socket.off('queue:job_added')
+      socket.off('queue:job_started')
+      socket.off('queue:job_completed')
+      socket.off('queue:job_failed')
+      socket.off('queue:job_cancelled')
+      socket.off('jobs:current_state')
+      socket.off('job:new')
     }
   }, [])
 
@@ -488,6 +638,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setSummaryProgress(null)
   }, [])
 
+  // 레스토랑별 Queue 상태 조회
+  const getRestaurantQueueStatus = useCallback((restaurantId: number): QueuedJob | null => {
+    return queueItems.find(item => item.restaurantId === restaurantId) || null
+  }, [queueItems])
+
+  // 레스토랑별 Job 상태 조회
+  const getRestaurantJobStatus = useCallback((restaurantId: number): ActiveJob | null => {
+    return activeJobs.find(job => job.restaurantId === restaurantId) || null
+  }, [activeJobs])
+
   const value: SocketContextValue = {
     socket: socketRef.current,
     isConnected,
@@ -498,11 +658,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
+    queueItems,
+    activeJobs,
+    queueStats,
     joinRestaurantRoom,
     leaveRestaurantRoom,
     setRestaurantCallbacks,
     resetCrawlStatus,
     resetSummaryStatus,
+    getRestaurantQueueStatus,
+    getRestaurantJobStatus,
   }
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>

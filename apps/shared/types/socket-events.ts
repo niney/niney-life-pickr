@@ -55,3 +55,65 @@ export interface JobNewEventData {
 export interface MenuProgressEventData extends ProgressEventData {
   metadata?: Record<string, string | number>;
 }
+
+/**
+ * Queue 대기열 Job 데이터
+ */
+export interface QueuedJob {
+  queueId: string;
+  jobId: string | null;
+  type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
+  restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
+  metadata?: Record<string, any>;
+  queueStatus: 'waiting' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  queuedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+  position: number;
+}
+
+/**
+ * 실행 중인 Job 데이터
+ */
+export interface ActiveJob {
+  jobId: string;
+  restaurantId: number;
+  restaurant?: {
+    id: number;
+    name: string;
+    category: string | null;
+    address: string | null;
+  };
+  type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
+  status: 'active' | 'completed' | 'failed' | 'cancelled';
+  isInterrupted: boolean;
+  progress: {
+    current: number;
+    total: number;
+    percentage: number;
+  };
+  metadata?: Record<string, string | number | boolean>;
+  error?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+/**
+ * Queue 통계 데이터
+ */
+export interface QueueStats {
+  total: number;
+  waiting: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+}

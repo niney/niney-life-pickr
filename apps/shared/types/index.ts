@@ -9,4 +9,7 @@ export type {
   CancellationEventData,
   JobNewEventData,
   MenuProgressEventData,
+  QueuedJob,
+  ActiveJob,
+  QueueStats,
 } from './socket-events';

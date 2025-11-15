@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMap, faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
-import { useTheme, THEME_COLORS, apiService, Alert, ProgressIndicator, type RestaurantCategory, type RestaurantData } from '@shared'
+import { useTheme, useSocket, THEME_COLORS, apiService, Alert, ProgressIndicator, type RestaurantCategory, type RestaurantData } from '@shared'
 import { useLocation, useNavigate } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
 
@@ -74,6 +74,9 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   const colors = THEME_COLORS[theme]
   const location = useLocation()
   const navigate = useNavigate()
+
+  // ✅ Socket Context에서 Queue/Job 상태 가져오기
+  const { getRestaurantQueueStatus, getRestaurantJobStatus } = useSocket()
 
   // URL에서 restaurant id 추출 (/restaurant/:id)
   const restaurantId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
@@ -424,13 +427,23 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
             <View style={styles.restaurantsList}>
               {restaurants.map((restaurant: RestaurantData) => {
                 const isSelected = restaurantId === String(restaurant.id)
+
+                // ✅ Queue/Job 상태 조회
+                const queueStatus = getRestaurantQueueStatus(restaurant.id)
+                const jobStatus = getRestaurantJobStatus(restaurant.id)
+
+                // 우선순위: 중단됨 > Job > Queue
+                const hasInterruptedJob = jobStatus && jobStatus.isInterrupted
+                const hasActiveJob = jobStatus && jobStatus.status === 'active' && !jobStatus.isInterrupted
+                const hasQueueItem = queueStatus && (queueStatus.queueStatus === 'waiting' || queueStatus.queueStatus === 'processing')
+
                 return (
                   <TouchableOpacity
                     key={restaurant.id}
                     style={[
                       styles.restaurantCard,
                       {
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                           ? (theme === 'light' ? '#f0f7ff' : 'rgba(33, 150, 243, 0.15)')
                           : (theme === 'light' ? '#fff' : colors.surface),
                         borderColor: isSelected ? colors.primary : colors.border,
@@ -441,12 +454,39 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                   >
                     <View style={styles.restaurantCardContent}>
                       <View style={styles.restaurantInfo}>
-                        <Text style={[
-                          styles.restaurantName,
-                          { color: isSelected ? colors.primary : colors.text }
-                        ]}>
-                          {restaurant.name}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <Text style={[
+                            styles.restaurantName,
+                            { color: isSelected ? colors.primary : colors.text }
+                          ]}>
+                            {restaurant.name}
+                          </Text>
+
+                          {/* ✅ 상태 배지 */}
+                          {hasInterruptedJob && (
+                            <View style={[styles.statusBadge, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                              <Text style={[styles.statusBadgeText, { color: '#f59e0b' }]}>
+                                ⚠️ 중단됨
+                              </Text>
+                            </View>
+                          )}
+                          {!hasInterruptedJob && hasActiveJob && (
+                            <View style={[styles.statusBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                              <Text style={[styles.statusBadgeText, { color: '#10b981' }]}>
+                                🔄 처리 중
+                              </Text>
+                            </View>
+                          )}
+                          {!hasInterruptedJob && !hasActiveJob && hasQueueItem && (
+                            <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 152, 0, 0.1)' }]}>
+                              <Text style={[styles.statusBadgeText, { color: '#ff9800' }]}>
+                                ⏳ 대기 중
+                                {queueStatus.position && ` (${queueStatus.position}번째)`}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
                         {restaurant.category && (
                           <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]}>{restaurant.category}</Text>
                         )}
@@ -890,6 +930,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
     lineHeight: 20,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 })
 

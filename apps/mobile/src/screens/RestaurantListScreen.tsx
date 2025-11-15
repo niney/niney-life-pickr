@@ -26,7 +26,9 @@ import {
   apiService,
   Alert,
   useRestaurantList,
-  type RestaurantData
+  type RestaurantData,
+  type QueuedJob,
+  type ActiveJob,
 } from 'shared';
 import type { RestaurantStackParamList } from '../navigation/types';
 import RecrawlModal from '../components/RecrawlModal';
@@ -118,6 +120,8 @@ interface RestaurantListItemProps {
   onPress: (restaurant: RestaurantData) => void;
   onRecrawl: (restaurant: RestaurantData) => void;
   onDelete: (restaurant: RestaurantData) => void;
+  queueStatus: QueuedJob | null;
+  jobStatus: ActiveJob | null;
 }
 
 const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
@@ -127,7 +131,14 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
   onPress,
   onRecrawl,
   onDelete,
+  queueStatus,
+  jobStatus,
 }) => {
+  // 우선순위: 중단됨 > Job > Queue
+  const hasInterruptedJob = jobStatus && jobStatus.isInterrupted;
+  const hasActiveJob = jobStatus && jobStatus.status === 'active' && !jobStatus.isInterrupted;
+  const hasQueueItem = queueStatus && (queueStatus.queueStatus === 'waiting' || queueStatus.queueStatus === 'processing');
+
   const renderRightActions = (
     progress: SharedValue<number>,
     dragX: SharedValue<number>
@@ -157,9 +168,36 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.restaurantCardContent}>
-          <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
-            {restaurant.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
+              {restaurant.name}
+            </Text>
+
+            {/* ✅ 상태 배지 */}
+            {hasInterruptedJob && (
+              <View style={[styles.statusBadge, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                <Text style={[styles.statusBadgeText, { color: '#f59e0b' }]}>
+                  ⚠️ 중단됨
+                </Text>
+              </View>
+            )}
+            {!hasInterruptedJob && hasActiveJob && (
+              <View style={[styles.statusBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                <Text style={[styles.statusBadgeText, { color: '#10b981' }]}>
+                  🔄 처리 중
+                </Text>
+              </View>
+            )}
+            {!hasInterruptedJob && !hasActiveJob && hasQueueItem && (
+              <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 152, 0, 0.1)' }]}>
+                <Text style={[styles.statusBadgeText, { color: '#ff9800' }]}>
+                  ⏳ 대기 중
+                  {queueStatus.position && ` (${queueStatus.position})`}
+                </Text>
+              </View>
+            )}
+          </View>
+
           {restaurant.category && (
             <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
               {restaurant.category}
@@ -181,7 +219,7 @@ const RestaurantListScreen: React.FC = () => {
   const route = useRoute<RouteProp<RestaurantStackParamList, 'RestaurantList'>>();
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
-  const { menuProgress, crawlProgress, dbProgress, isCrawlInterrupted, setRestaurantCallbacks, resetCrawlStatus } = useSocket();
+  const { menuProgress, crawlProgress, dbProgress, isCrawlInterrupted, setRestaurantCallbacks, resetCrawlStatus, getRestaurantQueueStatus, getRestaurantJobStatus } = useSocket();
 
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
@@ -659,17 +697,24 @@ const RestaurantListScreen: React.FC = () => {
           </View>
           {restaurants.length > 0 ? (
             <View style={styles.restaurantsList}>
-              {restaurants.map((restaurant) => (
-                <RestaurantListItem
-                  key={restaurant.id}
-                  restaurant={restaurant}
-                  theme={theme}
-                  colors={colors}
-                  onPress={handleRestaurantPress}
-                  onRecrawl={handleRecrawlClick}
-                  onDelete={handleDeleteClick}
-                />
-              ))}
+              {restaurants.map((restaurant) => {
+                const queueStatus = getRestaurantQueueStatus(restaurant.id);
+                const jobStatus = getRestaurantJobStatus(restaurant.id);
+
+                return (
+                  <RestaurantListItem
+                    key={restaurant.id}
+                    restaurant={restaurant}
+                    theme={theme}
+                    colors={colors}
+                    onPress={handleRestaurantPress}
+                    onRecrawl={handleRecrawlClick}
+                    onDelete={handleDeleteClick}
+                    queueStatus={queueStatus}
+                    jobStatus={jobStatus}
+                  />
+                );
+              })}
             </View>
           ) : !restaurantsLoading ? (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
@@ -910,6 +955,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 20,
     paddingHorizontal: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
 });
 
