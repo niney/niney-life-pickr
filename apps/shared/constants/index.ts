@@ -6,6 +6,7 @@ export { AUTH_CONSTANTS } from './auth.constants';
 
 // Theme related constants
 export { THEME_COLORS, HEADER_HEIGHT } from './theme.constants';
+export type { ThemeColors } from './theme.constants';
 
 // Socket.io configuration
 export { SOCKET_CONFIG } from './socket-config';

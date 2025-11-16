@@ -197,7 +197,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const sequence = data.sequence || data.current || 0
 
       // ✅ Sequence 체크
-      if (!sequenceManagerRef.current.check(`crawl-${jobId || 'default'}`, sequence)) return
+      if (!sequenceManagerRef.current.check(jobId || 'default', 'review:crawl_progress', sequence)) return
 
       // ✅ 완료 Job 체크
       if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
@@ -221,7 +221,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const sequence = data.sequence || data.current || 0
 
       // ✅ Sequence 체크
-      if (!sequenceManagerRef.current.check(`db-${jobId || 'default'}`, sequence)) return
+      if (!sequenceManagerRef.current.check(jobId || 'default', 'review:db_progress', sequence)) return
 
       // ✅ 완료 Job 체크
       if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
@@ -247,9 +247,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         setCrawlProgress(null)
         setDbProgress(null)
         setImageProgress(null)
-        sequenceManagerRef.current.reset(`crawl-${jobId || 'default'}`)
-        sequenceManagerRef.current.reset(`db-${jobId || 'default'}`)
-        sequenceManagerRef.current.reset(`image-${jobId || 'default'}`)
+        sequenceManagerRef.current.reset(jobId || 'default')
 
         // 완료 콜백 호출
         if (callbacksRef.current.onReviewCrawlCompleted) {
@@ -269,7 +267,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const sequence = data.sequence || data.current || 0
 
       // ✅ Sequence 체크
-      if (!sequenceManagerRef.current.check(`image-${jobId || 'default'}`, sequence)) return
+      if (!sequenceManagerRef.current.check(jobId || 'default', 'review:image_progress', sequence)) return
 
       // ✅ 완료 Job 체크
       if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
@@ -300,9 +298,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setDbProgress(null)
       setImageProgress(null)
       // Sequence 초기화
-      sequenceManagerRef.current.reset(`crawl-${jobId || 'default'}`)
-      sequenceManagerRef.current.reset(`db-${jobId || 'default'}`)
-      sequenceManagerRef.current.reset(`image-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(jobId || 'default')
       Alert.error('크롤링 실패', errorMessage)
 
       // 콜백 호출
@@ -331,9 +327,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setCrawlProgress(null)
       setDbProgress(null)
       setImageProgress(null)
-      sequenceManagerRef.current.reset(`crawl-${jobId || 'default'}`)
-      sequenceManagerRef.current.reset(`db-${jobId || 'default'}`)
-      sequenceManagerRef.current.reset(`image-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(jobId || 'default')
 
       // 콜백 호출 (에러 콜백 재사용)
       if (callbacksRef.current.onReviewCrawlError) {
@@ -352,7 +346,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       const sequence = data.sequence || data.current || 0
 
       // ✅ Sequence 체크
-      if (!sequenceManagerRef.current.check(`summary-${jobId || 'default'}`, sequence)) return
+      if (!sequenceManagerRef.current.check(jobId || 'default', 'review_summary:progress', sequence)) return
 
       // ✅ 완료 Job 체크
       if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
@@ -381,7 +375,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
         setReviewSummaryStatus({ status: 'completed' })
         setSummaryProgress(null)
-        sequenceManagerRef.current.reset(`summary-${jobId || 'default'}`)
+        sequenceManagerRef.current.reset(jobId || 'default')
 
         // 콜백 호출
         if (callbacksRef.current.onReviewSummaryCompleted) {
@@ -405,7 +399,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       setReviewSummaryStatus({ status: 'failed', error: errorMessage })
       setSummaryProgress(null)
-      sequenceManagerRef.current.reset(`summary-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(jobId || 'default')
       Alert.error('요약 실패', errorMessage)
     })
 
@@ -425,7 +419,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         error: data.reason || 'Server restarted - job was interrupted'
       })
       setSummaryProgress(null)
-      sequenceManagerRef.current.reset(`summary-${jobId || 'default'}`)
+      sequenceManagerRef.current.reset(jobId || 'default')
     })
 
     // 레스토랑 크롤링 중단 (서버 재시작/에러로 인한 중단)

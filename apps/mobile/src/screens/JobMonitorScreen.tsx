@@ -10,15 +10,9 @@ import { io, Socket } from 'socket.io-client';
 import { useTheme } from 'shared/contexts';
 import { THEME_COLORS, SOCKET_CONFIG } from 'shared/constants';
 import { getDefaultApiUrl } from 'shared/services';
-import { SocketSequenceManager, extractUniqueRestaurantIds } from 'shared/utils';
-import type {
-  ProgressEventData,
-  CompletionEventData,
-  ErrorEventData,
-  CancellationEventData,
-  JobNewEventData,
-  MenuProgressEventData,
-} from 'shared/types';
+import { SocketSequenceManager, JobCompletionTracker, registerJobSocketEvents, QueueStats, getTypeLabel, getPhaseLabel, getStatusColor, getStatusText, getQueueStatusColor, getQueueStatusText, getQueueTypeLabel } from 'shared/utils';
+import { useJobEventHandlers, useJobRefresh } from 'shared/hooks';
+import type { Job, QueuedJob } from 'shared/types';
 import type { RootTabParamList, RestaurantStackParamList } from '../navigation/types';
 
 // JobMonitor는 Tab에 있고, Restaurant Detail은 Restaurant Stack에 있음
@@ -29,62 +23,6 @@ type JobMonitorNavigationProp = CompositeNavigationProp<
 
 // Shared config에서 API URL 가져오기
 const SOCKET_URL = getDefaultApiUrl();
-
-/**
- * Job 데이터 타입
- */
-interface Job {
-  jobId: string;
-  restaurantId: number;
-  restaurant?: {
-    id: number;
-    name: string;
-    category: string | null;
-    address: string | null;
-  };
-  type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
-  status: 'active' | 'completed' | 'failed' | 'cancelled';
-  isInterrupted: boolean;
-  progress: {
-    current: number;
-    total: number;
-    percentage: number;
-  };
-  metadata?: Record<string, string | number | boolean>;
-  error?: string;
-  createdAt: string;
-  startedAt?: string;
-  completedAt?: string;
-}
-
-interface QueuedJob {
-  queueId: string;
-  jobId: string | null;
-  type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
-  restaurantId: number;
-  restaurant?: {
-    id: number;
-    name: string;
-    category: string | null;
-    address: string | null;
-  };
-  metadata: Record<string, string | number | boolean>;
-  queueStatus: 'waiting' | 'processing' | 'completed' | 'failed' | 'cancelled';
-  queuedAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
-  position?: number;
-}
-
-interface QueueStats {
-  total: number;
-  waiting: number;
-  processing: number;
-  completed: number;
-  failed: number;
-  cancelled: number;
-}
 
 /**
  * JobMonitorScreen - Mobile
@@ -98,10 +36,9 @@ const JobMonitorScreen: React.FC = () => {
   // Job State
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [subscribedRooms, setSubscribedRooms] = useState<Set<number>>(new Set());
+  const [_subscribedRooms, setSubscribedRooms] = useState<Set<number>>(new Set());
 
   // Queue State
   const [queueItems, setQueueItems] = useState<QueuedJob[]>([]);
@@ -114,154 +51,38 @@ const JobMonitorScreen: React.FC = () => {
     cancelled: 0,
   });
 
-  // 공통 유틸 인스턴스
+  // ✅ 공통 유틸 인스턴스 (Web 기준으로 통합)
   const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager());
+  const completionTrackerRef = useRef(new JobCompletionTracker());
 
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  /**
-   * Pull-to-Refresh 핸들러
-   * Socket으로 최신 Job 및 Queue 상태를 다시 가져옴
-   */
-  const onRefresh = useCallback(async () => {
-    if (!socket || !socketConnected) return;
+  // ==================== 공통 이벤트 핸들러 (Hook 사용) ====================
 
-    setRefreshing(true);
+  const {
+    handleProgressEvent,
+    handleCompletionEvent,
+    handleErrorEvent,
+    handleCancellationEvent,
+  } = useJobEventHandlers({
+    setJobs,
+    sequenceManager: sequenceManagerRef.current,
+    completionTracker: completionTrackerRef.current,
+  });
 
-    try {
-      // Job 리스트 다시 조회
-      socket.emit('subscribe:all_jobs');
+  // ==================== Pull-to-Refresh (Hook 사용) ====================
 
-      // Queue 리스트 다시 조회
-      socket.emit('subscribe:queue');
-
-      // 1초 후 refreshing 종료 (Socket 이벤트 수신 대기)
-      setTimeout(() => {
-        setRefreshing(false);
-      }, 1000);
-    } catch (error) {
-      console.error('[JobMonitor] Refresh failed:', error);
-      setRefreshing(false);
-    }
-  }, [socket, socketConnected]);
-
-  /**
-   * 진행률 이벤트로 Job 생성
-   */
-  const createJobFromProgress = useCallback((
-    data: ProgressEventData | MenuProgressEventData,
-    type: Job['type'],
-    additionalMetadata?: Record<string, string | number>
-  ): Job => {
-    return {
-      jobId: data.jobId,
-      restaurantId: data.restaurantId,
-      type,
-      status: 'active',
-      isInterrupted: false,
-      progress: {
-        current: data.current || 0,
-        total: data.total || 0,
-        percentage: data.percentage || 0
-      },
-      metadata: additionalMetadata || {},
-      createdAt: new Date(data.timestamp || Date.now()).toISOString(),
-      startedAt: new Date(data.timestamp || Date.now()).toISOString()
-    };
-  }, []);
-
-  /**
-   * Progress 이벤트 공통 핸들러
-   */
-  const handleProgressEvent = useCallback((
-    data: ProgressEventData | MenuProgressEventData,
-    jobType: Job['type'],
-    metadata?: Record<string, string | number>
-  ) => {
-    const sequence = data.sequence || data.current || 0;
-    if (!sequenceManagerRef.current.check(data.jobId, sequence)) return;
-
-    setJobs(prev => {
-      const existingJob = prev.find(job => job.jobId === data.jobId);
-      
-      if (!existingJob) {
-        return [createJobFromProgress(data, jobType, metadata), ...prev];
-      }
-      
-      return prev.map(job =>
-        job.jobId === data.jobId
-          ? {
-              ...job,
-              progress: {
-                current: data.current,
-                total: data.total,
-                percentage: data.percentage
-              },
-              metadata: { ...job.metadata, ...metadata }
-            }
-          : job
-      );
-    });
-
-    // 완료 처리
-    if (data.percentage === 100 || data.current === data.total) {
-      setTimeout(() => {
-        setJobs(prev => prev.map(job =>
-          job.jobId === data.jobId && job.status === 'active'
-            ? { ...job, status: 'completed', completedAt: new Date().toISOString() }
-            : job
-        ));
-        sequenceManagerRef.current.reset(data.jobId);
-      }, 3000);
-    }
-  }, [createJobFromProgress]);
-
-  /**
-   * 완료 이벤트 공통 핸들러
-   */
-  const handleCompletionEvent = useCallback((data: CompletionEventData) => {
-    sequenceManagerRef.current.reset(data.jobId);
-    setJobs(prev => prev.map(job =>
-      job.jobId === data.jobId
-        ? {
-            ...job,
-            status: 'completed',
-            completedAt: new Date(data.timestamp).toISOString()
-          }
-        : job
-    ));
-  }, []);
-
-  /**
-   * 에러 이벤트 공통 핸들러
-   */
-  const handleErrorEvent = useCallback((data: ErrorEventData) => {
-    sequenceManagerRef.current.reset(data.jobId);
-    setJobs(prev => prev.map(job =>
-      job.jobId === data.jobId
-        ? { ...job, status: 'failed', error: data.error }
-        : job
-    ));
-  }, []);
-
-  /**
-   * 취소 이벤트 공통 핸들러
-   */
-  const handleCancellationEvent = useCallback((data: CancellationEventData) => {
-    sequenceManagerRef.current.reset(data.jobId);
-    setJobs(prev => prev.map(job =>
-      job.jobId === data.jobId
-        ? { ...job, status: 'cancelled' }
-        : job
-    ));
-  }, []);
+  const { refreshing, onRefresh } = useJobRefresh({ socket, socketConnected });
 
   /**
    * Socket 연결 및 이벤트 리스너 등록
    */
   useEffect(() => {
     console.log('[JobMonitor] Socket 연결 시도...');
+
+    // ✅ ref.current를 effect 본문에서 변수로 복사 (cleanup에서 사용)
+    const completionTracker = completionTrackerRef.current;
 
     const newSocket = io(SOCKET_URL, SOCKET_CONFIG as any);
 
@@ -270,39 +91,14 @@ const JobMonitorScreen: React.FC = () => {
       setSocketConnected(true);
       setIsLoading(false);
 
+      // ✅ 연결 시 자동 정리 시작 (5분 주기)
+      completionTracker.startAutoCleanup(5);
+
       // 연결 후 즉시 데이터 조회
       newSocket.emit('subscribe:all_jobs');
       newSocket.emit('subscribe:queue');
     });
 
-    // jobs:current_state - 초기 Job 리스트 수신
-    newSocket.on('jobs:current_state', (data: {
-      total: number;
-      jobs: Job[];
-      timestamp: number;
-    }) => {
-      console.log('[JobMonitor] 초기 Job 리스트 수신:', data);
-      setJobs(data.jobs);
-
-      // 레스토랑 ID 목록 추출 (중복 제거)
-      const restaurantIds = extractUniqueRestaurantIds(data.jobs);
-
-      // 모든 레스토랑 Room 구독
-      restaurantIds.forEach((restaurantId) => {
-        setSubscribedRooms(prev => {
-          if (prev.has(restaurantId)) return prev;
-          newSocket.emit('subscribe:restaurant', restaurantId);
-          const newSet = new Set(prev);
-          newSet.add(restaurantId);
-          return newSet;
-        });
-      });
-    });
-
-    // jobs:error - Job 로딩 실패
-    newSocket.on('jobs:error', (error: { message: string; error: string }) => {
-      console.error('[JobMonitor] Job 로딩 실패:', error);
-    });
 
     newSocket.on('disconnect', (reason: string) => {
       console.log('[JobMonitor] Socket 연결 끊김:', reason);
@@ -345,125 +141,28 @@ const JobMonitorScreen: React.FC = () => {
       setSocketConnected(false);
     });
 
-    // job:new - 새 Job 시작 알림
-    newSocket.on('job:new', (data: JobNewEventData) => {
-      setSubscribedRooms(prev => {
-        if (prev.has(data.restaurantId)) return prev;
-        newSocket.emit('subscribe:restaurant', data.restaurantId);
-        const newSet = new Set(prev);
-        newSet.add(data.restaurantId);
-        return newSet;
-      });
-    });
+    // ==================== Job & Queue 이벤트 핸들러 등록 (공통 함수 사용) ====================
 
-    // Progress 이벤트 - 공통 핸들러 사용
-    newSocket.on('review:crawl_progress', (data: ProgressEventData) => {
-      handleProgressEvent(data, 'review_crawl', { phase: 'crawl' });
-    });
-
-    newSocket.on('review:db_progress', (data: ProgressEventData) => {
-      handleProgressEvent(data, 'review_crawl', { phase: 'db' });
-    });
-
-    newSocket.on('review:image_progress', (data: ProgressEventData) => {
-      handleProgressEvent(data, 'review_crawl', { phase: 'image' });
-    });
-
-    // 완료/에러/취소 이벤트 - 공통 핸들러 사용
-    newSocket.on('review:completed', handleCompletionEvent);
-    newSocket.on('review:error', handleErrorEvent);
-    newSocket.on('review:cancelled', handleCancellationEvent);
-
-    // Summary 이벤트 - 공통 핸들러 사용
-    newSocket.on('review_summary:progress', (data: ProgressEventData) => {
-      handleProgressEvent(data, 'review_summary');
-    });
-
-    newSocket.on('review_summary:completed', handleCompletionEvent);
-    newSocket.on('review_summary:error', handleErrorEvent);
-
-    // Restaurant 이벤트 - 공통 핸들러 사용
-    newSocket.on('restaurant:menu_progress', (data: MenuProgressEventData) => {
-      handleProgressEvent(data, 'restaurant_crawl', data.metadata);
-    });
-
-    // Queue 이벤트
-    newSocket.on('queue:current_state', (data: {
-      total: number;
-      queue: QueuedJob[];
-      stats: QueueStats;
-      timestamp: number;
-    }) => {
-      setQueueItems(data.queue);
-      setQueueStats(data.stats);
-    });
-
-    newSocket.on('queue:job_added', (data: {
-      queueId: string;
-      type: string;
-      restaurantId: number;
-      restaurant?: {
-        id: number;
-        name: string;
-        category: string | null;
-        address: string | null;
-      };
-      position: number;
-      timestamp: number;
-    }) => {
-      console.log('[JobMonitor] Queue에 Job 추가:', data);
-      newSocket.emit('subscribe:queue');
-    });
-
-    newSocket.on('queue:job_started', (data: { queueId: string }) => {
-      setQueueItems(prev => prev.map(item =>
-        item.queueId === data.queueId
-          ? { ...item, queueStatus: 'processing' as const, startedAt: new Date().toISOString() }
-          : item
-      ));
-    });
-
-    newSocket.on('queue:job_completed', (data: { queueId: string }) => {
-      setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId));
-      setQueueStats(prev => ({
-        ...prev,
-        processing: Math.max(0, prev.processing - 1),
-      }));
-    });
-
-    newSocket.on('queue:job_failed', (data: { queueId: string; error: string }) => {
-      setQueueItems(prev => prev.map(item =>
-        item.queueId === data.queueId
-          ? {
-              ...item,
-              queueStatus: 'failed' as const,
-              completedAt: new Date().toISOString(),
-              error: data.error,
-            }
-          : item
-      ));
-
-      setTimeout(() => {
-        setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId));
-        setQueueStats(prev => ({
-          ...prev,
-          processing: Math.max(0, prev.processing - 1),
-        }));
-      }, 3000);
-    });
-
-    newSocket.on('queue:job_cancelled', (data: { queueId: string }) => {
-      setQueueItems(prev => prev.filter(item => item.queueId !== data.queueId));
-      setQueueStats(prev => ({
-        ...prev,
-        waiting: Math.max(0, prev.waiting - 1),
-      }));
+    registerJobSocketEvents({
+      socket: newSocket,
+      handlers: {
+        handleProgressEvent,
+        handleCompletionEvent,
+        handleErrorEvent,
+        handleCancellationEvent,
+      },
+      setJobs,
+      setSubscribedRooms,
+      setQueueItems,
+      setQueueStats,
     });
 
     setSocket(newSocket);
     socketRef.current = newSocket;
 
     return () => {
+      console.log('[JobMonitor] Socket 연결 해제');
+      completionTracker.stopAutoCleanup(); // ✅ 자동 정리 중지
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -472,93 +171,6 @@ const JobMonitorScreen: React.FC = () => {
       socketRef.current = null;
     };
   }, [handleProgressEvent, handleCompletionEvent, handleErrorEvent, handleCancellationEvent]);
-
-  /**
-   * UI 헬퍼 함수
-   */
-  const getTypeLabel = (type: Job['type']) => {
-    switch (type) {
-      case 'review_crawl': return '리뷰 크롤링';
-      case 'review_summary': return '리뷰 요약';
-      case 'restaurant_crawl': return '레스토랑 크롤링';
-      default: return type;
-    }
-  };
-
-  const getPhaseLabel = (job: Job) => {
-    if (job.type === 'review_crawl') {
-      const phase = job.metadata?.phase;
-      if (phase === 'crawl') return '웹 크롤링 중';
-      if (phase === 'db') return 'DB 저장 중';
-      if (phase === 'image') return '이미지 다운로드 중';
-    }
-    if (job.type === 'review_summary') return 'AI 요약 생성 중';
-    if (job.type === 'restaurant_crawl') {
-      const step = job.metadata?.step;
-      const substep = job.metadata?.substep;
-      if (step === 'crawling') return '웹 크롤링 중';
-      if (step === 'menu') {
-        if (substep === 'normalizing') return '메뉴 정규화 중';
-        if (substep === 'saving') return 'DB 저장 중';
-        return '메뉴 처리 중';
-      }
-      return '레스토랑 정보 수집 중';
-    }
-    return '';
-  };
-
-  const getStatusColor = (job: Job) => {
-    if (job.isInterrupted) return '#f59e0b';
-    switch (job.status) {
-      case 'active': return colors.primary;
-      case 'completed': return colors.success;
-      case 'failed': return colors.error;
-      case 'cancelled': return colors.textSecondary;
-      default: return colors.text;
-    }
-  };
-
-  const getStatusText = (job: Job) => {
-    if (job.isInterrupted) return '⚠️ 중단됨';
-    switch (job.status) {
-      case 'active': return '▶ 실행 중';
-      case 'completed': return '✅ 완료';
-      case 'failed': return '❌ 실패';
-      case 'cancelled': return '🚫 취소됨';
-      default: return job.status;
-    }
-  };
-
-  const getQueueStatusColor = (status: QueuedJob['queueStatus']) => {
-    switch (status) {
-      case 'waiting': return colors.textSecondary;
-      case 'processing': return colors.primary;
-      case 'completed': return '#22c55e';
-      case 'failed': return '#ef4444';
-      case 'cancelled': return '#94a3b8';
-      default: return colors.textSecondary;
-    }
-  };
-
-  const getQueueStatusText = (item: QueuedJob) => {
-    switch (item.queueStatus) {
-      case 'waiting': return `대기 중 (${item.position}번째)`;
-      case 'processing': return '처리 중';
-      case 'completed': return '완료';
-      case 'failed': return '실패';
-      case 'cancelled': return '취소됨';
-      default: return item.queueStatus;
-    }
-  };
-
-  const getQueueTypeLabel = (type: QueuedJob['type']) => {
-    switch (type) {
-      case 'review_crawl': return '리뷰 크롤링';
-      case 'review_summary': return '리뷰 요약';
-      case 'restaurant_crawl': return '레스토랑 크롤링';
-      default: return type;
-    }
-  };
 
   const handleCancelQueue = async (queueId: string) => {
     try {
@@ -649,7 +261,7 @@ const JobMonitorScreen: React.FC = () => {
             <View style={styles.statusRow}>
               <Text style={[
                 styles.connectionStatusText,
-                { color: socketConnected ? '#22c55e' : '#ef4444' }
+                { color: socketConnected ? colors.success : colors.error }
               ]}>
                 {socketConnected ? '🟢 실시간 연결' : '🔴 연결 끊김'}
               </Text>
@@ -675,12 +287,12 @@ const JobMonitorScreen: React.FC = () => {
                   blurAmount={20}
                   reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
                 />
-                <View style={[styles.cardContent, styles.cardBorderLeft, { borderLeftColor: getQueueStatusColor(item.queueStatus) }]}>
+                <View style={[styles.cardContent, styles.cardBorderLeft, { borderLeftColor: getQueueStatusColor(item.queueStatus, colors) }]}>
                   <View style={styles.cardHeader}>
                     <Text style={[styles.typeLabel, { color: colors.text }]}>
                       {getQueueTypeLabel(item.type)}
                     </Text>
-                    <Text style={[styles.statusBadge, { color: getQueueStatusColor(item.queueStatus) }]}>
+                    <Text style={[styles.statusBadge, { color: getQueueStatusColor(item.queueStatus, colors) }]}>
                       {getQueueStatusText(item)}
                     </Text>
                   </View>
@@ -728,12 +340,12 @@ const JobMonitorScreen: React.FC = () => {
               blurAmount={20}
               reducedTransparencyFallbackColor={theme === 'dark' ? 'rgba(26, 26, 26, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
             />
-            <View style={[styles.cardContent, styles.cardBorderLeft, { borderLeftColor: getStatusColor(job) }]}>
+            <View style={[styles.cardContent, styles.cardBorderLeft, { borderLeftColor: getStatusColor(job, colors) }]}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.typeLabel, { color: colors.text }]}>
                   {getTypeLabel(job.type)}
                 </Text>
-                <Text style={[styles.statusBadge, { color: getStatusColor(job) }]}>
+                <Text style={[styles.statusBadge, { color: getStatusColor(job, colors) }]}>
                   {getStatusText(job)}
                 </Text>
               </View>
@@ -761,7 +373,7 @@ const JobMonitorScreen: React.FC = () => {
                         styles.progressFill,
                         {
                           width: `${job.progress.percentage}%`,
-                          backgroundColor: getStatusColor(job)
+                          backgroundColor: getStatusColor(job, colors)
                         }
                       ]}
                     />

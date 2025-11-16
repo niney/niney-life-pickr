@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '@shared/contexts';
 import { THEME_COLORS } from '@shared/constants';
-import type { QueuedJob } from '../types';
+import type { QueuedJob } from '@shared/types';
 
 interface QueueCardProps {
   item: QueuedJob;

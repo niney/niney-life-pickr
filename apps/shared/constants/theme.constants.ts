@@ -27,4 +27,7 @@ export const THEME_COLORS = {
   },
 };
 
+// Theme colors type
+export type ThemeColors = typeof THEME_COLORS.light;
+
 export const HEADER_HEIGHT = 48;

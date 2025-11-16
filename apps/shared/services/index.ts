@@ -1,6 +1,9 @@
 // API Service exports
 export { apiService } from './api.service';
 export { getDefaultApiUrl } from './api.config';
+
+// Queue Service exports
+export { cancelQueueItem } from './queueService';
 export type {
   ApiResponse,
   User,

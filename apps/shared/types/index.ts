@@ -14,3 +14,15 @@ export type {
   ActiveJob,
   QueueStats,
 } from './socket-events';
+
+// Type aliases for better semantics
+export type { ActiveJob as Job } from './socket-events';
+export type { Restaurant as RestaurantBasicInfo } from './socket-events';
+
+// Re-export types for convenience
+import type { ActiveJob, QueuedJob } from './socket-events';
+
+export type JobType = ActiveJob['type'];
+export type JobStatus = ActiveJob['status'];
+export type JobProgress = ActiveJob['progress'];
+export type QueueStatus = QueuedJob['queueStatus'];
