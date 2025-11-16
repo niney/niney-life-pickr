@@ -10,11 +10,12 @@ import {
 } from '../utils'
 import { SOCKET_CONFIG } from '../constants'
 import { getDefaultApiUrl } from '../services'
-import type { QueuedJob, ActiveJob, QueueStats } from '../types'
+import type { QueuedJob, ActiveJob, QueueStats, Restaurant } from '../types'
 
 interface SocketContextValue {
   socket: Socket | null
   isConnected: boolean
+  currentRestaurant: Restaurant | null
   menuProgress: ProgressData | null
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
@@ -53,6 +54,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const resolvedServerUrl = serverUrl || getDefaultApiUrl()
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null)
   const [menuProgress, setMenuProgress] = useState<ProgressData | null>(null)
   const [crawlProgress, setCrawlProgress] = useState<ProgressData | null>(null)
   const [dbProgress, setDbProgress] = useState<ProgressData | null>(null)
@@ -146,6 +148,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     // 레스토랑 현재 상태 (활성 이벤트 목록)
     socket.on('restaurant:current_state', (data: any) => {
       console.log('[Socket.io] Current State:', data)
+
+      // ✅ 레스토랑 정보 저장
+      if (data.restaurant) {
+        setCurrentRestaurant(data.restaurant)
+      }
 
       const activeEvents = new Set(data.activeEventNames || [])
 
@@ -609,6 +616,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     if (currentRestaurantIdRef.current === restaurantId) {
       currentRestaurantIdRef.current = null
       callbacksRef.current = {}
+      setCurrentRestaurant(null) // ✅ 레스토랑 정보 초기화
     }
   }, [])
 
@@ -651,6 +659,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const value: SocketContextValue = {
     socket: socketRef.current,
     isConnected,
+    currentRestaurant,
     menuProgress,
     crawlProgress,
     dbProgress,

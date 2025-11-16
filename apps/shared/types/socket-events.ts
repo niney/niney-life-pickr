@@ -4,6 +4,17 @@
  */
 
 /**
+ * 레스토랑 정보 (Socket 이벤트용)
+ */
+export interface Restaurant {
+  id: number;
+  name: string;
+  category: string | null;
+  address: string | null;
+  placeId: string;
+}
+
+/**
  * 진행률 이벤트 데이터
  */
 export interface ProgressEventData {

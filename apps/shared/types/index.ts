@@ -3,6 +3,7 @@
 
 // Socket.io 이벤트 타입
 export type {
+  Restaurant,
   ProgressEventData,
   CompletionEventData,
   ErrorEventData,

@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { FastifyInstance } from 'fastify';
 import jobRepository from '../db/repositories/job.repository';
+import restaurantRepository from '../db/repositories/restaurant.repository';
 import jobManager from '../services/job-manager.service';
 import { getInterruptEventName } from './events';
 
@@ -53,6 +54,10 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
 
       // 현재 활성 Job 조회 및 상태 전송
       try {
+        // 1. 레스토랑 정보 조회 (단일 쿼리)
+        const restaurant = await restaurantRepository.findById(parseInt(restaurantId));
+
+        // 2. 활성 Job 조회
         const dbActiveJobs = await jobRepository.findActiveByRestaurant(parseInt(restaurantId));
 
         // 활성 Job의 이벤트명 목록 수집
@@ -108,6 +113,13 @@ export function initializeSocketIO(fastify: FastifyInstance): SocketIOServer {
         // 현재 상태 정보 전송 (항상 전송)
         socket.emit('restaurant:current_state', {
           restaurantId: parseInt(restaurantId),
+          restaurant: restaurant ? {
+            id: restaurant.id,
+            name: restaurant.name,
+            category: restaurant.category,
+            address: restaurant.address,
+            placeId: restaurant.place_id
+          } : undefined,
           activeEventNames, // 현재 활성화된 이벤트 목록
           interruptedCount: interruptedJobs.length,
           hasActiveJobs: activeEventNames.length > 0,
