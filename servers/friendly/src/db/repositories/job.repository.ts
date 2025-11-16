@@ -72,12 +72,37 @@ class JobRepository {
 
   /**
    * 메타데이터 업데이트 (Socket 통신 데이터 저장)
+   * - 기존 metadata와 병합하여 업데이트 (덮어쓰기 방지)
    */
   async updateMetadata(
     jobId: string,
     eventName: string,
     metadata: Record<string, any>
   ): Promise<void> {
+    // 1. 기존 Job 조회
+    const job = await this.findById(jobId);
+    if (!job) {
+      throw new Error(`Job not found: ${jobId}`);
+    }
+
+    // 2. 기존 metadata 파싱
+    let existingMetadata: Record<string, any> = {};
+    if (job.metadata) {
+      try {
+        existingMetadata = JSON.parse(job.metadata);
+      } catch (error) {
+        console.error('[JobRepository] Failed to parse existing metadata:', error);
+        // 파싱 실패 시 빈 객체로 시작
+      }
+    }
+
+    // 3. 새 metadata와 병합 (새 값이 우선)
+    const mergedMetadata = {
+      ...existingMetadata,
+      ...metadata,
+    };
+
+    // 4. DB 업데이트
     await db.run(`
       UPDATE jobs
       SET metadata = ?,
@@ -85,7 +110,7 @@ class JobRepository {
           updated_at = ?
       WHERE id = ?
     `, [
-      JSON.stringify(metadata),
+      JSON.stringify(mergedMetadata),
       eventName || null,
       new Date().toISOString(),
       jobId
@@ -94,13 +119,38 @@ class JobRepository {
 
   /**
    * Job 완료
+   * - 기존 metadata와 병합하여 업데이트 (덮어쓰기 방지)
    */
   async complete(
     jobId: string,
     finalMetadata?: Record<string, any>
   ): Promise<void> {
+    // 1. 기존 Job 조회
+    const job = await this.findById(jobId);
+    if (!job) {
+      throw new Error(`Job not found: ${jobId}`);
+    }
+
+    // 2. 기존 metadata 파싱
+    let existingMetadata: Record<string, any> = {};
+    if (job.metadata) {
+      try {
+        existingMetadata = JSON.parse(job.metadata);
+      } catch (error) {
+        console.error('[JobRepository] Failed to parse existing metadata:', error);
+        // 파싱 실패 시 빈 객체로 시작
+      }
+    }
+
+    // 3. 새 metadata와 병합 (새 값이 우선)
+    const mergedMetadata = {
+      ...existingMetadata,
+      ...(finalMetadata || {}),
+    };
+
     const now = new Date().toISOString();
 
+    // 4. DB 업데이트
     await db.run(`
       UPDATE jobs
       SET status = 'completed',
@@ -109,7 +159,7 @@ class JobRepository {
           updated_at = ?
       WHERE id = ?
     `, [
-      finalMetadata ? JSON.stringify(finalMetadata) : null,
+      JSON.stringify(mergedMetadata),
       now,
       now,
       jobId
@@ -118,10 +168,35 @@ class JobRepository {
 
   /**
    * Job 실패
+   * - 기존 metadata와 병합하여 업데이트 (덮어쓰기 방지)
    */
   async fail(jobId: string, error: string, metadata?: Record<string, any>): Promise<void> {
+    // 1. 기존 Job 조회
+    const job = await this.findById(jobId);
+    if (!job) {
+      throw new Error(`Job not found: ${jobId}`);
+    }
+
+    // 2. 기존 metadata 파싱
+    let existingMetadata: Record<string, any> = {};
+    if (job.metadata) {
+      try {
+        existingMetadata = JSON.parse(job.metadata);
+      } catch (error) {
+        console.error('[JobRepository] Failed to parse existing metadata:', error);
+        // 파싱 실패 시 빈 객체로 시작
+      }
+    }
+
+    // 3. 새 metadata와 병합 (새 값이 우선)
+    const mergedMetadata = {
+      ...existingMetadata,
+      ...(metadata || {}),
+    };
+
     const now = new Date().toISOString();
 
+    // 4. DB 업데이트
     await db.run(`
       UPDATE jobs
       SET status = 'failed',
@@ -132,7 +207,7 @@ class JobRepository {
       WHERE id = ?
     `, [
       error,
-      metadata ? JSON.stringify(metadata) : null,
+      JSON.stringify(mergedMetadata),
       now,
       now,
       jobId
@@ -141,10 +216,35 @@ class JobRepository {
 
   /**
    * Job 취소
+   * - 기존 metadata와 병합하여 업데이트 (덮어쓰기 방지)
    */
   async cancel(jobId: string, metadata?: Record<string, any>): Promise<void> {
+    // 1. 기존 Job 조회
+    const job = await this.findById(jobId);
+    if (!job) {
+      throw new Error(`Job not found: ${jobId}`);
+    }
+
+    // 2. 기존 metadata 파싱
+    let existingMetadata: Record<string, any> = {};
+    if (job.metadata) {
+      try {
+        existingMetadata = JSON.parse(job.metadata);
+      } catch (error) {
+        console.error('[JobRepository] Failed to parse existing metadata:', error);
+        // 파싱 실패 시 빈 객체로 시작
+      }
+    }
+
+    // 3. 새 metadata와 병합 (새 값이 우선)
+    const mergedMetadata = {
+      ...existingMetadata,
+      ...(metadata || {}),
+    };
+
     const now = new Date().toISOString();
 
+    // 4. DB 업데이트
     await db.run(`
       UPDATE jobs
       SET status = 'cancelled',
@@ -153,7 +253,7 @@ class JobRepository {
           updated_at = ?
       WHERE id = ?
     `, [
-      metadata ? JSON.stringify(metadata) : null,
+      JSON.stringify(mergedMetadata),
       now,
       now,
       jobId
