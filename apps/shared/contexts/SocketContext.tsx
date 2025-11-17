@@ -46,7 +46,6 @@ interface SocketContextValue {
 
   // 공통 Queue 상태
   queueItems: QueuedJob[]
-  activeJobs: ActiveJob[]
   queueStats: QueueStats
 
   // Restaurant 함수
@@ -102,7 +101,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
   // 공통 Queue 상태
   const [queueItems, setQueueItems] = useState<QueuedJob[]>([])
-  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([])
   const [queueStats, setQueueStats] = useState<QueueStats>({
     total: 0,
     waiting: 0,
@@ -559,10 +557,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     }) => {
       console.log('[Socket.io] Jobs current state:', data)
 
-      // activeJobs 업데이트 (기존)
-      setActiveJobs(data.jobs)
-
-      // JobMonitor: jobs 업데이트
+      // jobs 업데이트
       setJobs(data.jobs)
       setJobsLoading(false)
 
@@ -747,8 +742,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
   // 레스토랑별 Job 상태 조회
   const getRestaurantJobStatus = useCallback((restaurantId: number): ActiveJob | null => {
-    return activeJobs.find(job => job.restaurantId === restaurantId) || null
-  }, [activeJobs])
+    return jobs.find(job => job.restaurantId === restaurantId) || null
+  }, [jobs])
 
   const value: SocketContextValue = {
     socket: socketRef.current,
@@ -770,7 +765,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
     // 공통 Queue 상태
     queueItems,
-    activeJobs,
     queueStats,
 
     // Restaurant 함수
