@@ -1,19 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { io, Socket } from 'socket.io-client';
-import { useTheme } from '@shared/contexts';
-import { THEME_COLORS, SOCKET_CONFIG } from '@shared/constants';
-import { getDefaultApiUrl, cancelQueueItem } from '@shared/services';
-import { SocketSequenceManager, JobCompletionTracker, registerJobSocketEvents } from '@shared/utils';
-import type { QueueStats } from '@shared/utils';
-import { useJobEventHandlers } from '@shared/hooks';
-import type { Job, QueuedJob } from '@shared/types';
+import { useTheme, useSocket } from '@shared/contexts';
+import { THEME_COLORS } from '@shared/constants';
+import { cancelQueueItem } from '@shared/services';
 import { JobCard } from '@shared/components';
 import Header from './Header';
 import Drawer from './Drawer';
 import { QueueCard } from './QueueCard';
-
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || getDefaultApiUrl();
 
 /**
  * JobMonitor 컴포넌트
@@ -54,123 +47,15 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({ onLogout }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ==================== Job State 관리 ====================
-
-  const [jobs, setJobs] = useState<Job[]>([]); // Job 리스트
-  const [isLoading, setIsLoading] = useState(true); // 초기 로딩 상태
-  const [socketConnected, setSocketConnected] = useState(false); // Socket 연결 상태
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_socket, setSocket] = useState<Socket | null>(null); // Socket 인스턴스 (향후 확장용)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_subscribedRooms, setSubscribedRooms] = useState<Set<number>>(new Set()); // 구독 중인 Room
-
-  // ==================== Queue State 관리 ====================
-
-  const [queueItems, setQueueItems] = useState<QueuedJob[]>([]); // Queue 리스트
-  const [queueStats, setQueueStats] = useState<QueueStats>({
-    total: 0,
-    waiting: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-  });
-
-  // ✅ Sequence 및 Completion 추적 (공통 유틸)
-  const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager());
-  const completionTrackerRef = useRef<JobCompletionTracker>(new JobCompletionTracker());
-
-  // ==================== 공통 이벤트 핸들러 (Hook 사용) ====================
+  // ==================== Socket Context ====================
 
   const {
-    handleProgressEvent,
-    handleCompletionEvent,
-    handleErrorEvent,
-    handleCancellationEvent,
-  } = useJobEventHandlers({
-    setJobs,
-    sequenceManager: sequenceManagerRef.current,
-    completionTracker: completionTrackerRef.current,
-  });
-
-  // ==================== Socket 연결 및 이벤트 리스너 (1회 설정) ====================
-
-  /**
-   * Socket 연결 및 이벤트 리스너 등록
-   *
-   * 이벤트 종류:
-   * - review:crawl_progress → 웹 크롤링 진행률
-   * - review:db_progress → DB 저장 진행률
-   * - review:image_progress → 이미지 다운로드 진행률
-   * - review:completed → 리뷰 크롤링 완료
-   * - review:error → 리뷰 크롤링 실패
-   * - review:cancelled → 리뷰 크롤링 취소
-   * - review_summary:progress → 리뷰 요약 진행률
-   * - review_summary:completed → 리뷰 요약 완료
-   * - review_summary:error → 리뷰 요약 실패
-   * - restaurant:menu_progress → 메뉴 크롤링 진행률
-   */
-  useEffect(() => {
-    console.log('[JobMonitor] Socket 연결 시도...');
-
-    // ✅ ref.current를 effect 본문에서 변수로 복사 (cleanup에서 사용)
-    const completionTracker = completionTrackerRef.current;
-
-    const newSocket = io(SOCKET_URL, {
-      ...SOCKET_CONFIG,
-      transports: ['websocket', 'polling'], // readonly를 mutable로 변환
-    });
-
-    // Socket 연결 성공
-    newSocket.on('connect', () => {
-      console.log('[JobMonitor] Socket 연결 성공:', newSocket.id);
-      setSocketConnected(true);
-
-      // ✅ 연결 시 자동 정리 시작 (5분 주기)
-      completionTracker.startAutoCleanup(5);
-
-      // ✅ Mobile 방식: 연결 후 즉시 데이터 조회
-      newSocket.emit('subscribe:all_jobs');
-      newSocket.emit('subscribe:queue');
-    });
-
-    // Socket 연결 끊김
-    newSocket.on('disconnect', () => {
-      console.log('[JobMonitor] Socket 연결 끊김');
-      setSocketConnected(false);
-    });
-
-    // ==================== Socket 이벤트 핸들러 등록 (공통 함수 사용) ====================
-
-    registerJobSocketEvents({
-      socket: newSocket,
-      handlers: {
-        handleProgressEvent,
-        handleCompletionEvent,
-        handleErrorEvent,
-        handleCancellationEvent,
-      },
-      setJobs,
-      setSubscribedRooms,
-      setQueueItems,
-      setQueueStats,
-      setIsLoading,
-    });
-
-    setSocket(newSocket);
-
-    // Cleanup: 컴포넌트 unmount 시 Socket 연결 해제
-    return () => {
-      console.log('[JobMonitor] Socket 연결 해제');
-      completionTracker.stopAutoCleanup(); // ✅ 자동 정리 중지
-      newSocket.emit('unsubscribe:all_jobs'); // 전체 Job 구독 해제
-      newSocket.close();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // ℹ️ 빈 배열 의도: Socket 핸들러는 마운트 시 1회만 등록
-  // ℹ️ 공통 핸들러(handleProgressEvent, handleCompletionEvent 등)는 useCallback으로
-  //    안전하게 클로저에 캡처됨 - 다시 등록할 필요 없음
+    isConnected: socketConnected,
+    jobs,
+    jobsLoading: isLoading,
+    queueItems,
+    queueStats,
+  } = useSocket();
 
   // ==================== UI 핸들러 ====================
 

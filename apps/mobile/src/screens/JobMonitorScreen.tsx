@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from '@react-native-community/blur';
@@ -6,13 +6,10 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { io, Socket } from 'socket.io-client';
-import { useTheme } from 'shared/contexts';
-import { THEME_COLORS, SOCKET_CONFIG } from 'shared/constants';
+import { useTheme, useSocket } from 'shared/contexts';
+import { THEME_COLORS } from 'shared/constants';
 import { getDefaultApiUrl } from 'shared/services';
-import { SocketSequenceManager, JobCompletionTracker, registerJobSocketEvents, QueueStats, getTypeLabel, getPhaseLabel, getStatusColor, getStatusText, getQueueStatusColor, getQueueStatusText, getQueueTypeLabel } from 'shared/utils';
-import { useJobEventHandlers, useJobRefresh } from 'shared/hooks';
-import type { Job, QueuedJob } from 'shared/types';
+import { getTypeLabel, getPhaseLabel, getStatusColor, getStatusText, getQueueStatusColor, getQueueStatusText, getQueueTypeLabel } from 'shared/utils';
 import type { RootTabParamList, RestaurantStackParamList } from '../navigation/types';
 
 // JobMonitor는 Tab에 있고, Restaurant Detail은 Restaurant Stack에 있음
@@ -33,144 +30,27 @@ const JobMonitorScreen: React.FC = () => {
   const colors = THEME_COLORS[theme];
   const navigation = useNavigation<JobMonitorNavigationProp>();
 
-  // Job State
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [socketConnected, setSocketConnected] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [_subscribedRooms, setSubscribedRooms] = useState<Set<number>>(new Set());
-
-  // Queue State
-  const [queueItems, setQueueItems] = useState<QueuedJob[]>([]);
-  const [queueStats, setQueueStats] = useState<QueueStats>({
-    total: 0,
-    waiting: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-  });
-
-  // ✅ 공통 유틸 인스턴스 (Web 기준으로 통합)
-  const sequenceManagerRef = useRef<SocketSequenceManager>(new SocketSequenceManager());
-  const completionTrackerRef = useRef(new JobCompletionTracker());
-
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-
-  // ==================== 공통 이벤트 핸들러 (Hook 사용) ====================
+  // ==================== Socket Context ====================
 
   const {
-    handleProgressEvent,
-    handleCompletionEvent,
-    handleErrorEvent,
-    handleCancellationEvent,
-  } = useJobEventHandlers({
-    setJobs,
-    sequenceManager: sequenceManagerRef.current,
-    completionTracker: completionTrackerRef.current,
-  });
+    isConnected: socketConnected,
+    jobs,
+    jobsLoading: isLoading,
+    queueItems,
+    queueStats,
+    refreshJobs,
+  } = useSocket();
 
-  // ==================== Pull-to-Refresh (Hook 사용) ====================
+  // ==================== Pull-to-Refresh ====================
 
-  const { refreshing, onRefresh } = useJobRefresh({ socket, socketConnected });
+  const [refreshing, setRefreshing] = useState(false);
 
-  /**
-   * Socket 연결 및 이벤트 리스너 등록
-   */
-  useEffect(() => {
-    console.log('[JobMonitor] Socket 연결 시도...');
-
-    // ✅ ref.current를 effect 본문에서 변수로 복사 (cleanup에서 사용)
-    const completionTracker = completionTrackerRef.current;
-
-    const newSocket = io(SOCKET_URL, SOCKET_CONFIG as any);
-
-    newSocket.on('connect', () => {
-      console.log('[JobMonitor] Socket 연결 성공');
-      setSocketConnected(true);
-      setIsLoading(false);
-
-      // ✅ 연결 시 자동 정리 시작 (5분 주기)
-      completionTracker.startAutoCleanup(5);
-
-      // 연결 후 즉시 데이터 조회
-      newSocket.emit('subscribe:all_jobs');
-      newSocket.emit('subscribe:queue');
-    });
-
-
-    newSocket.on('disconnect', (reason: string) => {
-      console.log('[JobMonitor] Socket 연결 끊김:', reason);
-      setSocketConnected(false);
-
-      // 의도치 않은 끊김이면 재연결 시도
-      if (reason === 'io server disconnect') {
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-        }
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (socketRef.current && !socketRef.current.connected) {
-            console.log('[JobMonitor] Socket 재연결 시도...');
-            socketRef.current.connect();
-          }
-        }, 1000);
-      }
-    });
-
-    // 재연결 이벤트
-    newSocket.on('reconnect', (attemptNumber: number) => {
-      console.log('[JobMonitor] Socket 재연결 성공:', attemptNumber);
-      // 재연결 후 데이터 갱신
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit('subscribe:all_jobs');
-        socketRef.current.emit('subscribe:queue');
-      }
-    });
-
-    newSocket.on('reconnect_attempt', (attemptNumber: number) => {
-      console.log('[JobMonitor] Socket 재연결 시도:', attemptNumber);
-    });
-
-    newSocket.on('reconnect_error', (error: Error) => {
-      console.error('[JobMonitor] Socket 재연결 실패:', error);
-    });
-
-    newSocket.on('reconnect_failed', () => {
-      console.error('[JobMonitor] Socket 재연결 완전 실패');
-      setSocketConnected(false);
-    });
-
-    // ==================== Job & Queue 이벤트 핸들러 등록 (공통 함수 사용) ====================
-
-    registerJobSocketEvents({
-      socket: newSocket,
-      handlers: {
-        handleProgressEvent,
-        handleCompletionEvent,
-        handleErrorEvent,
-        handleCancellationEvent,
-      },
-      setJobs,
-      setSubscribedRooms,
-      setQueueItems,
-      setQueueStats,
-    });
-
-    setSocket(newSocket);
-    socketRef.current = newSocket;
-
-    return () => {
-      console.log('[JobMonitor] Socket 연결 해제');
-      completionTracker.stopAutoCleanup(); // ✅ 자동 정리 중지
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      newSocket.emit('unsubscribe:all_jobs');
-      newSocket.close();
-      socketRef.current = null;
-    };
-  }, [handleProgressEvent, handleCompletionEvent, handleErrorEvent, handleCancellationEvent]);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    refreshJobs();
+    // 1초 후 refreshing 상태 해제 (시각적 피드백)
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [refreshJobs]);
 
   const handleCancelQueue = async (queueId: string) => {
     try {

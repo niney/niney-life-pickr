@@ -27,6 +27,3 @@ export type { UseJobEventHandlersParams, UseJobEventHandlersReturn } from './use
 
 export { useJobRefresh } from './useJobRefresh';
 export type { UseJobRefreshParams, UseJobRefreshReturn } from './useJobRefresh';
-
-export { useJobSocket } from './useJobSocket';
-export type { UseJobSocketParams, UseJobSocketReturn } from './useJobSocket';

@@ -10,34 +10,17 @@ import type { ThemeColors } from '../constants';
  * Job 타입 → 한글 라벨
  */
 export function getTypeLabel(type: JobType): string {
-  switch (type) {
-    case 'review_crawl':
-      return '리뷰 크롤링';
-    case 'review_summary':
-      return '리뷰 요약';
-    case 'restaurant_crawl':
-      return '레스토랑 크롤링';
-    default:
-      return type;
+  if (type === 'restaurant_crawl') {
+    return '레스토랑 크롤링';
   }
+  return type;
 }
 
 /**
  * Job 진행 단계 → 한글 라벨
- * metadata의 phase, step, substep 정보를 기반으로 상세 라벨 반환
+ * metadata의 step, substep 정보를 기반으로 상세 라벨 반환
  */
 export function getPhaseLabel(job: Job): string {
-  if (job.type === 'review_crawl') {
-    const phase = job.metadata?.phase;
-    if (phase === 'crawl') return '웹 크롤링 중';
-    if (phase === 'db') return 'DB 저장 중';
-    if (phase === 'image') return '이미지 다운로드 중';
-  }
-
-  if (job.type === 'review_summary') {
-    return 'AI 요약 생성 중';
-  }
-
   if (job.type === 'restaurant_crawl') {
     const step = job.metadata?.step;
     const substep = job.metadata?.substep;

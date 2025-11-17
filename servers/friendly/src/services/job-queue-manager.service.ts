@@ -260,62 +260,12 @@ class JobQueueManager {
     const { type, restaurantId, metadata } = queuedJob;
 
     switch (type) {
-      case 'review_crawl':
-        return await this.processReviewCrawl(restaurantId, metadata.placeId, metadata.url);
-
-      case 'review_summary':
-        return await this.processReviewSummary(restaurantId, metadata);
-
       case 'restaurant_crawl':
         return await this.processRestaurantCrawl(restaurantId, metadata);
 
       default:
         throw new Error(`Unknown job type: ${type}`);
     }
-  }
-
-  /**
-   * 리뷰 크롤링 처리
-   * - 기존 crawler.routes.ts의 로직 재사용
-   */
-  private async processReviewCrawl(
-    restaurantId: number,
-    placeId: string,
-    url: string
-  ): Promise<string> {
-    // ✅ 기존 로직 재사용: Job 생성 후 백그라운드 실행
-    const jobService = await import('./job-socket.service');
-    const reviewCrawlerProcessor = await import('./review-crawler-processor.service');
-
-    // Job 시작
-    const jobId = await jobService.default.start({
-      restaurantId,
-      metadata: {
-        step: 'queue_processing',
-        placeId,
-        url,
-      },
-    });
-
-    console.log(`[JobQueueManager] Review crawl job started: ${jobId}`);
-
-    // 리뷰 크롤링 실행
-    await reviewCrawlerProcessor.default.processWithJobId(
-      jobId,
-      placeId,
-      url,
-      restaurantId
-    );
-
-    // Job 완료
-    await jobService.default.complete(jobId, {
-      step: 'completed',
-      completedAt: Date.now(),
-    });
-
-    console.log(`[JobQueueManager] Review crawl job completed: ${jobId}`);
-
-    return jobId;
   }
 
   /**
@@ -374,47 +324,6 @@ class JobQueueManager {
     });
 
     console.log(`[JobQueueManager] Restaurant crawl job completed: ${jobId}`);
-
-    return jobId;
-  }
-
-  /**
-   * 리뷰 요약 생성 처리
-   */
-  private async processReviewSummary(
-    restaurantId: number,
-    metadata: Record<string, any>
-  ): Promise<string> {
-    const jobService = await import('./job-socket.service');
-    const crawlerExecutor = await import('./crawler-executor.service');
-
-    const { resetSummary = false } = metadata;
-
-    // Job 시작
-    const jobId = await jobService.default.start({
-      restaurantId,
-      metadata: {
-        step: 'queue_processing',
-        resetSummary,
-      },
-    });
-
-    console.log(`[JobQueueManager] Review summary job started: ${jobId}`);
-
-    // 리뷰 요약 실행
-    await crawlerExecutor.default.executeReviewSummary(
-      restaurantId,
-      resetSummary,
-      jobId
-    );
-
-    // Job 완료
-    await jobService.default.complete(jobId, {
-      step: 'completed',
-      completedAt: Date.now(),
-    });
-
-    console.log(`[JobQueueManager] Review summary job completed: ${jobId}`);
 
     return jobId;
   }

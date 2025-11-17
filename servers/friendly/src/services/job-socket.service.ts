@@ -64,7 +64,7 @@ export class JobService {
 
     const eventData: JobEventData = {
       jobId,
-      type: 'review_crawl', // 커스텀 이벤트이므로 type은 참고용
+      type: 'restaurant_crawl', // 커스텀 이벤트이므로 type은 참고용
       restaurantId,
       status: 'progress',
       current: progress.current,

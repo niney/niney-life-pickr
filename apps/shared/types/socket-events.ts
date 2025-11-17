@@ -32,6 +32,7 @@ export interface ProgressEventData {
  */
 export interface CompletionEventData {
   jobId: string;
+  restaurantId: number;
   timestamp: number;
 }
 
@@ -73,7 +74,7 @@ export interface MenuProgressEventData extends ProgressEventData {
 export interface QueuedJob {
   queueId: string;
   jobId: string | null;
-  type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
+  type: 'restaurant_crawl';
   restaurantId: number;
   restaurant?: {
     id: number;
@@ -102,7 +103,7 @@ export interface ActiveJob {
     category: string | null;
     address: string | null;
   };
-  type: 'review_crawl' | 'review_summary' | 'restaurant_crawl';
+  type: 'restaurant_crawl';
   status: 'active' | 'completed' | 'failed' | 'cancelled';
   isInterrupted: boolean;
   progress: {

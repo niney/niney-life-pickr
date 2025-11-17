@@ -29,5 +29,3 @@ export {
   getQueueTypeLabel,
 } from './jobFormatters';
 export { createJobFromProgress } from './jobHelpers';
-export { registerJobSocketEvents } from './registerJobSocketEvents';
-export type { QueueStats, RegisterJobSocketEventsParams } from './registerJobSocketEvents';
