@@ -8,7 +8,7 @@ import Drawer from './Drawer'
 import RestaurantList from './Restaurant/RestaurantList'
 import RestaurantDetail from './Restaurant/RestaurantDetail'
 import SeoulMapView from './Restaurant/SeoulMapView'
-import type { RestaurantData, RestaurantCategory, ProgressData } from '@shared'
+import type { RestaurantData, RestaurantCategory } from '@shared'
 
 interface RestaurantProps {
   onLogout: () => Promise<void>
@@ -29,10 +29,6 @@ interface DesktopLayoutProps {
   setSearchName: (searchName: string) => void
   searchAddress: string
   setSearchAddress: (searchAddress: string) => void
-  menuProgress: ProgressData | null
-  crawlProgress: ProgressData | null
-  dbProgress: ProgressData | null
-  isCrawlInterrupted?: boolean
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
   fetchRestaurants: (limit?: number, offset?: number) => Promise<RestaurantData[]>
@@ -69,7 +65,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
   const restaurantState = useRestaurant()
 
   // Socket 연결 (전역 단일 연결)
-  const { menuProgress, crawlProgress, dbProgress, isCrawlInterrupted, setRestaurantCallbacks, resetCrawlStatus } = useSocket()
+  const { setRestaurantCallbacks, resetCrawlStatus } = useSocket()
 
   const { theme } = useTheme()
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -123,7 +119,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     fetchRestaurants,
     fetchCategories,
   } = restaurantState
-  
+
   // 크롤링 시작 핸들러 (socket 콜백 설정)
   const handleCrawlWithSocket = async () => {
     resetCrawlStatus()
@@ -185,10 +181,6 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   setSearchName={setSearchName}
                   searchAddress={searchAddress}
                   setSearchAddress={setSearchAddress}
-                  menuProgress={menuProgress}
-                  crawlProgress={crawlProgress}
-                  dbProgress={dbProgress}
-                  isCrawlInterrupted={isCrawlInterrupted}
                   handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClick}
                   fetchRestaurants={fetchRestaurants}
@@ -230,10 +222,6 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   setSearchName={setSearchName}
                   searchAddress={searchAddress}
                   setSearchAddress={setSearchAddress}
-                  menuProgress={menuProgress}
-                  crawlProgress={crawlProgress}
-                  dbProgress={dbProgress}
-                  isCrawlInterrupted={isCrawlInterrupted}
                   handleCrawl={handleCrawlWithSocket}
                   handleRestaurantClick={handleRestaurantClickWithMapClose}
                   fetchRestaurants={fetchRestaurants}

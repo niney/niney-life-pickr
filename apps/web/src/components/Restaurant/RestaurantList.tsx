@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMap, faPlus, faRotate, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
-import { useTheme, useSocket, THEME_COLORS, apiService, Alert, ProgressIndicator, type RestaurantCategory, type RestaurantData } from '@shared'
+import { useTheme, useSocket, THEME_COLORS, apiService, Alert, type RestaurantCategory, type RestaurantData } from '@shared'
 import { useLocation, useNavigate } from 'react-router-dom'
 import RecrawlModal from './RecrawlModal'
 
@@ -30,10 +30,6 @@ interface RestaurantListProps {
   setSearchName: (searchName: string) => void
   searchAddress: string
   setSearchAddress: (searchAddress: string) => void
-  menuProgress: { current: number; total: number; percentage: number } | null
-  crawlProgress: { current: number; total: number; percentage: number } | null
-  dbProgress: { current: number; total: number; percentage: number } | null
-  isCrawlInterrupted?: boolean
   handleCrawl: () => Promise<void>
   handleRestaurantClick: (restaurant: RestaurantData) => void
   fetchRestaurants: (limit?: number, offset?: number) => Promise<void | RestaurantData[]>
@@ -58,10 +54,6 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   setSearchName,
   searchAddress,
   setSearchAddress,
-  menuProgress,
-  crawlProgress,
-  dbProgress,
-  isCrawlInterrupted = false,
   handleCrawl,
   handleRestaurantClick,
   fetchRestaurants,
@@ -76,7 +68,13 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   const navigate = useNavigate()
 
   // ✅ Socket Context에서 Queue/Job 상태 가져오기
-  const { getRestaurantQueueStatus, getRestaurantJobStatus } = useSocket()
+  const {
+    getRestaurantQueueStatus,
+    getRestaurantJobStatus,
+    jobs,
+    queueItems,
+    queueStats
+  } = useSocket()
 
   // URL에서 restaurant id 추출 (/restaurant/:id)
   const restaurantId = location.pathname.split('/restaurant/')[1]?.split('/')[0]
@@ -368,50 +366,36 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
           )}
         </View>
 
-        {/* 크롤링 진행 상황 */}
-        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
+        {/* 큐 및 Job 상태 */}
+        {(queueItems.length > 0 || jobs.length > 0) && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: isCrawlInterrupted ? '#ff9800' : colors.text }]}>
-                {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                📊 진행 상태
               </Text>
-              {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
             </View>
 
-            {isCrawlInterrupted && (
-              <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
-                서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
-              </Text>
+            {/* 대기열 현황 */}
+            {queueItems.length > 0 && (
+              <View style={styles.statusCard}>
+                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
+                  대기열: {queueStats.waiting}개 대기 / {queueStats.processing}개 처리 중
+                </Text>
+              </View>
             )}
 
-            {menuProgress && menuProgress.total > 0 && (
-              <ProgressIndicator
-                label="메뉴 수집"
-                current={menuProgress.current}
-                total={menuProgress.total}
-                percentage={menuProgress.percentage}
-                color="#4caf50"
-              />
-            )}
-
-            {crawlProgress && crawlProgress.total > 0 && (
-              <ProgressIndicator
-                label="리뷰 수집"
-                current={crawlProgress.current}
-                total={crawlProgress.total}
-                percentage={crawlProgress.percentage}
-                color="#2196f3"
-              />
-            )}
-
-            {dbProgress && dbProgress.total > 0 && (
-              <ProgressIndicator
-                label="DB 저장"
-                current={dbProgress.current}
-                total={dbProgress.total}
-                percentage={dbProgress.percentage}
-                color={colors.primary}
-              />
+            {/* 실행 중 Job 현황 */}
+            {jobs.length > 0 && (
+              <View style={styles.statusCard}>
+                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
+                  실행 중: {jobs.filter(j => j.status === 'active').length}개
+                </Text>
+                {jobs.filter(j => j.isInterrupted).length > 0 && (
+                  <Text style={[styles.statusLabel, { color: '#ff9800' }]}>
+                    ⚠️ 중단됨: {jobs.filter(j => j.isInterrupted).length}개
+                  </Text>
+                )}
+              </View>
             )}
           </View>
         )}
@@ -941,6 +925,10 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  statusLabel: {
+    fontSize: 14,
+    marginBottom: 4,
   },
 })
 
