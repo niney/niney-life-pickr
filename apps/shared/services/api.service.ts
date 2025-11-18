@@ -425,7 +425,6 @@ class ApiService {
 
   /**
    * 레스토랑 재크롤링 (deprecated - crawl 사용 권장)
-   * @deprecated Use crawl() instead
    */
   async recrawlRestaurant(
     restaurantId: number,
@@ -607,7 +606,7 @@ class ApiService {
   async searchRestaurants(params: RestaurantSearchRequest): Promise<ApiResponse<NaverPlaceSearchResult>> {
     const queryParams = new URLSearchParams();
     queryParams.append('keyword', params.keyword);
-    
+
     if (params.maxResults !== undefined) {
       queryParams.append('maxResults', params.maxResults.toString());
     }

@@ -19,7 +19,6 @@ import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
   useAnimatedStyle,
   interpolate,
-  Extrapolate,
   SharedValue,
 } from 'react-native-reanimated';
 import {
@@ -59,14 +58,14 @@ const SwipeActionsContent: React.FC<SwipeActionsContentProps> = ({ dragX, onRecr
       dragX.value,
       [-144, 0],
       [0, 144],
-      Extrapolate.CLAMP
+      'clamp'
     );
 
     const opacity = interpolate(
       dragX.value,
       [-144, -100, 0],
       [1, 0.8, 0],
-      Extrapolate.CLAMP
+      'clamp'
     );
 
     return {
@@ -80,14 +79,14 @@ const SwipeActionsContent: React.FC<SwipeActionsContentProps> = ({ dragX, onRecr
       dragX.value,
       [-144, 0],
       [0, 72],
-      Extrapolate.CLAMP
+      'clamp'
     );
 
     const opacity = interpolate(
       dragX.value,
       [-144, -100, 0],
       [1, 0.8, 0],
-      Extrapolate.CLAMP
+      'clamp'
     );
 
     return {
@@ -186,29 +185,29 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = React.memo(({
       activeOpacity={0.7}
     >
       <View style={styles.restaurantCardContent}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <View style={styles.restaurantNameRow}>
           <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
             {restaurant.name}
           </Text>
 
           {/* ✅ 상태 배지 */}
           {hasInterruptedJob && (
-            <View style={[styles.statusBadge, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-              <Text style={[styles.statusBadgeText, { color: '#f59e0b' }]}>
+            <View style={[styles.statusBadge, styles.statusBadgeInterrupted]}>
+              <Text style={[styles.statusBadgeText, styles.statusBadgeTextInterrupted]}>
                 ⚠️ 중단됨
               </Text>
             </View>
           )}
           {!hasInterruptedJob && hasActiveJob && (
-            <View style={[styles.statusBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-              <Text style={[styles.statusBadgeText, { color: '#10b981' }]}>
+            <View style={[styles.statusBadge, styles.statusBadgeActive]}>
+              <Text style={[styles.statusBadgeText, styles.statusBadgeTextActive]}>
                 🔄 처리 중
               </Text>
             </View>
           )}
           {!hasInterruptedJob && !hasActiveJob && hasQueueItem && (
-            <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 152, 0, 0.1)' }]}>
-              <Text style={[styles.statusBadgeText, { color: '#ff9800' }]}>
+            <View style={[styles.statusBadge, styles.statusBadgeQueue]}>
+              <Text style={[styles.statusBadgeText, styles.statusBadgeTextQueue]}>
                 ⏳ 대기 중
                 {queueStatus.position && ` (${queueStatus.position})`}
               </Text>
@@ -422,7 +421,10 @@ const ListHeader: React.FC<ListHeaderProps> = React.memo(({
     {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: isCrawlInterrupted ? '#ff9800' : colors.text }]}>
+          <Text style={[
+            styles.sectionTitle,
+            isCrawlInterrupted ? styles.sectionTitleInterrupted : { color: colors.text }
+          ]}>
             {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
           </Text>
           {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
@@ -644,7 +646,7 @@ const RestaurantListScreen: React.FC = () => {
     if (route.params?.searchAddress) {
       setSearchAddress(route.params.searchAddress);
     }
-  }, [route.params?.searchAddress]);
+  }, [route.params?.searchAddress, setSearchAddress]);
 
   // 카테고리 클릭 핸들러 메모이제이션 (성능 최적화)
   const handleCategoryClick = useCallback((category: string) => {
@@ -653,7 +655,7 @@ const RestaurantListScreen: React.FC = () => {
     } else {
       setSelectedCategory(category);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, setSelectedCategory]);
 
   // Pull to refresh 핸들러
   const onRefresh = useCallback(async () => {
@@ -1083,6 +1085,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     paddingHorizontal: 4,
   },
+  restaurantNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1090,9 +1098,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  statusBadgeInterrupted: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  statusBadgeActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  statusBadgeQueue: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+  },
   statusBadgeText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  statusBadgeTextInterrupted: {
+    color: '#f59e0b',
+  },
+  statusBadgeTextActive: {
+    color: '#10b981',
+  },
+  statusBadgeTextQueue: {
+    color: '#ff9800',
+  },
+  sectionTitleInterrupted: {
+    color: '#ff9800',
   },
 });
 

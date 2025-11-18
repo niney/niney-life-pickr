@@ -76,6 +76,41 @@ const ReviewTabComponent: React.FC<ReviewTabProps> = ({
   handleImagePress,
   openResummaryModal,
 }) => {
+  // ⚡ FlashList 최적화: renderItem 메모이제이션 (Hooks는 최상위에서 호출)
+  const renderReviewItem = useCallback(({ item }: { item: Review }) => (
+    <ReviewCard
+      review={item}
+      theme={theme}
+      colors={colors}
+      dynamicStyles={dynamicStyles}
+      expandedKeywords={expandedKeywords}
+      toggleKeywords={toggleKeywords}
+      renderStars={renderStars}
+      handleImagePress={handleImagePress}
+      openResummaryModal={openResummaryModal}
+    />
+  ), [theme, colors, dynamicStyles, expandedKeywords, toggleKeywords, renderStars, handleImagePress, openResummaryModal]);
+
+  const keyExtractor = useCallback((item: Review) => String(item.id), []);
+
+  // Footer loading indicator component
+  const renderFooter = useCallback(() => {
+    if (!reviewsLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text
+          style={[
+            styles.footerLoaderText,
+            { color: colors.textSecondary },
+          ]}
+        >
+          리뷰 불러오는 중...
+        </Text>
+      </View>
+    );
+  }, [reviewsLoadingMore, colors]);
+
   // Skeleton loading UI
   if (reviewsLoading && reviews.length === 0) {
     return (
@@ -146,41 +181,6 @@ const ReviewTabComponent: React.FC<ReviewTabProps> = ({
       </View>
     )
   }
-
-  // ⚡ FlashList 최적화: renderItem 메모이제이션
-  const renderReviewItem = useCallback(({ item }: { item: Review }) => (
-    <ReviewCard
-      review={item}
-      theme={theme}
-      colors={colors}
-      dynamicStyles={dynamicStyles}
-      expandedKeywords={expandedKeywords}
-      toggleKeywords={toggleKeywords}
-      renderStars={renderStars}
-      handleImagePress={handleImagePress}
-      openResummaryModal={openResummaryModal}
-    />
-  ), [theme, colors, dynamicStyles, expandedKeywords, toggleKeywords, renderStars, handleImagePress, openResummaryModal]);
-
-  const keyExtractor = useCallback((item: Review) => String(item.id), []);
-
-  // Footer loading indicator component
-  const renderFooter = useCallback(() => {
-    if (!reviewsLoadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text
-          style={[
-            styles.footerLoaderText,
-            { color: colors.textSecondary },
-          ]}
-        >
-          리뷰 불러오는 중...
-        </Text>
-      </View>
-    );
-  }, [reviewsLoadingMore, colors]);
 
   // Reviews list
   if (reviews.length > 0) {
