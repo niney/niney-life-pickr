@@ -1,4 +1,4 @@
-import React, { JSX } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native'
 import { THEME_COLORS } from 'shared'
 import { ReviewHeader } from './ReviewHeader'
@@ -51,7 +51,7 @@ interface ReviewCardProps {
   }
   expandedKeywords: Set<number>
   toggleKeywords: (reviewId: number) => void
-  renderStars: (score: number, borderColor: string) => JSX.Element[]
+  renderStars: (score: number, borderColor: string) => React.ReactElement[]
   handleImagePress: (images: string[], index: number) => void
   openResummaryModal: (reviewId: number) => void
 }
@@ -59,8 +59,10 @@ interface ReviewCardProps {
 /**
  * Single review card component
  * Composes ReviewHeader, ReviewImages, and AISummarySection
+ *
+ * ⚡ 성능 최적화: React.memo 적용
  */
-export const ReviewCard: React.FC<ReviewCardProps> = ({
+const ReviewCardComponent: React.FC<ReviewCardProps> = ({
   review,
   theme,
   colors,
@@ -175,6 +177,8 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({
     </View>
   )
 }
+
+export const ReviewCard = React.memo(ReviewCardComponent)
 
 const styles = StyleSheet.create({
   reviewCardContainer: {

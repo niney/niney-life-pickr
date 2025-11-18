@@ -1,4 +1,4 @@
-import React, { JSX } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { THEME_COLORS } from 'shared'
 import { getSentimentColor } from '../utils/getSentimentColor'
@@ -24,7 +24,7 @@ interface AISummarySectionProps {
   reviewId: number
   expandedKeywords: Set<number>
   toggleKeywords: (reviewId: number) => void
-  renderStars: (score: number, borderColor: string) => JSX.Element[]
+  renderStars: (score: number, borderColor: string) => React.ReactElement[]
   theme: 'light' | 'dark'
   colors: typeof THEME_COLORS['light']
   dynamicStyles: {
@@ -38,8 +38,10 @@ interface AISummarySectionProps {
 /**
  * AI Summary section component
  * Displays AI-generated review summary with sentiment, keywords, menu items, tips
+ *
+ * ⚡ 성능 최적화: React.memo 적용
  */
-export const AISummarySection: React.FC<AISummarySectionProps> = ({
+const AISummarySectionComponent: React.FC<AISummarySectionProps> = ({
   summary,
   reviewId,
   expandedKeywords,
@@ -224,6 +226,8 @@ export const AISummarySection: React.FC<AISummarySectionProps> = ({
     </View>
   )
 }
+
+export const AISummarySection = React.memo(AISummarySectionComponent)
 
 const styles = StyleSheet.create({
   summaryContainer: {

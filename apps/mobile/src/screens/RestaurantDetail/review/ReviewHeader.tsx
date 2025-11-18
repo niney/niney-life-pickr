@@ -17,8 +17,10 @@ interface ReviewHeaderProps {
 /**
  * Review card header component
  * Displays user name, visit date, and resummary button
+ *
+ * ⚡ 성능 최적화: React.memo 적용
  */
-export const ReviewHeader: React.FC<ReviewHeaderProps> = ({
+const ReviewHeaderComponent: React.FC<ReviewHeaderProps> = ({
   review,
   colors,
   onResummaryPress,
@@ -45,6 +47,8 @@ export const ReviewHeader: React.FC<ReviewHeaderProps> = ({
     </View>
   )
 }
+
+export const ReviewHeader = React.memo(ReviewHeaderComponent)
 
 const styles = StyleSheet.create({
   reviewCardHeader: {

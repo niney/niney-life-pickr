@@ -7,8 +7,11 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
+  Platform,
+  UIManager,
+  Alert as RNAlert,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -36,9 +39,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import type { IconProp } from '@fortawesome/fontawesome-svg-core';
 import { faMap } from '@fortawesome/free-solid-svg-icons';
 
+// Android LayoutAnimation 활성화
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 type NavigationProp = NativeStackNavigationProp<RestaurantStackParamList, 'RestaurantList'>;
 
-// 스와이프 액션 콘텐츠 컴포넌트 (Hook을 올바르게 사용)
+// iOS 전용: 스와이프 액션 콘텐츠 컴포넌트
 interface SwipeActionsContentProps {
   dragX: SharedValue<number>;
   onRecrawl: () => void;
@@ -124,7 +132,7 @@ interface RestaurantListItemProps {
   jobStatus: ActiveJob | null;
 }
 
-const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
+const RestaurantListItem: React.FC<RestaurantListItemProps> = React.memo(({
   restaurant,
   theme,
   colors,
@@ -139,8 +147,9 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
   const hasActiveJob = jobStatus && jobStatus.status === 'active' && !jobStatus.isInterrupted;
   const hasQueueItem = queueStatus && (queueStatus.queueStatus === 'waiting' || queueStatus.queueStatus === 'processing');
 
-  const renderRightActions = (
-    progress: SharedValue<number>,
+  // iOS: Swipeable 렌더 함수
+  const renderRightActions = useCallback((
+    _progress: SharedValue<number>,
     dragX: SharedValue<number>
   ) => {
     return (
@@ -150,69 +159,347 @@ const RestaurantListItem: React.FC<RestaurantListItemProps> = ({
         onDelete={() => onDelete(restaurant)}
       />
     );
-  };
+  }, [restaurant, onRecrawl, onDelete]);
 
-  return (
+  // Android: Long Press 핸들러
+  const handleLongPress = useCallback(() => {
+    RNAlert.alert(
+      restaurant.name,
+      '작업을 선택하세요',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '재크롤', onPress: () => onRecrawl(restaurant) },
+        { text: '삭제', onPress: () => onDelete(restaurant), style: 'destructive' },
+      ]
+    );
+  }, [restaurant, onRecrawl, onDelete]);
+
+  // 카드 콘텐츠 컴포넌트
+  const cardContent = (
+    <TouchableOpacity
+      style={[
+        styles.restaurantCardContainer,
+        theme === 'dark' ? styles.restaurantCardDark : styles.restaurantCardLight,
+      ]}
+      onPress={() => onPress(restaurant)}
+      onLongPress={Platform.OS === 'android' ? handleLongPress : undefined}
+      activeOpacity={0.7}
+    >
+      <View style={styles.restaurantCardContent}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
+            {restaurant.name}
+          </Text>
+
+          {/* ✅ 상태 배지 */}
+          {hasInterruptedJob && (
+            <View style={[styles.statusBadge, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+              <Text style={[styles.statusBadgeText, { color: '#f59e0b' }]}>
+                ⚠️ 중단됨
+              </Text>
+            </View>
+          )}
+          {!hasInterruptedJob && hasActiveJob && (
+            <View style={[styles.statusBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+              <Text style={[styles.statusBadgeText, { color: '#10b981' }]}>
+                🔄 처리 중
+              </Text>
+            </View>
+          )}
+          {!hasInterruptedJob && !hasActiveJob && hasQueueItem && (
+            <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 152, 0, 0.1)' }]}>
+              <Text style={[styles.statusBadgeText, { color: '#ff9800' }]}>
+                ⏳ 대기 중
+                {queueStatus.position && ` (${queueStatus.position})`}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {restaurant.category && (
+          <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
+            {restaurant.category}
+          </Text>
+        )}
+        {restaurant.address && (
+          <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+            {restaurant.address}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  // iOS: Swipeable로 감싸기, Android: 그대로 반환
+  return Platform.OS === 'ios' ? (
     <Swipeable
       renderRightActions={renderRightActions}
       overshootRight={false}
       friction={2}
       rightThreshold={40}
     >
-      <TouchableOpacity
-        style={[
-          styles.restaurantCardContainer,
-          theme === 'dark' ? styles.restaurantCardDark : styles.restaurantCardLight,
-        ]}
-        onPress={() => onPress(restaurant)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.restaurantCardContent}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
-              {restaurant.name}
-            </Text>
-
-            {/* ✅ 상태 배지 */}
-            {hasInterruptedJob && (
-              <View style={[styles.statusBadge, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                <Text style={[styles.statusBadgeText, { color: '#f59e0b' }]}>
-                  ⚠️ 중단됨
-                </Text>
-              </View>
-            )}
-            {!hasInterruptedJob && hasActiveJob && (
-              <View style={[styles.statusBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                <Text style={[styles.statusBadgeText, { color: '#10b981' }]}>
-                  🔄 처리 중
-                </Text>
-              </View>
-            )}
-            {!hasInterruptedJob && !hasActiveJob && hasQueueItem && (
-              <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 152, 0, 0.1)' }]}>
-                <Text style={[styles.statusBadgeText, { color: '#ff9800' }]}>
-                  ⏳ 대기 중
-                  {queueStatus.position && ` (${queueStatus.position})`}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {restaurant.category && (
-            <Text style={[styles.restaurantCategory, { color: colors.textSecondary }]} numberOfLines={1}>
-              {restaurant.category}
-            </Text>
-          )}
-          {restaurant.address && (
-            <Text style={[styles.restaurantAddress, { color: colors.textSecondary }]} numberOfLines={1}>
-              {restaurant.address}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
+      {cardContent}
     </Swipeable>
+  ) : (
+    cardContent
   );
-};
+});
+
+// ListHeader 컴포넌트 분리 (성능 최적화)
+interface ListHeaderProps {
+  inputStyle: any;
+  colors: typeof THEME_COLORS.light;
+  url: string;
+  setUrl: (url: string) => void;
+  theme: 'light' | 'dark';
+  searchButtonStyle: any;
+  handleCrawl: () => void;
+  loading: boolean;
+  searchButtonTextStyle: any;
+  restaurantSearchWrapperStyle: any;
+  restaurantSearchInputStyle: any;
+  searchName: string;
+  setSearchName: (name: string) => void;
+  clearButtonTextStyle: any;
+  searchAddress: string;
+  setSearchAddress: (address: string) => void;
+  navigation: NavigationProp;
+  categories: any[];
+  categoriesLoading: boolean;
+  handleCategoryClick: (category: string) => void;
+  categorySelectedStyle: any;
+  selectedCategory: string | null;
+  menuProgress: any;
+  crawlProgress: any;
+  dbProgress: any;
+  isCrawlInterrupted: boolean;
+  progressCardStyle: any;
+  progressBarBackgroundStyle: any;
+  menuProgressBarFillStyle: any;
+  reviewProgressBarFillStyle: any;
+  dbProgressBarFillStyle: any;
+  total: number;
+  restaurantsLoading: boolean;
+}
+
+const ListHeader: React.FC<ListHeaderProps> = React.memo(({
+  inputStyle, colors, url, setUrl, theme, searchButtonStyle, handleCrawl, loading, searchButtonTextStyle,
+  restaurantSearchWrapperStyle, restaurantSearchInputStyle, searchName, setSearchName, clearButtonTextStyle,
+  searchAddress, setSearchAddress, navigation, categories, categoriesLoading, handleCategoryClick,
+  categorySelectedStyle, selectedCategory, menuProgress, crawlProgress, dbProgress, isCrawlInterrupted,
+  progressCardStyle, progressBarBackgroundStyle, menuProgressBarFillStyle, reviewProgressBarFillStyle,
+  dbProgressBarFillStyle, total, restaurantsLoading
+}) => (
+  <View style={styles.headerContainer}>
+    {/* 크롤링 URL 입력 */}
+    <View style={styles.searchContainer}>
+      <TextInput
+        style={inputStyle}
+        placeholder="URL 또는 Place ID를 입력하세요"
+        placeholderTextColor={colors.textSecondary}
+        value={url}
+        onChangeText={setUrl}
+        keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+      />
+      <TouchableOpacity
+        style={searchButtonStyle}
+        onPress={handleCrawl}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Text style={searchButtonTextStyle}>추가</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+
+    {/* 레스토랑 이름 검색 */}
+    <View style={styles.restaurantSearchContainer}>
+      <View style={restaurantSearchWrapperStyle}>
+        <TextInput
+          style={restaurantSearchInputStyle}
+          placeholder="레스토랑 이름 검색..."
+          placeholderTextColor={colors.textSecondary}
+          value={searchName}
+          onChangeText={setSearchName}
+          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+        />
+        {searchName.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearchName('')}
+            style={styles.clearButton}
+          >
+            <Text style={clearButtonTextStyle}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+
+    {/* 레스토랑 주소 검색 */}
+    <View style={styles.restaurantSearchContainer}>
+      <View style={restaurantSearchWrapperStyle}>
+        <TextInput
+          style={restaurantSearchInputStyle}
+          placeholder="레스토랑 주소 검색..."
+          placeholderTextColor={colors.textSecondary}
+          value={searchAddress}
+          onChangeText={setSearchAddress}
+          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+        />
+        {searchAddress.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearchAddress('')}
+            style={styles.clearButton}
+          >
+            <Text style={clearButtonTextStyle}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+
+    {/* 서울 지도 보기 버튼 */}
+    <TouchableOpacity
+      style={[
+        styles.mapButton,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+      onPress={() => navigation.navigate('RestaurantMap')}
+    >
+      <FontAwesomeIcon icon={faMap as IconProp} color={colors.primary} size={16} />
+      <Text style={[styles.mapButtonText, { color: colors.text }]}>
+        서울 지도 보기
+      </Text>
+    </TouchableOpacity>
+
+    {/* 카테고리 섹션 */}
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>카테고리</Text>
+        {categoriesLoading && <ActivityIndicator size="small" color={colors.text} />}
+      </View>
+      {categories.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScrollContent}
+        >
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category.category}
+              onPress={() => handleCategoryClick(category.category)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.categoryCardContainer,
+                  theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
+                  selectedCategory === category.category && categorySelectedStyle
+                ]}
+              >
+                <View style={styles.categoryCardContent}>
+                  <Text style={[
+                    styles.categoryName,
+                    { color: selectedCategory === category.category ? colors.primary : colors.text }
+                  ]}>
+                    {category.category}
+                  </Text>
+                  <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : !categoriesLoading ? (
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
+      ) : null}
+    </View>
+
+    {/* 크롤링 진행 상황 */}
+    {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: isCrawlInterrupted ? '#ff9800' : colors.text }]}>
+            {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
+          </Text>
+          {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
+        </View>
+
+        {isCrawlInterrupted && (
+          <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
+            서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
+          </Text>
+        )}
+
+        {menuProgress && menuProgress.total > 0 && (
+          <View style={progressCardStyle}>
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
+              <Text style={[styles.progressValue, { color: colors.text }]}>
+                {menuProgress.current} / {menuProgress.total}
+              </Text>
+            </View>
+            <View style={[styles.progressBar, progressBarBackgroundStyle]}>
+              <View
+                style={[styles.progressBarFill, { width: `${menuProgress.percentage}%` }, menuProgressBarFillStyle]}
+              />
+            </View>
+            <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+              {menuProgress.percentage}%
+            </Text>
+          </View>
+        )}
+
+        {crawlProgress && crawlProgress.total > 0 && (
+          <View style={progressCardStyle}>
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>리뷰 수집</Text>
+              <Text style={[styles.progressValue, { color: colors.text }]}>
+                {crawlProgress.current} / {crawlProgress.total}
+              </Text>
+            </View>
+            <View style={[styles.progressBar, progressBarBackgroundStyle]}>
+              <View
+                style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%` }, reviewProgressBarFillStyle]}
+              />
+            </View>
+            <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+              {crawlProgress.percentage}%
+            </Text>
+          </View>
+        )}
+
+        {dbProgress && dbProgress.total > 0 && (
+          <View style={progressCardStyle}>
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
+              <Text style={[styles.progressValue, { color: colors.text }]}>
+                {dbProgress.current} / {dbProgress.total}
+              </Text>
+            </View>
+            <View style={[styles.progressBar, progressBarBackgroundStyle]}>
+              <View
+                style={[styles.progressBarFill, { width: `${dbProgress.percentage}%` }, dbProgressBarFillStyle]}
+              />
+            </View>
+            <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
+              {dbProgress.percentage}%
+            </Text>
+          </View>
+        )}
+      </View>
+    )}
+
+    {/* 레스토랑 목록 헤더 */}
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>레스토랑 목록 ({total})</Text>
+      {restaurantsLoading && <ActivityIndicator size="small" color={colors.text} />}
+    </View>
+  </View>
+));
 
 const RestaurantListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -359,14 +646,14 @@ const RestaurantListScreen: React.FC = () => {
     }
   }, [route.params?.searchAddress]);
 
-  // 카테고리 클릭 핸들러
-  const handleCategoryClick = (category: string) => {
+  // 카테고리 클릭 핸들러 메모이제이션 (성능 최적화)
+  const handleCategoryClick = useCallback((category: string) => {
     if (selectedCategory === category) {
       setSelectedCategory(null); // 같은 카테고리 클릭 시 필터 해제
     } else {
       setSelectedCategory(category);
     }
-  };
+  }, [selectedCategory]);
 
   // Pull to refresh 핸들러
   const onRefresh = useCallback(async () => {
@@ -383,8 +670,8 @@ const RestaurantListScreen: React.FC = () => {
     }
   }, [fetchCategories, fetchRestaurants]);
 
-  // 모바일 전용 크롤링 핸들러 (Socket 콜백 설정 추가)
-  const handleCrawl = async () => {
+  // 모바일 전용 크롤링 핸들러 메모이제이션 (Socket 콜백 설정 추가)
+  const handleCrawl = useCallback(async () => {
     resetCrawlStatus();
 
     setRestaurantCallbacks({
@@ -399,9 +686,10 @@ const RestaurantListScreen: React.FC = () => {
     });
 
     await sharedHandleCrawl();
-  };
+  }, [resetCrawlStatus, setRestaurantCallbacks, fetchRestaurants, fetchCategories, sharedHandleCrawl]);
 
-  const handleRestaurantPress = (restaurant: RestaurantData) => {
+  // 레스토랑 클릭 핸들러 메모이제이션 (성능 최적화)
+  const handleRestaurantPress = useCallback((restaurant: RestaurantData) => {
     // 포커스 복원을 재시도하는 함수 (100ms 간격으로 최대 5번 시도)
     const waitForFocus = (attempt: number = 0) => {
       const maxAttempts = 5; // 최대 500ms
@@ -420,12 +708,13 @@ const RestaurantListScreen: React.FC = () => {
 
     // 포커스 체크 시작
     waitForFocus(0);
-  };
+  }, [navigation]);
 
-  const handleRecrawlClick = (restaurant: RestaurantData) => {
+  // 재크롤 클릭 핸들러 메모이제이션 (성능 최적화)
+  const handleRecrawlClick = useCallback((restaurant: RestaurantData) => {
     setSelectedRestaurant(restaurant);
     setRecrawlModalVisible(true);
-  };
+  }, []);
 
   const handleRecrawlConfirm = async (options: { crawlMenus: boolean; crawlReviews: boolean; createSummary: boolean }) => {
     if (!selectedRestaurant) return;
@@ -443,7 +732,8 @@ const RestaurantListScreen: React.FC = () => {
     }
   };
 
-  const handleDeleteClick = (restaurant: RestaurantData) => {
+  // 삭제 클릭 핸들러 메모이제이션 (성능 최적화)
+  const handleDeleteClick = useCallback((restaurant: RestaurantData) => {
     Alert.confirm(
       '레스토랑 삭제',
       `${restaurant.name}을(를) 삭제하시겠습니까?\n모든 메뉴, 리뷰, 이미지가 함께 삭제되며 복구할 수 없습니다.`,
@@ -470,257 +760,90 @@ const RestaurantListScreen: React.FC = () => {
         // 취소 버튼 클릭 시 (아무것도 하지 않음)
       }
     );
-  };
+  }, [fetchRestaurants, fetchCategories]);
+
+  // FlatList renderItem 메모이제이션 (성능 최적화)
+  const renderRestaurantItem = useCallback(({ item }: { item: RestaurantData }) => {
+    const queueStatus = getRestaurantQueueStatus(item.id);
+    const jobStatus = getRestaurantJobStatus(item.id);
+
+    return (
+      <RestaurantListItem
+        restaurant={item}
+        theme={theme}
+        colors={colors}
+        onPress={handleRestaurantPress}
+        onRecrawl={handleRecrawlClick}
+        onDelete={handleDeleteClick}
+        queueStatus={queueStatus}
+        jobStatus={jobStatus}
+      />
+    );
+  }, [theme, colors, handleRestaurantPress, handleRecrawlClick, handleDeleteClick, getRestaurantQueueStatus, getRestaurantJobStatus]);
+
+  // FlatList keyExtractor
+  const keyExtractor = useCallback((item: RestaurantData) => item.id.toString(), []);
+
+  // FlatList getItemLayout 제거 (Android에서 부정확할 수 있음)
+
+  // FlatList ListEmptyComponent
+  const renderListEmpty = useCallback(() => (
+    !restaurantsLoading ? (
+      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
+    ) : null
+  ), [restaurantsLoading, colors]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+      <FlashList
+        data={restaurants}
+        renderItem={renderRestaurantItem as any}
+        keyExtractor={keyExtractor}
+        {...({ estimatedItemSize: 80 } as any)}
+        ListHeaderComponent={
+          <ListHeader
+            inputStyle={inputStyle}
+            colors={colors}
+            url={url}
+            setUrl={setUrl}
+            theme={theme}
+            searchButtonStyle={searchButtonStyle}
+            handleCrawl={handleCrawl}
+            loading={loading}
+            searchButtonTextStyle={searchButtonTextStyle}
+            restaurantSearchWrapperStyle={restaurantSearchWrapperStyle}
+            restaurantSearchInputStyle={restaurantSearchInputStyle}
+            searchName={searchName}
+            setSearchName={setSearchName}
+            clearButtonTextStyle={clearButtonTextStyle}
+            searchAddress={searchAddress}
+            setSearchAddress={setSearchAddress}
+            navigation={navigation}
+            categories={categories}
+            categoriesLoading={categoriesLoading}
+            handleCategoryClick={handleCategoryClick}
+            categorySelectedStyle={categorySelectedStyle}
+            selectedCategory={selectedCategory}
+            menuProgress={menuProgress}
+            crawlProgress={crawlProgress}
+            dbProgress={dbProgress}
+            isCrawlInterrupted={isCrawlInterrupted}
+            progressCardStyle={progressCardStyle}
+            progressBarBackgroundStyle={progressBarBackgroundStyle}
+            menuProgressBarFillStyle={menuProgressBarFillStyle}
+            reviewProgressBarFillStyle={reviewProgressBarFillStyle}
+            dbProgressBarFillStyle={dbProgressBarFillStyle}
+            total={total}
+            restaurantsLoading={restaurantsLoading}
           />
         }
-      >
-        {/* 크롤링 URL 입력 */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={inputStyle}
-            placeholder="URL 또는 Place ID를 입력하세요"
-            placeholderTextColor={colors.textSecondary}
-            value={url}
-            onChangeText={setUrl}
-            keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
-          />
-          <TouchableOpacity
-            style={searchButtonStyle}
-            onPress={handleCrawl}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Text style={searchButtonTextStyle}>추가</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* 레스토랑 이름 검색 */}
-        <View style={styles.restaurantSearchContainer}>
-          <View style={restaurantSearchWrapperStyle}>
-            <TextInput
-              style={restaurantSearchInputStyle}
-              placeholder="레스토랑 이름 검색..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchName}
-              onChangeText={setSearchName}
-              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
-            />
-            {searchName.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchName('')}
-                style={styles.clearButton}
-              >
-                <Text style={clearButtonTextStyle}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* 레스토랑 주소 검색 */}
-        <View style={styles.restaurantSearchContainer}>
-          <View style={restaurantSearchWrapperStyle}>
-            <TextInput
-              style={restaurantSearchInputStyle}
-              placeholder="레스토랑 주소 검색..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchAddress}
-              onChangeText={setSearchAddress}
-              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
-            />
-            {searchAddress.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchAddress('')}
-                style={styles.clearButton}
-              >
-                <Text style={clearButtonTextStyle}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* 서울 지도 보기 버튼 */}
-        <TouchableOpacity
-          style={[
-            styles.mapButton,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-          onPress={() => navigation.navigate('RestaurantMap')}
-        >
-          <FontAwesomeIcon icon={faMap as IconProp} color={colors.primary} size={16} />
-          <Text style={[styles.mapButtonText, { color: colors.text }]}>
-            서울 지도 보기
-          </Text>
-        </TouchableOpacity>
-
-        {/* 카테고리 섹션 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>카테고리</Text>
-            {categoriesLoading && <ActivityIndicator size="small" color={colors.text} />}
-          </View>
-          {categories.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesScrollContent}
-            >
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.category}
-                  onPress={() => handleCategoryClick(category.category)}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    style={[
-                      styles.categoryCardContainer,
-                      theme === 'dark' ? styles.categoryCardDark : styles.categoryCardLight,
-                      selectedCategory === category.category && categorySelectedStyle
-                    ]}
-                  >
-                    <View style={styles.categoryCardContent}>
-                      <Text style={[
-                        styles.categoryName,
-                        { color: selectedCategory === category.category ? colors.primary : colors.text }
-                      ]}>
-                        {category.category}
-                      </Text>
-                      <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>{category.count}개</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : !categoriesLoading ? (
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
-          ) : null}
-        </View>
-
-        {/* 크롤링 진행 상황 */}
-        {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: isCrawlInterrupted ? '#ff9800' : colors.text }]}>
-                {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
-              </Text>
-              {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
-            </View>
-
-            {isCrawlInterrupted && (
-              <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
-                서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
-              </Text>
-            )}
-
-            {menuProgress && menuProgress.total > 0 && (
-              <View style={progressCardStyle}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {menuProgress.current} / {menuProgress.total}
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, progressBarBackgroundStyle]}>
-                  <View
-                    style={[styles.progressBarFill, { width: `${menuProgress.percentage}%` }, menuProgressBarFillStyle]}
-                  />
-                </View>
-                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-                  {menuProgress.percentage}%
-                </Text>
-              </View>
-            )}
-
-            {crawlProgress && crawlProgress.total > 0 && (
-              <View style={progressCardStyle}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>리뷰 수집</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {crawlProgress.current} / {crawlProgress.total}
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, progressBarBackgroundStyle]}>
-                  <View
-                    style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%` }, reviewProgressBarFillStyle]}
-                  />
-                </View>
-                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-                  {crawlProgress.percentage}%
-                </Text>
-              </View>
-            )}
-
-            {dbProgress && dbProgress.total > 0 && (
-              <View style={progressCardStyle}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {dbProgress.current} / {dbProgress.total}
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, progressBarBackgroundStyle]}>
-                  <View
-                    style={[styles.progressBarFill, { width: `${dbProgress.percentage}%` }, dbProgressBarFillStyle]}
-                  />
-                </View>
-                <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-                  {dbProgress.percentage}%
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* 레스토랑 목록 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>레스토랑 목록 ({total})</Text>
-            {restaurantsLoading && <ActivityIndicator size="small" color={colors.text} />}
-          </View>
-          {restaurants.length > 0 ? (
-            <View style={styles.restaurantsList}>
-              {restaurants.map((restaurant) => {
-                const queueStatus = getRestaurantQueueStatus(restaurant.id);
-                const jobStatus = getRestaurantJobStatus(restaurant.id);
-
-                return (
-                  <RestaurantListItem
-                    key={restaurant.id}
-                    restaurant={restaurant}
-                    theme={theme}
-                    colors={colors}
-                    onPress={handleRestaurantPress}
-                    onRecrawl={handleRecrawlClick}
-                    onDelete={handleDeleteClick}
-                    queueStatus={queueStatus}
-                    jobStatus={jobStatus}
-                  />
-                );
-              })}
-            </View>
-          ) : !restaurantsLoading ? (
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 레스토랑이 없습니다</Text>
-          ) : null}
-        </View>
-      </ScrollView>
+        ListEmptyComponent={renderListEmpty}
+        contentContainerStyle={styles.flashListContent}
+        showsVerticalScrollIndicator={false}
+        onRefresh={onRefresh as any}
+        refreshing={refreshing}
+        {...({ drawDistance: 400 } as any)}
+      />
 
       <RecrawlModal
         visible={recrawlModalVisible}
@@ -736,12 +859,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
   content: {
     padding: 16,
     paddingBottom: 100,
+  },
+  flashListContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  headerContainer: {
+    // padding은 FlashList contentContainerStyle에서 처리
   },
   searchContainer: {
     flexDirection: 'row',

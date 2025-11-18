@@ -10,8 +10,10 @@ interface ReviewImagesProps {
 /**
  * Review images gallery component
  * Displays single full-width image or horizontal scrollable gallery
+ *
+ * ⚡ 성능 최적화: React.memo 적용 + 이미지 최적화
  */
-export const ReviewImages: React.FC<ReviewImagesProps> = ({
+const ReviewImagesComponent: React.FC<ReviewImagesProps> = ({
   images,
   onImagePress,
 }) => {
@@ -27,9 +29,14 @@ export const ReviewImages: React.FC<ReviewImagesProps> = ({
           activeOpacity={0.9}
         >
           <Image
-            source={{ uri: `${getDefaultApiUrl()}${images[0]}` }}
+            source={{
+              uri: `${getDefaultApiUrl()}${images[0]}`,
+              cache: 'force-cache', // 캐시 강제 사용
+            }}
             style={styles.reviewImageFull}
             resizeMode="cover"
+            resizeMethod="resize" // 디코딩 전 리사이즈로 메모리 절약
+            fadeDuration={0} // Android에서 페이드 제거로 성능 향상
           />
         </TouchableOpacity>
       ) : (
@@ -38,6 +45,9 @@ export const ReviewImages: React.FC<ReviewImagesProps> = ({
           showsHorizontalScrollIndicator={false}
           style={styles.reviewImagesScrollView}
           contentContainerStyle={styles.reviewImagesScrollContent}
+          removeClippedSubviews={true} // 화면 밖 뷰 제거로 메모리 절약
+          scrollEventThrottle={16}
+          decelerationRate="fast"
         >
           {images.map((imageUrl: string, idx: number) => (
             <TouchableOpacity
@@ -46,9 +56,14 @@ export const ReviewImages: React.FC<ReviewImagesProps> = ({
               activeOpacity={0.9}
             >
               <Image
-                source={{ uri: `${getDefaultApiUrl()}${imageUrl}` }}
+                source={{
+                  uri: `${getDefaultApiUrl()}${imageUrl}`,
+                  cache: 'force-cache', // 캐시 강제 사용
+                }}
                 style={styles.reviewImageScroll}
                 resizeMode="cover"
+                resizeMethod="resize" // 디코딩 전 리사이즈로 메모리 절약
+                fadeDuration={0} // Android에서 페이드 제거로 성능 향상
               />
             </TouchableOpacity>
           ))}
@@ -57,6 +72,8 @@ export const ReviewImages: React.FC<ReviewImagesProps> = ({
     </View>
   )
 }
+
+export const ReviewImages = React.memo(ReviewImagesComponent)
 
 const styles = StyleSheet.create({
   reviewImagesContainer: {

@@ -184,6 +184,9 @@ const RestaurantDetailScreen: React.FC = () => {
     },
   }), [theme, colors]);
 
+  // ⚡ 성능 최적화: 리뷰 변환 메모이제이션
+  const convertedReviews = useMemo(() => reviews.map(convertReview), [reviews]);
+
   // 최신 값을 참조하기 위한 ref
   const activeTabRef = useRef(activeTab);
   const fetchReviewsRef = useRef(fetchReviews);
@@ -447,7 +450,7 @@ const RestaurantDetailScreen: React.FC = () => {
         {/* 리뷰 탭 */}
         {activeTab === 'review' && (
           <ReviewTab
-            reviews={reviews.map(convertReview)}
+            reviews={convertedReviews}
             reviewsLoading={reviewsLoading}
             reviewsLoadingMore={reviewsLoadingMore}
             theme={theme}

@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { FlashList } from '@shopify/flash-list'
 import { THEME_COLORS } from 'shared'
 import { ReviewCard } from '../review/ReviewCard'
 
@@ -51,7 +52,7 @@ interface ReviewTabProps {
   }
   expandedKeywords: Set<number>
   toggleKeywords: (reviewId: number) => void
-  renderStars: (score: number, borderColor: string) => JSX.Element[]
+  renderStars: (score: number, borderColor: string) => React.ReactElement[]
   handleImagePress: (images: string[], index: number) => void
   openResummaryModal: (reviewId: number) => void
 }
@@ -59,8 +60,10 @@ interface ReviewTabProps {
 /**
  * Review tab component
  * Displays list of review cards with loading states
+ *
+ * ⚡ 성능 최적화: React.memo 적용
  */
-export const ReviewTab: React.FC<ReviewTabProps> = ({
+const ReviewTabComponent: React.FC<ReviewTabProps> = ({
   reviews,
   reviewsLoading,
   reviewsLoadingMore,
@@ -144,41 +147,54 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({
     )
   }
 
+  // ⚡ FlashList 최적화: renderItem 메모이제이션
+  const renderReviewItem = useCallback(({ item }: { item: Review }) => (
+    <ReviewCard
+      review={item}
+      theme={theme}
+      colors={colors}
+      dynamicStyles={dynamicStyles}
+      expandedKeywords={expandedKeywords}
+      toggleKeywords={toggleKeywords}
+      renderStars={renderStars}
+      handleImagePress={handleImagePress}
+      openResummaryModal={openResummaryModal}
+    />
+  ), [theme, colors, dynamicStyles, expandedKeywords, toggleKeywords, renderStars, handleImagePress, openResummaryModal]);
+
+  const keyExtractor = useCallback((item: Review) => String(item.id), []);
+
+  // Footer loading indicator component
+  const renderFooter = useCallback(() => {
+    if (!reviewsLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text
+          style={[
+            styles.footerLoaderText,
+            { color: colors.textSecondary },
+          ]}
+        >
+          리뷰 불러오는 중...
+        </Text>
+      </View>
+    );
+  }, [reviewsLoadingMore, colors]);
+
   // Reviews list
   if (reviews.length > 0) {
     return (
-      <View style={styles.paddingHorizontal16}>
-        <View style={styles.reviewsList}>
-          {reviews.map((review) => (
-            <ReviewCard
-              key={review.id}
-              review={review}
-              theme={theme}
-              colors={colors}
-              dynamicStyles={dynamicStyles}
-              expandedKeywords={expandedKeywords}
-              toggleKeywords={toggleKeywords}
-              renderStars={renderStars}
-              handleImagePress={handleImagePress}
-              openResummaryModal={openResummaryModal}
-            />
-          ))}
-        </View>
-
-        {/* Footer loading indicator */}
-        {reviewsLoadingMore && (
-          <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text
-              style={[
-                styles.footerLoaderText,
-                { color: colors.textSecondary },
-              ]}
-            >
-              리뷰 불러오는 중...
-            </Text>
-          </View>
-        )}
+      <View style={styles.flashListContainer}>
+        <FlashList
+          data={reviews}
+          renderItem={renderReviewItem as any}
+          keyExtractor={keyExtractor}
+          {...({ estimatedItemSize: 400 } as any)}
+          scrollEnabled={false}
+          ListFooterComponent={renderFooter}
+          {...({ drawDistance: 500 } as any)}
+        />
       </View>
     )
   }
@@ -195,9 +211,15 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({
   )
 }
 
+export const ReviewTab = React.memo(ReviewTabComponent)
+
 const styles = StyleSheet.create({
   paddingHorizontal16: {
     paddingHorizontal: 16,
+  },
+  flashListContainer: {
+    paddingHorizontal: 16,
+    minHeight: 2, // FlashList requires minimum height
   },
   reviewsList: {
     // gap 제거 - borderBottom으로 구분
