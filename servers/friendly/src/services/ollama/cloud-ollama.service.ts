@@ -5,6 +5,7 @@
 
 import { BaseOllamaService } from './base-ollama.service';
 import type { CloudOllamaConfig, GenerateOptions } from './ollama.types';
+import { globalCloudOllamaMutex } from './mutex';
 
 export abstract class BaseCloudOllamaService extends BaseOllamaService {
   protected host: string;
@@ -97,6 +98,11 @@ export abstract class BaseCloudOllamaService extends BaseOllamaService {
   /**
    * 병렬로 여러 프롬프트 처리
    * 
+   * ⚠️ 배치 단위로 전역 뮤텍스를 사용하여 공평한 실행 보장
+   * - 각 배치마다 락을 획득/해제하여 여러 요청이 번갈아가며 처리
+   * - 배치 내에서는 병렬 실행 (parallelSize만큼 동시 처리)
+   * - API rate limit 준수 및 리소스 과부하 방지
+   * 
    * @param prompts - 처리할 프롬프트 배열
    * @param options - 생성 옵션
    * @param parallelSize - 동시 처리 크기 (기본값: 생성자에서 설정한 값)
@@ -115,46 +121,61 @@ export abstract class BaseCloudOllamaService extends BaseOllamaService {
 
     console.log(`\n🚀 Cloud 병렬 처리 시작`);
     console.log(`   총 요청: ${totalPrompts}개`);
-    console.log(`   동시 처리: ${batchSize}개`);
+    console.log(`   동시 처리: ${batchSize}개 (배치 단위)`);
     console.log(`   모델: ${this.model}\n`);
 
     const startTime = Date.now();
 
-    // 배치 단위로 처리
+    // 배치 단위로 처리 (각 배치마다 락 획득/해제)
     for (let i = 0; i < totalPrompts; i += batchSize) {
       const batch = prompts.slice(i, Math.min(i + batchSize, totalPrompts));
       const batchNumber = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(totalPrompts / batchSize);
-      const batchStart = Date.now();
 
-      console.log(`[배치 ${batchNumber}/${totalBatches}] ${batch.length}개 요청 병렬 처리 중...`);
-
-      // 병렬로 API 호출
-      const batchPromises = batch.map(prompt => this.generate(prompt, options));
-      const batchSettledResults = await Promise.allSettled(batchPromises);
-
-      // 결과 처리
-      let successCount = 0;
-      const batchResults: string[] = [];
-      for (const result of batchSettledResults) {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-          batchResults.push(result.value);
-          successCount++;
-        } else {
-          console.error(`  ⚠️ 요청 실패:`, result.reason?.message || result.reason);
-          results.push('');
-          batchResults.push('');
-        }
+      // 배치 시작 전 뮤텍스 대기 상태 확인
+      if (globalCloudOllamaMutex.isLocked()) {
+        const queueLength = globalCloudOllamaMutex.getQueueLength();
+        console.log(`[배치 ${batchNumber}/${totalBatches}] ⏳ 다른 배치 대기 중... (대기 순번: ${queueLength + 1})`);
       }
 
-      const batchTime = Date.now() - batchStart;
-      console.log(`  ✅ 배치 완료: ${(batchTime / 1000).toFixed(2)}초 (${successCount}/${batch.length} 성공)`);
+      // 배치 단위로 뮤텍스 획득
+      await globalCloudOllamaMutex.acquire();
       
-      // 진행 상황 콜백 호출 (배치 결과 포함)
-      if (onProgress) {
-        const currentProgress = Math.min(i + batchSize, totalPrompts);
-        onProgress(currentProgress, totalPrompts, batchResults);
+      try {
+        const batchStart = Date.now();
+        console.log(`[배치 ${batchNumber}/${totalBatches}] 🔒 ${batch.length}개 요청 병렬 처리 중...`);
+
+        // 배치 내에서는 병렬로 API 호출 (락이 없으므로 진짜 병렬 실행)
+        const batchPromises = batch.map(prompt => this.generate(prompt, options));
+        const batchSettledResults = await Promise.allSettled(batchPromises);
+
+        // 결과 처리
+        let successCount = 0;
+        const batchResults: string[] = [];
+        for (const result of batchSettledResults) {
+          if (result.status === 'fulfilled') {
+            results.push(result.value);
+            batchResults.push(result.value);
+            successCount++;
+          } else {
+            console.error(`  ⚠️ 요청 실패:`, result.reason?.message || result.reason);
+            results.push('');
+            batchResults.push('');
+          }
+        }
+
+        const batchTime = Date.now() - batchStart;
+        console.log(`  ✅ 배치 완료: ${(batchTime / 1000).toFixed(2)}초 (${successCount}/${batch.length} 성공)`);
+        
+        // 진행 상황 콜백 호출 (배치 결과 포함)
+        if (onProgress) {
+          const currentProgress = Math.min(i + batchSize, totalPrompts);
+          onProgress(currentProgress, totalPrompts, batchResults);
+        }
+      } finally {
+        // 배치 완료 후 뮤텍스 해제 (다른 요청의 배치가 실행될 수 있음)
+        globalCloudOllamaMutex.release();
+        console.log(`  🔓 배치 락 해제 (다른 요청 실행 가능)\n`);
       }
     }
 
