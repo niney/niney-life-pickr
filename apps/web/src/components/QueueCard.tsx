@@ -49,10 +49,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({ item, onCancel }) => {
 
   const getTypeLabel = () => {
     switch (item.type) {
-      case 'review_crawl':
-        return '리뷰 크롤링';
-      case 'review_summary':
-        return '리뷰 요약';
       case 'restaurant_crawl':
         return '레스토랑 크롤링';
       default:
