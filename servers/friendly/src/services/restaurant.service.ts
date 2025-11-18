@@ -107,7 +107,7 @@ export class RestaurantService {
     const menuItems = restaurantInfo.menuItems || [];
     if (jobId && menuItems.length > 0) {
       const jobService = await import('./job-socket.service');
-      jobService.default.emitProgressSocketEvent(
+      await jobService.default.emitProgressSocketEvent(
         jobId,
         restaurantId,
         SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
@@ -132,7 +132,7 @@ export class RestaurantService {
       // Socket 통신: DB 저장 시작
       if (jobId) {
         const jobService = await import('./job-socket.service');
-        jobService.default.emitProgressSocketEvent(
+        await jobService.default.emitProgressSocketEvent(
           jobId,
           restaurantId,
           SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
@@ -185,7 +185,7 @@ export class RestaurantService {
       // Socket 통신: 1단계 - 크롤링 시작
       if (jobId && restaurantId) {
         const jobService = await import('./job-socket.service');
-        jobService.default.emitProgressSocketEvent(
+        await jobService.default.emitProgressSocketEvent(
           jobId,
           restaurantId,
           SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
@@ -228,7 +228,7 @@ export class RestaurantService {
         const menuItems = restaurantInfo.menuItems || [];
         if (jobId && restaurantId) {
           const jobService = await import('./job-socket.service');
-          jobService.default.emitProgressSocketEvent(
+          await jobService.default.emitProgressSocketEvent(
             jobId,
             restaurantId,
             SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
@@ -254,7 +254,7 @@ export class RestaurantService {
           // Socket 통신: 3단계 - DB 저장 시작
           if (jobId && restaurantId) {
             const jobService = await import('./job-socket.service');
-            jobService.default.emitProgressSocketEvent(
+            await jobService.default.emitProgressSocketEvent(
               jobId,
               restaurantId,
               SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,
@@ -281,7 +281,7 @@ export class RestaurantService {
         // Socket 통신: 4단계 - 완료
         if (jobId && restaurantId) {
           const jobService = await import('./job-socket.service');
-          jobService.default.emitProgressSocketEvent(
+          await jobService.default.emitProgressSocketEvent(
             jobId,
             restaurantId,
             SOCKET_EVENTS.RESTAURANT_MENU_PROGRESS,

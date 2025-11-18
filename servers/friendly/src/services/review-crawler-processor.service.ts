@@ -76,11 +76,19 @@ export class ReviewCrawlerProcessor {
       }
 
       // ✅ DB 저장 진행률: Socket 이벤트만 전송 (매번, DB 저장 없음)
-      jobService.emitProgressSocketEvent(
+      await jobService.emitProgressSocketEvent(
         jobId,
         restaurantId,
         SOCKET_EVENTS.REVIEW_DB_PROGRESS,
-        { current, total, metadata: { placeId } }
+        { 
+          current, 
+          total, 
+          metadata: { 
+            step: 'review',
+            substep: 'saving',
+            placeId 
+          } 
+        }
       );
       
       // if (current % 10 === 0 || current === total) {
@@ -88,13 +96,21 @@ export class ReviewCrawlerProcessor {
       // }
     },
       // 크롤링 진행 상황 콜백 (Socket 이벤트만, DB 저장 없음)
-      (current, total) => {
+      async (current, total) => {
         // ✅ 크롤링 진행률: Socket 이벤트만 전송 (매번)
-        jobService.emitProgressSocketEvent(
+        await jobService.emitProgressSocketEvent(
           jobId,
           restaurantId,
           SOCKET_EVENTS.REVIEW_CRAWL_PROGRESS,
-          { current, total, metadata: { placeId } }
+          { 
+            current, 
+            total, 
+            metadata: { 
+              step: 'review',
+              substep: 'crawling',
+              placeId 
+            } 
+          }
         );
         
         if (current % 10 === 0 || current === total) {
@@ -102,13 +118,21 @@ export class ReviewCrawlerProcessor {
         }
       },
       // 이미지 처리 진행 상황 콜백 (Socket 이벤트만, DB 저장 없음)
-      (current, total) => {
+      async (current, total) => {
         // ✅ 이미지 처리 진행률: Socket 이벤트만 전송 (매번)
-        jobService.emitProgressSocketEvent(
+        await jobService.emitProgressSocketEvent(
           jobId,
           restaurantId,
           SOCKET_EVENTS.REVIEW_IMAGE_PROGRESS,
-          { current, total, metadata: { placeId } }
+          { 
+            current, 
+            total, 
+            metadata: { 
+              step: 'review',
+              substep: 'image_processing',
+              placeId 
+            } 
+          }
         );
         
         if (current % 10 === 0 || current === total) {

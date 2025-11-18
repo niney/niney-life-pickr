@@ -154,7 +154,7 @@ export class ReviewSummaryProcessor {
           }
           
           // Socket 진행률 업데이트 (Socket 이벤트만, DB 저장 없음)
-          jobService.emitProgressSocketEvent(
+          await jobService.emitProgressSocketEvent(
             jobId,
             restaurantId,
             SOCKET_EVENTS.REVIEW_SUMMARY_PROGRESS,
@@ -162,6 +162,8 @@ export class ReviewSummaryProcessor {
               current,
               total,
               metadata: {
+                step: 'summary',
+                substep: 'processing',
                 serviceType,
                 succeeded: globalCompletedCount,
                 failed: globalFailedCount

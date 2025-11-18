@@ -25,12 +25,32 @@ export function getPhaseLabel(job: Job): string {
     const step = job.metadata?.step;
     const substep = job.metadata?.substep;
 
+    // 크롤링 단계
     if (step === 'crawling') return '웹 크롤링 중';
+    
+    // 메뉴 단계
     if (step === 'menu') {
+      if (substep === 'fetching') return '메뉴 크롤링 중';
       if (substep === 'normalizing') return '메뉴 정규화 중';
-      if (substep === 'saving') return 'DB 저장 중';
+      if (substep === 'saving') return '메뉴 DB 저장 중';
+      if (substep === 'completed') return '메뉴 처리 완료';
       return '메뉴 처리 중';
     }
+    
+    // 리뷰 단계
+    if (step === 'review') {
+      if (substep === 'crawling') return '리뷰 크롤링 중';
+      if (substep === 'saving') return '리뷰 DB 저장 중';
+      if (substep === 'image_processing') return '리뷰 이미지 처리 중';
+      return '리뷰 처리 중';
+    }
+    
+    // 요약 단계
+    if (step === 'summary') {
+      if (substep === 'processing') return 'AI 요약 생성 중';
+      return '요약 처리 중';
+    }
+    
     return '레스토랑 정보 수집 중';
   }
 
