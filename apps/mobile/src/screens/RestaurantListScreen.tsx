@@ -268,15 +268,10 @@ interface ListHeaderProps {
   handleCategoryClick: (category: string) => void;
   categorySelectedStyle: any;
   selectedCategory: string | null;
-  menuProgress: any;
-  crawlProgress: any;
-  dbProgress: any;
-  isCrawlInterrupted: boolean;
-  progressCardStyle: any;
-  progressBarBackgroundStyle: any;
-  menuProgressBarFillStyle: any;
-  reviewProgressBarFillStyle: any;
-  dbProgressBarFillStyle: any;
+  jobs: any[];
+  queueItems: any[];
+  queueStats: { waiting: number; processing: number };
+  statusCardStyle: any;
   total: number;
   restaurantsLoading: boolean;
 }
@@ -285,9 +280,7 @@ const ListHeader: React.FC<ListHeaderProps> = React.memo(({
   inputStyle, colors, url, setUrl, theme, searchButtonStyle, handleCrawl, loading, searchButtonTextStyle,
   restaurantSearchWrapperStyle, restaurantSearchInputStyle, searchName, setSearchName, clearButtonTextStyle,
   searchAddress, setSearchAddress, navigation, categories, categoriesLoading, handleCategoryClick,
-  categorySelectedStyle, selectedCategory, menuProgress, crawlProgress, dbProgress, isCrawlInterrupted,
-  progressCardStyle, progressBarBackgroundStyle, menuProgressBarFillStyle, reviewProgressBarFillStyle,
-  dbProgressBarFillStyle, total, restaurantsLoading
+  categorySelectedStyle, selectedCategory, jobs, queueItems, queueStats, statusCardStyle, total, restaurantsLoading
 }) => (
   <View style={styles.headerContainer}>
     {/* 크롤링 URL 입력 */}
@@ -417,79 +410,35 @@ const ListHeader: React.FC<ListHeaderProps> = React.memo(({
       ) : null}
     </View>
 
-    {/* 크롤링 진행 상황 */}
-    {(menuProgress !== null || crawlProgress !== null || dbProgress !== null || isCrawlInterrupted) && (
+    {/* 큐 및 Job 상태 */}
+    {(queueItems.length > 0 || jobs.length > 0) && (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[
-            styles.sectionTitle,
-            isCrawlInterrupted ? styles.sectionTitleInterrupted : { color: colors.text }
-          ]}>
-            {isCrawlInterrupted ? '⚠️ 크롤링 중단됨' : '크롤링 진행 상황'}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            📊 진행 상태
           </Text>
-          {!isCrawlInterrupted && <ActivityIndicator size="small" color={colors.primary} />}
         </View>
 
-        {isCrawlInterrupted && (
-          <Text style={[styles.interruptedMessage, { color: colors.textSecondary }]}>
-            서버가 재시작되어 작업이 중단되었습니다. 다시 시도해주세요.
-          </Text>
-        )}
-
-        {menuProgress && menuProgress.total > 0 && (
-          <View style={progressCardStyle}>
-            <View style={styles.progressHeader}>
-              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>메뉴 수집</Text>
-              <Text style={[styles.progressValue, { color: colors.text }]}>
-                {menuProgress.current} / {menuProgress.total}
-              </Text>
-            </View>
-            <View style={[styles.progressBar, progressBarBackgroundStyle]}>
-              <View
-                style={[styles.progressBarFill, { width: `${menuProgress.percentage}%` }, menuProgressBarFillStyle]}
-              />
-            </View>
-            <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-              {menuProgress.percentage}%
+        {/* 대기열 현황 */}
+        {queueItems.length > 0 && (
+          <View style={statusCardStyle}>
+            <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
+              대기열: {queueStats.waiting}개 대기 / {queueStats.processing}개 처리 중
             </Text>
           </View>
         )}
 
-        {crawlProgress && crawlProgress.total > 0 && (
-          <View style={progressCardStyle}>
-            <View style={styles.progressHeader}>
-              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>리뷰 수집</Text>
-              <Text style={[styles.progressValue, { color: colors.text }]}>
-                {crawlProgress.current} / {crawlProgress.total}
-              </Text>
-            </View>
-            <View style={[styles.progressBar, progressBarBackgroundStyle]}>
-              <View
-                style={[styles.progressBarFill, { width: `${crawlProgress.percentage}%` }, reviewProgressBarFillStyle]}
-              />
-            </View>
-            <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-              {crawlProgress.percentage}%
+        {/* 실행 중 Job 현황 */}
+        {jobs.length > 0 && (
+          <View style={statusCardStyle}>
+            <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
+              실행 중: {jobs.filter(j => j.status === 'active').length}개
             </Text>
-          </View>
-        )}
-
-        {dbProgress && dbProgress.total > 0 && (
-          <View style={progressCardStyle}>
-            <View style={styles.progressHeader}>
-              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>DB 저장</Text>
-              <Text style={[styles.progressValue, { color: colors.text }]}>
-                {dbProgress.current} / {dbProgress.total}
+            {jobs.filter(j => j.isInterrupted).length > 0 && (
+              <Text style={[styles.statusLabel, styles.statusBadgeTextQueue]}>
+                ⚠️ 중단됨: {jobs.filter(j => j.isInterrupted).length}개
               </Text>
-            </View>
-            <View style={[styles.progressBar, progressBarBackgroundStyle]}>
-              <View
-                style={[styles.progressBarFill, { width: `${dbProgress.percentage}%` }, dbProgressBarFillStyle]}
-              />
-            </View>
-            <Text style={[styles.progressPercentage, { color: colors.textSecondary }]}>
-              {dbProgress.percentage}%
-            </Text>
+            )}
           </View>
         )}
       </View>
@@ -508,7 +457,15 @@ const RestaurantListScreen: React.FC = () => {
   const route = useRoute<RouteProp<RestaurantStackParamList, 'RestaurantList'>>();
   const { theme } = useTheme();
   const colors = THEME_COLORS[theme];
-  const { menuProgress, crawlProgress, dbProgress, isCrawlInterrupted, setRestaurantCallbacks, resetCrawlStatus, getRestaurantQueueStatus, getRestaurantJobStatus } = useSocket();
+  const {
+    setRestaurantCallbacks,
+    resetCrawlStatus,
+    getRestaurantQueueStatus,
+    getRestaurantJobStatus,
+    jobs,
+    queueItems,
+    queueStats
+  } = useSocket();
 
   const [recrawlModalVisible, setRecrawlModalVisible] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantData | null>(null);
@@ -579,35 +536,15 @@ const RestaurantListScreen: React.FC = () => {
     [colors.primary]
   );
 
-  const progressCardStyle = React.useMemo(
+  const statusCardStyle = React.useMemo(
     () => [
-      styles.progressCard,
+      styles.statusCard,
       {
         backgroundColor: theme === 'light' ? '#ffffff' : colors.surface,
         borderColor: colors.border,
       },
     ],
     [theme, colors.surface, colors.border]
-  );
-
-  const progressBarBackgroundStyle = React.useMemo(
-    () => ({ backgroundColor: colors.border }),
-    [colors.border]
-  );
-
-  const menuProgressBarFillStyle = React.useMemo(
-    () => ({ backgroundColor: '#4caf50' as const }),
-    []
-  );
-
-  const reviewProgressBarFillStyle = React.useMemo(
-    () => ({ backgroundColor: '#2196f3' as const }),
-    []
-  );
-
-  const dbProgressBarFillStyle = React.useMemo(
-    () => ({ backgroundColor: colors.primary }),
-    [colors.primary]
   );
 
   // shared 훅 사용 (플랫폼 독립적)
@@ -826,15 +763,10 @@ const RestaurantListScreen: React.FC = () => {
             handleCategoryClick={handleCategoryClick}
             categorySelectedStyle={categorySelectedStyle}
             selectedCategory={selectedCategory}
-            menuProgress={menuProgress}
-            crawlProgress={crawlProgress}
-            dbProgress={dbProgress}
-            isCrawlInterrupted={isCrawlInterrupted}
-            progressCardStyle={progressCardStyle}
-            progressBarBackgroundStyle={progressBarBackgroundStyle}
-            menuProgressBarFillStyle={menuProgressBarFillStyle}
-            reviewProgressBarFillStyle={reviewProgressBarFillStyle}
-            dbProgressBarFillStyle={dbProgressBarFillStyle}
+            jobs={jobs}
+            queueItems={queueItems}
+            queueStats={queueStats}
+            statusCardStyle={statusCardStyle}
             total={total}
             restaurantsLoading={restaurantsLoading}
           />
@@ -1044,47 +976,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
-  progressCard: {
-    padding: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressPercentage: {
-    fontSize: 13,
-    textAlign: 'right',
-  },
-  interruptedMessage: {
-    fontSize: 14,
-    marginTop: 8,
-    marginBottom: 12,
-    lineHeight: 20,
-    paddingHorizontal: 4,
-  },
   restaurantNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1122,6 +1013,16 @@ const styles = StyleSheet.create({
   },
   sectionTitleInterrupted: {
     color: '#ff9800',
+  },
+  statusCard: {
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  statusLabel: {
+    fontSize: 14,
+    marginBottom: 4,
   },
 });
 
