@@ -29,30 +29,78 @@ class ReviewSummaryService extends UnifiedOllamaService {
 
     try {
       // 1. 각 리뷰당 프롬프트 1개 생성
-      const prompts = reviews.map(review => 
+      const prompts = reviews.map(review =>
         this.createSingleReviewPrompt(review)
       );
-      
+
       // 2. Cloud: 병렬 / Local: 순차 (진행 상황 콜백 전달)
       const responses = await this.generateBatch(
-        prompts, 
+        prompts,
         { num_ctx: 2048 },
         onProgress
       );
 
-      // 3. JSON 파싱
-      const results = responses.map((response, index) => {
+      // 3. 초기 파싱 (null 허용)
+      const results: (ReviewSummaryData | null)[] = responses.map((response, index) => {
         const parsed = this.parseJsonResponse<ReviewSummaryData>(response);
-        
+
         if (!parsed || !parsed.summary) {
-          console.warn(`⚠️ 리뷰 ${reviews[index].id} 요약 파싱 실패`);
-          return this.createFallbackSummary(reviews[index]);
+          console.warn(`⚠️ 리뷰 ${reviews[index].id} 요약 파싱 실패 (1차 시도)`);
+          return null;
         }
 
         return parsed;
       });
 
-      return results;
+      // 4. 파싱 실패 항목 수집
+      const failedIndices: number[] = [];
+      results.forEach((result, index) => {
+        if (result === null) {
+          failedIndices.push(index);
+        }
+      });
+
+      // 5. 재시도 로직
+      if (failedIndices.length > 0) {
+        console.log(`\n🔄 파싱 실패 ${failedIndices.length}개 항목 재시도...`);
+
+        for (const idx of failedIndices) {
+          const review = reviews[idx];
+
+          // 5-1. 현재 서비스로 재시도
+          console.log(`  [${idx + 1}/${reviews.length}] 재시도 (리뷰 ${review.id})`);
+          const retried = await this.retrySingleReview(review);
+
+          if (retried) {
+            console.log(`  ✅ 재시도 성공 (리뷰 ${review.id})`);
+            results[idx] = retried;
+            continue;
+          }
+
+          // 5-2. Local로 재시도 (Cloud였다면)
+          const localRetried = await this.tryWithLocalFallback(review);
+
+          if (localRetried) {
+            results[idx] = localRetried;
+            continue;
+          }
+
+          // 5-3. 최종 실패 로그
+          console.warn(`  ⚠️ 최종 파싱 실패, Fallback 사용 (리뷰 ${review.id})`);
+        }
+      }
+
+      // 6. 최종 결과 반환 (null은 fallback으로 대체)
+      const finalResults = results.map((result, index) =>
+        result || this.createFallbackSummary(reviews[index])
+      );
+
+      // 7. 통계 출력
+      const successCount = results.filter(r => r !== null).length;
+      const fallbackCount = results.filter(r => r === null).length;
+      console.log(`\n📊 요약 결과: 성공 ${successCount}, Fallback ${fallbackCount} / 전체 ${reviews.length}`);
+
+      return finalResults;
 
     } catch (error) {
       console.error('❌ 리뷰 요약 실패:', error);
@@ -179,11 +227,66 @@ JSON 형식:
   }
 
   /**
+   * 단일 리뷰 재시도 (현재 서비스)
+   * @returns 파싱된 결과 또는 null
+   */
+  private async retrySingleReview(review: ReviewDB): Promise<ReviewSummaryData | null> {
+    try {
+      const prompt = this.createSingleReviewPrompt(review);
+      const response = await this.generateSingle(prompt, { num_ctx: 2048 });
+      const parsed = this.parseJsonResponse<ReviewSummaryData>(response);
+
+      if (parsed && parsed.summary) {
+        return parsed;
+      }
+      return null;
+    } catch (error) {
+      console.error(`  ❌ 재시도 실패 (리뷰 ${review.id}):`, error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
+
+  /**
+   * Local로 재시도 (Cloud였던 경우만)
+   * @returns 파싱된 결과 또는 null
+   */
+  private async tryWithLocalFallback(review: ReviewDB): Promise<ReviewSummaryData | null> {
+    // Cloud 사용 중이 아니면 skip
+    if (this.getCurrentServiceType() !== 'cloud') {
+      return null;
+    }
+
+    try {
+      console.log(`  🔄 Local로 재시도 (리뷰 ${review.id})`);
+
+      // 임시로 Local 서비스 직접 접근 (protected localService)
+      // UnifiedOllamaService의 localService를 사용
+      const prompt = this.createSingleReviewPrompt(review);
+
+      // Local 서비스 강제 사용을 위해 isCloudAvailable를 임시로 false로 설정하고 generateSingle 호출
+      // 더 나은 방법: UnifiedOllamaService에 generateWithLocal 같은 메서드 추가
+      // 일단은 새 Local 서비스 인스턴스 생성
+      const localService = new ReviewSummaryService(false, this.customConfig);
+      const response = await localService.generateSingle(prompt, { num_ctx: 2048 });
+      const parsed = this.parseJsonResponse<ReviewSummaryData>(response);
+
+      if (parsed && parsed.summary) {
+        console.log(`  ✅ Local 재시도 성공 (리뷰 ${review.id})`);
+        return parsed;
+      }
+      return null;
+    } catch (error) {
+      console.error(`  ❌ Local 재시도 실패 (리뷰 ${review.id}):`, error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
+
+  /**
    * AI 실패 시 폴백
    */
   private createFallbackSummary(review: ReviewDB): ReviewSummaryData {
     const keywords = review.emotion_keywords?.split(',').map(k => k.trim()) || [];
-    
+
     return {
       summary: review.review_text || '리뷰 내용 없음',
       keyKeywords: keywords.slice(0, 5),

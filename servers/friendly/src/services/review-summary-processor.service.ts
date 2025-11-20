@@ -125,7 +125,9 @@ export class ReviewSummaryProcessor {
       // 7. AI에게 전체 리뷰 전달 - AI가 내부에서 배치 처리하고 콜백으로 저장
       const allReviewIds = allReviews.map(r => r.id);
       let processedCount = 0;
-      
+      const savePromises: Promise<{ succeeded: number; failed: number; failedReviewIds: number[] }>[] = [];
+      const allFailedReviewIds: number[] = [];
+
       await summaryService.summarizeReviews(
         allReviews,
         async (current, total, batchResults) => {
@@ -134,25 +136,29 @@ export class ReviewSummaryProcessor {
             const batchStartIndex = processedCount;
             const batchEndIndex = batchStartIndex + batchResults.length;
             const currentBatchReviewIds = allReviewIds.slice(batchStartIndex, batchEndIndex);
-            
+
             // 배치 결과를 DB에 일괄 저장 (트랜잭션)
-            this.saveBatchResultsOptimized(
+            const savePromise = this.saveBatchResultsOptimized(
               currentBatchReviewIds,
               batchResults,
               summaryService
-            ).then(({ succeeded, failed }) => {
+            ).then(({ succeeded, failed, failedReviewIds }) => {
               globalCompletedCount += succeeded;
               globalFailedCount += failed;
-              
+              allFailedReviewIds.push(...failedReviewIds);
+
               console.log(`  💾 AI 배치 저장 완료: ${succeeded}개 성공, ${failed}개 실패 (누적: ${globalCompletedCount}/${total})`);
+              return { succeeded, failed, failedReviewIds };
             }).catch((err: Error) => {
               console.error('  ❌ 배치 저장 오류:', err);
               globalFailedCount += batchResults.length;
+              return { succeeded: 0, failed: batchResults.length, failedReviewIds: currentBatchReviewIds };
             });
-            
+
+            savePromises.push(savePromise);
             processedCount += batchResults.length;
           }
-          
+
           // Socket 진행률 업데이트 (Socket 이벤트만, DB 저장 없음)
           await jobService.emitProgressSocketEvent(
             jobId,
@@ -172,10 +178,51 @@ export class ReviewSummaryProcessor {
           );
         }
       );
-      
+
+      // 8. 모든 저장 작업 완료 대기
+      console.log(`⏳ 모든 배치 저장 완료 대기 중...`);
+      await Promise.all(savePromises);
+      console.log(`✅ 모든 배치 저장 완료`);
+
+      // 9. 실패 항목 재시도
+      if (allFailedReviewIds.length > 0) {
+        console.log(`\n🔄 실패한 ${allFailedReviewIds.length}개 항목 재시도...`);
+
+        const failedReviews = await reviewRepository.findByIds(allFailedReviewIds);
+        let retrySucceeded = 0;
+        let retryFailed = 0;
+
+        for (const review of failedReviews) {
+          try {
+            console.log(`  [재시도] 리뷰 ${review.id} 처리 중...`);
+            const [summaryData] = await summaryService.summarizeReviews([review]);
+
+            // 재시도 성공 시만 DB 업데이트
+            if (summaryData && summaryData.summary && summaryData.summary !== '') {
+              await reviewSummaryRepository.updateSummary(review.id, summaryData);
+              retrySucceeded++;
+              globalCompletedCount++;
+              globalFailedCount--;
+              console.log(`  ✅ 재시도 성공 (리뷰 ${review.id})`);
+            } else {
+              // 재시도 실패 → DB 업데이트 안 함 (원래 에러 메시지 유지: 'AI 요약 생성 실패' 등)
+              console.warn(`  ⚠️ 재시도 후에도 빈 요약 (리뷰 ${review.id}) - 원래 에러 메시지 유지`);
+              retryFailed++;
+            }
+          } catch (error) {
+            // 재시도 실패 → DB 업데이트 안 함 (원래 에러 메시지 유지: 'AI 요약 생성 실패' 등)
+            console.error(`  ❌ 재시도 실패 (리뷰 ${review.id}):`, error instanceof Error ? error.message : error);
+            console.error(`  → 원래 에러 메시지 유지 (DB 업데이트 안 함)`);
+            retryFailed++;
+          }
+        }
+
+        console.log(`📊 재시도 결과: 성공 ${retrySucceeded}개, 실패 ${retryFailed}개`);
+      }
+
       const duration = Date.now() - globalStartTime;
-      console.log(`✅ 전체 처리 완료! 성공: ${globalCompletedCount}개, 실패: ${globalFailedCount}개 (소요: ${(duration / 1000).toFixed(1)}초)`);
-      
+      console.log(`\n✅ 전체 처리 완료! 성공: ${globalCompletedCount}개, 실패: ${globalFailedCount}개 (소요: ${(duration / 1000).toFixed(1)}초)`);
+
       // 결과 반환 (Job 생명주기는 orchestrator가 관리)
       return {
         totalIncomplete,
@@ -192,7 +239,7 @@ export class ReviewSummaryProcessor {
     reviewIds: number[],
     batchResults: string[],
     summaryService: ReturnType<typeof createReviewSummaryService>
-  ): Promise<{ succeeded: number; failed: number }> {
+  ): Promise<{ succeeded: number; failed: number; failedReviewIds: number[] }> {
     const updates: Array<{
       reviewId: number;
       summaryData: any | null;
@@ -259,8 +306,9 @@ export class ReviewSummaryProcessor {
 
     const succeeded = updates.filter(u => u.summaryData).length;
     const failed = updates.filter(u => u.errorMessage).length;
+    const failedReviewIds = updates.filter(u => u.errorMessage).map(u => u.reviewId);
 
-    return { succeeded, failed };
+    return { succeeded, failed, failedReviewIds };
   }
 
   /**
