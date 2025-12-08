@@ -1,12 +1,10 @@
 /**
  * Ollama 설정 로더
- * base.yml에서 설정을 읽어와 우선순위에 따라 병합
+ * 공통 config 유틸을 사용하여 base.yml에서 설정 로드
  * 우선순위: 기본값 < base.yml < 생성자 파라미터
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as yaml from 'js-yaml';
+import { loadConfigSection } from '../../utils/config.utils';
 import type { OllamaYamlConfig, LocalOllamaConfig, CloudOllamaConfig } from './ollama.types';
 
 /**
@@ -30,40 +28,7 @@ const DEFAULT_CLOUD_CONFIG = {
  * base.yml에서 Ollama 설정 로드
  */
 export function loadOllamaYamlConfig(): OllamaYamlConfig | null {
-  try {
-    // config 폴더 경로 탐색
-    const possiblePaths = [
-      path.join(process.cwd(), 'config', 'base.yml'),
-      path.join(__dirname, '../../../../config/base.yml'),
-      path.join(__dirname, '../../../../../config/base.yml'),
-    ];
-
-    let configPath: string | null = null;
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        configPath = p;
-        break;
-      }
-    }
-
-    if (!configPath) {
-      console.warn('⚠️  base.yml 파일을 찾을 수 없습니다. 기본 설정을 사용합니다.');
-      return null;
-    }
-
-    const fileContents = fs.readFileSync(configPath, 'utf8');
-    const config = yaml.load(fileContents) as any;
-
-    if (!config?.ollama) {
-      console.warn('⚠️  base.yml에 ollama 설정이 없습니다. 기본 설정을 사용합니다.');
-      return null;
-    }
-
-    return config.ollama as OllamaYamlConfig;
-  } catch (error) {
-    console.error('❌ base.yml 로드 중 오류 발생:', error);
-    return null;
-  }
+  return loadConfigSection<OllamaYamlConfig>('ollama');
 }
 
 /**

@@ -67,3 +67,9 @@ ollama:
     timeout: 60000
     parallelSize: 10
     apiKey: ""  # Cloud API 키를 여기에 입력하세요
+
+# VWorld Map API Configuration
+vworld:
+  apiKey: ""  # VWorld API Key (https://www.vworld.kr에서 발급)
+  geocodeUrl: "https://api.vworld.kr/req/address"
+  wmtsUrl: "https://api.vworld.kr/req/wmts/1.0.0"

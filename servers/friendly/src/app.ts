@@ -25,6 +25,7 @@ import reviewSummaryRoutes from './routes/review-summary.routes';
 import reviewRoutes from './routes/review.routes';
 import menuStatisticsRoutes from './routes/menu-statistics.routes';
 import searchRoutes from './routes/search.routes';
+import vworldRoutes from './routes/vworld.routes';
 
 // Create Fastify app with TypeBox provider
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -213,6 +214,9 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   
   // Menu Statistics 라우트
   await app.register(menuStatisticsRoutes, { prefix: '/api/restaurants' }); // 메뉴별 감정 통계
+
+  // VWorld 라우트
+  await app.register(vworldRoutes, { prefix: '/api/vworld' }); // VWorld Geocoding API 프록시
 
   return app;
 };
