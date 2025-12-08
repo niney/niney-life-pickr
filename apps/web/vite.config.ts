@@ -76,6 +76,7 @@ function isObject(item: any): boolean {
 const loadedConfig = loadConfig()
 const webConfig = loadedConfig.server?.web || { host: 'localhost', port: 3000 }
 const apiConfig = loadedConfig.api || { url: 'http://localhost:4000' }
+const vworldConfig = loadedConfig.vworld || { apiKey: '', geocodeUrl: '', wmtsUrl: '' }
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -103,6 +104,10 @@ export default defineConfig({
     global: 'globalThis',
     // API URL을 빌드 시점에 YAML에서 주입
     'import.meta.env.VITE_API_URL': JSON.stringify(apiConfig.url),
+    // VWorld API 설정
+    'import.meta.env.VITE_VWORLD_API_KEY': JSON.stringify(vworldConfig.apiKey),
+    'import.meta.env.VITE_VWORLD_GEOCODE_URL': JSON.stringify(vworldConfig.geocodeUrl),
+    'import.meta.env.VITE_VWORLD_WMTS_URL': JSON.stringify(vworldConfig.wmtsUrl),
   },
   optimizeDeps: {
     include: ['react-native-web'],

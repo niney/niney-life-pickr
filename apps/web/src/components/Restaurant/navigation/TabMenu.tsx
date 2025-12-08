@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 
-export type TabType = 'menu' | 'review' | 'statistics' | 'map'
+export type TabType = 'menu' | 'review' | 'statistics' | 'map' | 'vworld'
 
 interface TabMenuProps {
   activeTab: TabType
@@ -26,6 +26,7 @@ const TabMenu: React.FC<TabMenuProps> = ({
     { key: 'review', label: `리뷰 (${reviewCount})` },
     { key: 'statistics', label: '📊 통계' },
     { key: 'map', label: '🗺️ 네이버맵' },
+    { key: 'vworld', label: '🌏 VWorld' },
   ]
 
   return (

@@ -13,6 +13,7 @@ import CrawlProgressCard from './progress/CrawlProgressCard'
 import SummaryProgressCard from './progress/SummaryProgressCard'
 import MenuTab from './tabs/MenuTab'
 import MapTab from './tabs/MapTab'
+import VworldMapTab from './tabs/VworldMapTab'
 import StatisticsTab from './tabs/StatisticsTab'
 import ReviewTab from './tabs/ReviewTab'
 import ResummaryModal from './modals/ResummaryModal'
@@ -355,6 +356,17 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
           <MapTab
             placeId={restaurant?.place_id}
             onOpenNaverMap={openNaverMap}
+            isMobile={isMobile}
+          />
+        )}
+
+        {/* VWorld 맵 탭 */}
+        {activeTab === 'vworld' && (
+          <VworldMapTab
+            lat={restaurant?.lat}
+            lng={restaurant?.lng}
+            address={restaurant?.address}
+            restaurantName={restaurant?.name}
             isMobile={isMobile}
           />
         )}
