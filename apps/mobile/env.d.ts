@@ -35,6 +35,27 @@ declare namespace NodeJS {
      * - "production": base.yml + production.yml merge
      */
     NODE_ENV?: 'development' | 'production' | 'test';
+
+    /**
+     * VWorld API Key
+     * - config/base.yml의 vworld.apiKey
+     * @example "64DA561E-6B4A-32A3-AA29-6F2E6B1D6391"
+     */
+    VWORLD_API_KEY?: string;
+
+    /**
+     * VWorld Geocoding API URL
+     * - config/base.yml의 vworld.geocodeUrl
+     * @example "https://api.vworld.kr/req/address"
+     */
+    VWORLD_GEOCODE_URL?: string;
+
+    /**
+     * VWorld WMTS API URL
+     * - config/base.yml의 vworld.wmtsUrl
+     * @example "https://api.vworld.kr/req/wmts/1.0.0"
+     */
+    VWORLD_WMTS_URL?: string;
   }
 }
 

@@ -65,10 +65,16 @@ function isObject(item) {
 // YAML config 로드
 const loadedConfig = loadConfig();
 const apiConfig = loadedConfig.api || {};
+const vworldConfig = loadedConfig.vworld || {};
 
 // 환경변수로 주입 (babel-plugin-transform-inline-environment-variables가 치환)
 process.env.API_MOBILE_ANDROID = apiConfig.mobile?.android || 'http://10.0.2.2:4000';
 process.env.API_MOBILE_IOS = apiConfig.mobile?.ios || 'http://localhost:4000';
+
+// VWorld API 설정
+process.env.VWORLD_API_KEY = vworldConfig.apiKey || '';
+process.env.VWORLD_GEOCODE_URL = vworldConfig.geocodeUrl || 'https://api.vworld.kr/req/address';
+process.env.VWORLD_WMTS_URL = vworldConfig.wmtsUrl || 'https://api.vworld.kr/req/wmts/1.0.0';
 
 module.exports = {
   presets: ['module:@react-native/babel-preset'],

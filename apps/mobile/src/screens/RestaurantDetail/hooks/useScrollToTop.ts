@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-type TabType = 'menu' | 'review' | 'statistics' | 'map';
+type TabType = 'menu' | 'review' | 'statistics' | 'map' | 'vworld';
 
 interface UseScrollToTopReturn {
   headerHeight: number;

@@ -10,8 +10,9 @@
  * - review: 리뷰 탭 (리뷰 목록 및 AI 요약)
  * - statistics: 통계 탭 (메뉴별 감정 분석 통계)
  * - map: 지도 탭 (네이버맵 연동)
+ * - vworld: VWorld 지도 탭
  */
-export type TabType = 'menu' | 'review' | 'statistics' | 'map';
+export type TabType = 'menu' | 'review' | 'statistics' | 'map' | 'vworld';
 
 /**
  * TabConfig

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme, THEME_COLORS } from 'shared';
 
-export type TabType = 'menu' | 'review' | 'statistics' | 'map';
+export type TabType = 'menu' | 'review' | 'statistics' | 'map' | 'vworld';
 
 interface TabMenuProps {
   activeTab: TabType;
@@ -84,9 +84,26 @@ const TabMenu: React.FC<TabMenuProps> = ({
               { color: activeTab === 'map' ? colors.primary : colors.textSecondary }
             ]}
           >
-            🗺️ 네이버맵
+            🗺️ 네이버
           </Text>
           {activeTab === 'map' && (
+            <View style={[styles.indicator, { backgroundColor: colors.primary }]} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => onTabChange('vworld')}
+        >
+          <Text
+            style={[
+              styles.buttonText,
+              { color: activeTab === 'vworld' ? colors.primary : colors.textSecondary }
+            ]}
+          >
+            🌏 맵
+          </Text>
+          {activeTab === 'vworld' && (
             <View style={[styles.indicator, { backgroundColor: colors.primary }]} />
           )}
         </TouchableOpacity>

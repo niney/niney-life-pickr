@@ -28,6 +28,7 @@ import { MenuTab } from './RestaurantDetail/tabs/MenuTab';
 import { ReviewTab } from './RestaurantDetail/tabs/ReviewTab';
 import { StatisticsTab } from './RestaurantDetail/tabs/StatisticsTab';
 import MapTab from './RestaurantDetail/tabs/MapTab';
+import VworldMapTab from './RestaurantDetail/tabs/VworldMapTab';
 import ImageViewer from './RestaurantDetail/modals/ImageViewer';
 import { ResummaryModal } from './RestaurantDetail/modals/ResummaryModal';
 
@@ -476,6 +477,14 @@ const RestaurantDetailScreen: React.FC = () => {
           <MapTab
             placeId={restaurant?.place_id}
             onOpenMap={openNaverMap}
+          />
+        )}
+
+        {/* VWorld 맵 탭 */}
+        {activeTab === 'vworld' && (
+          <VworldMapTab
+            address={restaurant?.address ?? undefined}
+            restaurantName={restaurant?.name}
           />
         )}
       </ScrollView>
