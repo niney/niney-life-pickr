@@ -17,6 +17,7 @@ let cachedConfigPath: string | null = null
 function findConfigPath(): string | null {
   const possiblePaths = [
     path.join(process.cwd(), 'config', 'base.yml'),
+    path.join(__dirname, '../../../config/base.yml'),
     path.join(__dirname, '../../../../config/base.yml'),
     path.join(__dirname, '../../../../../config/base.yml'),
   ]
