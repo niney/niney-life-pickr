@@ -4,6 +4,58 @@ import { createVWorldConfig } from '../services/vworld/vworld.config'
 
 export default async function vworldRoutes(fastify: FastifyInstance) {
   /**
+   * VWorld 설정 조회 (API 키, WMTS URL)
+   * 모바일 앱에서 지도 타일 로드에 필요
+   */
+  fastify.get('/config', {
+    schema: {
+      tags: ['vworld'],
+      summary: 'VWorld 설정 조회',
+      description: 'VWorld API 키와 WMTS URL을 반환합니다.',
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          data: Type.Union([
+            Type.Object({
+              apiKey: Type.String({ description: 'VWorld API 키' }),
+              wmtsUrl: Type.String({ description: 'WMTS 베이스 URL' }),
+            }),
+            Type.Null(),
+          ]),
+          message: Type.String(),
+          timestamp: Type.String(),
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          data: Type.Null(),
+          message: Type.String(),
+          timestamp: Type.String(),
+        }),
+      },
+    },
+  }, async (_request, reply) => {
+    const vworldConfig = createVWorldConfig()
+    if (!vworldConfig) {
+      return reply.status(500).send({
+        result: false,
+        data: null,
+        message: 'VWorld API 키가 설정되지 않았습니다',
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return reply.send({
+      result: true,
+      data: {
+        apiKey: vworldConfig.apiKey,
+        wmtsUrl: vworldConfig.wmtsUrl,
+      },
+      message: '설정 조회 성공',
+      timestamp: new Date().toISOString(),
+    })
+  })
+
+  /**
    * 주소 → 좌표 변환 (Geocoding)
    * VWorld API 프록시 (CORS 우회)
    */
