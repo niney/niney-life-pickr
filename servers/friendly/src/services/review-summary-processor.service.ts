@@ -192,28 +192,44 @@ export class ReviewSummaryProcessor {
         let retrySucceeded = 0;
         let retryFailed = 0;
 
-        for (const review of failedReviews) {
-          try {
-            console.log(`  [재시도] 리뷰 ${review.id} 처리 중...`);
-            const [summaryData] = await summaryService.summarizeReviews([review]);
+        // Cloud면 10건씩 배치, Local이면 1건씩 처리
+        const isCloud = serviceType === 'cloud';
+        const batchSize = isCloud ? 10 : 1;
+        console.log(`  📦 ${isCloud ? 'Cloud' : 'Local'} 모드: ${batchSize}건씩 재시도`);
 
-            // 재시도 성공 시만 DB 업데이트
-            if (summaryData && summaryData.summary && summaryData.summary !== '') {
-              await reviewSummaryRepository.updateSummary(review.id, summaryData);
-              retrySucceeded++;
-              globalCompletedCount++;
-              globalFailedCount--;
-              console.log(`  ✅ 재시도 성공 (리뷰 ${review.id})`);
-            } else {
-              // 재시도 실패 → DB 업데이트 안 함 (원래 에러 메시지 유지: 'AI 요약 생성 실패' 등)
-              console.warn(`  ⚠️ 재시도 후에도 빈 요약 (리뷰 ${review.id}) - 원래 에러 메시지 유지`);
-              retryFailed++;
+        for (let i = 0; i < failedReviews.length; i += batchSize) {
+          const batch = failedReviews.slice(i, i + batchSize);
+          const batchIds = batch.map(r => r.id);
+
+          try {
+            console.log(`  [재시도] 리뷰 ${batchIds.join(', ')} 처리 중...`);
+            const summaryResults = await summaryService.summarizeReviews(batch);
+
+            // 배치 결과 처리
+            for (let j = 0; j < batch.length; j++) {
+              const review = batch[j];
+              const summaryData = summaryResults[j];
+
+              // 재시도 성공 시만 DB 업데이트
+              if (summaryData && summaryData.summary && summaryData.summary !== '') {
+                await reviewSummaryRepository.updateSummary(review.id, summaryData);
+                retrySucceeded++;
+                globalCompletedCount++;
+                globalFailedCount--;
+                console.log(`  ✅ 재시도 성공 (리뷰 ${review.id})`);
+              } else {
+                // 재시도 실패 → DB 업데이트 안 함 (원래 에러 메시지 유지: 'AI 요약 생성 실패' 등)
+                console.warn(`  ⚠️ 재시도 후에도 빈 요약 (리뷰 ${review.id}) - 원래 에러 메시지 유지`);
+                retryFailed++;
+              }
             }
           } catch (error) {
-            // 재시도 실패 → DB 업데이트 안 함 (원래 에러 메시지 유지: 'AI 요약 생성 실패' 등)
-            console.error(`  ❌ 재시도 실패 (리뷰 ${review.id}):`, error instanceof Error ? error.message : error);
-            console.error(`  → 원래 에러 메시지 유지 (DB 업데이트 안 함)`);
-            retryFailed++;
+            // 배치 전체 실패 → 각 리뷰에 대해 실패 처리
+            for (const review of batch) {
+              console.error(`  ❌ 재시도 실패 (리뷰 ${review.id}):`, error instanceof Error ? error.message : error);
+              console.error(`  → 원래 에러 메시지 유지 (DB 업데이트 안 함)`);
+              retryFailed++;
+            }
           }
         }
 
