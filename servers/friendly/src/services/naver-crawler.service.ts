@@ -79,7 +79,10 @@ class NaverCrawlerService {
         '--disable-plugins',
         '--disable-default-apps',
         '--disable-background-networking',
-        '--window-size=1920,1080'
+        '--window-size=1920,1080',
+        // 이미지 로딩 최적화 (URL만 추출하면 되므로 실제 이미지 불필요)
+        '--blink-settings=imagesEnabled=false',
+        '--disable-remote-fonts'
       ]
     };
 
@@ -807,111 +810,92 @@ class NaverCrawlerService {
         console.log('전체 리뷰 개수 추출 실패:', error);
       }
 
-      // 리뷰 목록 "더보기" 버튼을 반복 클릭
+      // 리뷰 목록 "더보기" 버튼을 반복 클릭 (waitForFunction 방식)
       console.log('리뷰 목록 더보기 버튼 클릭 시작...');
 
       let clickCount = 0;
       const maxClicks = 5000;
       let previousReviewCount = 0;
-      let errorCount = 0;       // 에러 발생 카운터
+
+      // 더보기 버튼 찾기 함수 (브라우저 컨텍스트)
+      const findMoreButtonScript = `
+        (() => {
+          const buttons = document.querySelectorAll('a.fvwqf');
+          for (let i = 0; i < buttons.length; i++) {
+            const button = buttons[i];
+            const text = button.textContent?.trim() || '';
+            if (text.includes('펼쳐서 더보기') &&
+                !text.includes('팔로우') &&
+                !text.includes('follow') &&
+                !text.includes('구독')) {
+              return true;
+            }
+          }
+          return false;
+        })()
+      `;
 
       while (clickCount < maxClicks) {
         try {
-          // 더보기 버튼 클릭 작업에 30초 타임아웃 설정
-          const operationTimeout = 30000; // 30초
+          // 현재 리뷰 개수 확인 및 진행 상황 콜백
+          const currentReviewCount = await page.evaluate(() => {
+            return document.querySelectorAll('#_review_list li.place_apply_pui').length;
+          });
 
-          const currentReviewCount = await Promise.race([
-            page.evaluate(() => {
-              return document.querySelectorAll('#_review_list li.place_apply_pui').length;
-            }),
-            new Promise<number>((_, reject) =>
-              setTimeout(() => reject(new Error('리뷰 개수 확인 타임아웃')), operationTimeout)
-            )
-          ]);
-
-          console.log(`현재 로드된 리뷰 개수: ${currentReviewCount}`);
-
-          // 리뷰가 증가했을 때 크롤링 진행 상황 콜백 호출
-          if (currentReviewCount !== previousReviewCount && onCrawlProgress) {
-            onCrawlProgress(currentReviewCount, totalReviewCount || currentReviewCount);
+          if (currentReviewCount !== previousReviewCount) {
+            console.log(`현재 로드된 리뷰 개수: ${currentReviewCount}`);
+            if (onCrawlProgress) {
+              onCrawlProgress(currentReviewCount, totalReviewCount || currentReviewCount);
+            }
             previousReviewCount = currentReviewCount;
           }
 
-          const moreButtonExists = await Promise.race([
-            page.evaluate(() => {
-              const buttons = document.querySelectorAll('a.fvwqf');
-              for (let i = 0; i < buttons.length; i++) {
-                const button = buttons[i];
-                const text = button.textContent?.trim() || '';
+          // 100ms 대기 후 클릭
+          await new Promise(resolve => setTimeout(resolve, 100));
 
-                if (text.includes('펼쳐서 더보기') &&
-                    !text.includes('팔로우') &&
-                    !text.includes('follow') &&
-                    !text.includes('구독')) {
-                  return true;
-                }
+          // 더보기 버튼 클릭
+          const clicked = await page.evaluate(() => {
+            const buttons = document.querySelectorAll('a.fvwqf');
+            for (let i = 0; i < buttons.length; i++) {
+              const button = buttons[i];
+              const text = button.textContent?.trim() || '';
+              if (text.includes('펼쳐서 더보기') &&
+                  !text.includes('팔로우') &&
+                  !text.includes('follow') &&
+                  !text.includes('구독')) {
+                (button as HTMLElement).click();
+                return true;
               }
-              return false;
-            }),
-            new Promise<boolean>((_, reject) =>
-              setTimeout(() => reject(new Error('더보기 버튼 확인 타임아웃')), operationTimeout)
-            )
-          ]);
-
-          if (moreButtonExists) {
-            console.log(`리뷰 더보기 버튼 클릭 시도 ${clickCount + 1}/${maxClicks}`);
-
-            const clickResult = await Promise.race([
-              page.evaluate(() => {
-                const buttons = document.querySelectorAll('a.fvwqf');
-                for (let i = 0; i < buttons.length; i++) {
-                  const button = buttons[i];
-                  const text = button.textContent?.trim() || '';
-
-                  if (text.includes('펼쳐서 더보기') &&
-                      !text.includes('팔로우') &&
-                      !text.includes('follow') &&
-                      !text.includes('구독')) {
-                    (button as HTMLElement).click();
-                    return true;
-                  }
-                }
-                return false;
-              }),
-              new Promise<boolean>((_, reject) =>
-                setTimeout(() => reject(new Error('더보기 버튼 클릭 타임아웃')), operationTimeout)
-              )
-            ]);
-
-            if (clickResult) {
-              clickCount++;
-              errorCount = 0;  // 성공 시 에러 카운터 리셋
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            } else {
-              console.log('더보기 버튼 클릭 실패');
-              break;
             }
-          } else {
+            return false;
+          });
+
+          if (!clicked) {
             console.log('더보기 버튼을 찾을 수 없음, 모든 리뷰 로드 완료');
+            break;
+          }
+
+          clickCount++;
+          if (clickCount % 10 === 0) {
+            console.log(`리뷰 더보기 버튼 클릭: ${clickCount}/${maxClicks}`);
+          }
+
+          // 버튼이 다시 나타날 때까지 대기 (최대 5초, 100ms 폴링)
+          try {
+            await page.waitForFunction(findMoreButtonScript, {
+              timeout: 5000,
+              polling: 100
+            });
+          } catch {
+            // 타임아웃 = 더 이상 버튼 없음 (모든 리뷰 로드 완료)
+            console.log('더보기 버튼 대기 타임아웃, 모든 리뷰 로드 완료');
             break;
           }
 
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.log('더보기 버튼 클릭 중 오류:', errorMessage);
-
-          // 타임아웃 에러인 경우 즉시 중단
-          if (errorMessage.includes('타임아웃')) {
-            console.log('작업 타임아웃으로 크롤링 중단');
-            break;
-          }
-
-          errorCount++;  // 에러 카운터만 증가
-
-           if (errorCount >= 2) {
-            console.log('연속 2번 실패, 크롤링 중단');
-            break;
-          }
+          break;
         }
       }
 
@@ -928,111 +912,41 @@ class NaverCrawlerService {
         onCrawlProgress(loadedReviewCount, totalReviewCount || loadedReviewCount);
       }
 
-      // 🔥 스크롤 기반 이미지 로딩 (옵션 활성화 시)
+      // 🔥 스크롤 기반 DOM 로딩 (이미지 URL 추출용, 실제 이미지 로딩 불필요)
       if (enableScrollForImages) {
-        console.log('📸 스크롤 기반 이미지 로딩 시작...');
+        console.log('📸 스크롤 기반 DOM 로딩 시작...');
 
         const totalScrollItems = await page.evaluate(() => {
           return document.querySelectorAll('#_review_list li.place_apply_pui').length;
         });
 
-        // 브라우저 컨텍스트에 진행 상태를 저장할 변수 설정
-        await page.evaluate(() => {
-          (window as any).__scrollProgress = 0;
-        });
-
-        // 스크롤 작업 시작 (비동기) - Skip + 검증 방식
+        // 빠른 스크롤 (이미지 대기 없이 DOM만 로드)
         const scrollPromise = page.evaluate(() => {
           return new Promise<void>((resolve) => {
             const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
             let currentIndex = 0;
-            const SKIP_COUNT = 5; // 5개씩 건너뛰기 (성능 최적화)
-
-            // 이미지 로딩 대기 함수 (검증)
-            const waitForImagesLoaded = (element: Element): Promise<void> => {
-              return new Promise((resolveWait) => {
-                const images = element.querySelectorAll('img[data-src]');
-                if (images.length === 0) {
-                  resolveWait();
-                  return;
-                }
-
-                const maxWait = 500; // 최대 500ms 대기
-                const startTime = Date.now();
-                const checkInterval = 50; // 50ms마다 체크
-
-                const checkLoaded = () => {
-                  if (Date.now() - startTime >= maxWait) {
-                    // 타임아웃 - 더 이상 기다리지 않음
-                    resolveWait();
-                    return;
-                  }
-
-                  let allLoaded = true;
-                  images.forEach(img => {
-                    const dataSrc = img.getAttribute('data-src');
-                    const src = img.getAttribute('src');
-                    // data-src가 있지만 src가 없으면 아직 로딩 안 됨
-                    if (dataSrc && (!src || src.includes('blank.gif'))) {
-                      allLoaded = false;
-                    }
-                  });
-
-                  if (allLoaded) {
-                    resolveWait();
-                  } else {
-                    setTimeout(checkLoaded, checkInterval);
-                  }
-                };
-
-                checkLoaded();
-              });
-            };
+            const SKIP_COUNT = 10; // 10개씩 건너뛰기 (뷰포트 4000px 활용)
 
             const scrollToNext = () => {
               if (currentIndex >= reviewElements.length) {
-                console.log('✅ 모든 리뷰 스크롤 완료');
-                (window as any).__scrollProgress = reviewElements.length;
                 resolve();
                 return;
               }
 
               const element = reviewElements[currentIndex];
-              // 요소를 뷰포트 중앙으로 즉시 스크롤
               element.scrollIntoView({ behavior: 'instant', block: 'center' });
+              currentIndex += SKIP_COUNT;
 
-              // 이미지 로딩 검증 후 다음 스크롤
-              waitForImagesLoaded(element).then(() => {
-                currentIndex += SKIP_COUNT; // 건너뛰기
-                // 진행 상태 업데이트 (전체 개수 기준)
-                (window as any).__scrollProgress = Math.min(currentIndex, reviewElements.length);
-
-                // 다음 스크롤 (이미지 로딩이 끝났으므로 즉시 진행)
-                setTimeout(scrollToNext, 50);
-              });
+              // 다음 스크롤 (30ms만 대기 - DOM 업데이트용)
+              setTimeout(scrollToNext, 30);
             };
 
             scrollToNext();
           });
         });
 
-        // 스크롤 진행률 모니터링 (1초마다 체크)
-        const progressInterval = setInterval(async () => {
-          try {
-            if (!page) return;
-            const currentProgress = await page.evaluate(() => (window as any).__scrollProgress);
-            if (onImageProgress && currentProgress > 0) {
-              console.log(`📸 스크롤 진행률: ${currentProgress}/${totalScrollItems}`);
-            }
-          } catch (error) {
-            // 페이지가 닫혔거나 오류 발생 시 무시
-          }
-        }, 1000);
-
-        // 스크롤 작업 완료 대기
         await scrollPromise;
-        clearInterval(progressInterval);
-        console.log('✅ 스크롤 기반 이미지 로딩 완료');
+        console.log(`✅ 스크롤 완료 (${totalScrollItems}개 리뷰)`);
       }
 
       // 감정 키워드 더보기 버튼 클릭
