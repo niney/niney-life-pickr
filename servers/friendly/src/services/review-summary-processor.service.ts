@@ -192,8 +192,9 @@ export class ReviewSummaryProcessor {
         let retrySucceeded = 0;
         let retryFailed = 0;
 
-        // Cloud면 10건씩 배치, Local이면 1건씩 처리
-        const isCloud = serviceType === 'cloud';
+        // Production 환경이면 강제 Cloud, 아니면 기존 serviceType 사용
+        const isProduction = process.env.NODE_ENV === 'production';
+        const isCloud = isProduction || serviceType === 'cloud';
         const batchSize = isCloud ? 10 : 1;
         console.log(`  📦 ${isCloud ? 'Cloud' : 'Local'} 모드: ${batchSize}건씩 재시도`);
 
