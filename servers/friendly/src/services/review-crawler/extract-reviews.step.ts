@@ -116,22 +116,20 @@ const EXTRACT_REVIEWS_SCRIPT = `
             visitDate = timeElement.textContent?.trim() || null;
           }
         }
-
-        if (userName || reviewText) {
-          reviews.push({
-            userName,
-            visitKeywords,
-            waitTime,
-            reviewText,
-            emotionKeywords,
-            visitInfo: {
-              visitDate,
-              visitCount,
-              verificationMethod
-            },
-            imageUrls
-          });
-        }
+        
+        reviews.push({
+          userName,
+          visitKeywords,
+          waitTime,
+          reviewText,
+          emotionKeywords,
+          visitInfo: {
+            visitDate,
+            visitCount,
+            verificationMethod
+          },
+          imageUrls
+        });
       } catch (error) {
         console.error('리뷰 추출 중 오류:', error);
       }
