@@ -13,28 +13,44 @@ import { catchtableReviewSummaryProcessor } from '../services/catchtable-review-
  */
 const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
   /**
-   * POST /:restaurantId/reviews/crawl
-   * 캐치테이블 리뷰 크롤링 (백그라운드 실행)
+   * POST /:restaurantId/process
+   * 캐치테이블 통합 처리 (ID 저장 + 리뷰 크롤링 + 요약)
    */
   fastify.post(
-    '/:restaurantId/reviews/crawl',
+    '/:restaurantId/process',
     {
       schema: {
         tags: ['catchtable'],
-        summary: '캐치테이블 리뷰 크롤링',
+        summary: '캐치테이블 통합 처리',
         description:
-          '레스토랑의 catchtable_id를 사용하여 캐치테이블 API에서 리뷰를 수집합니다. 백그라운드에서 실행되며 Socket.io로 진행률을 전송합니다.',
+          '캐치테이블 ID 저장, 리뷰 크롤링, 요약을 옵션에 따라 처리합니다. ID 저장은 동기로, 크롤링/요약은 백그라운드로 실행됩니다.',
         params: Type.Object({
           restaurantId: Type.Number({ description: '레스토랑 ID' }),
         }),
+        body: Type.Object({
+          catchtableId: Type.Optional(
+            Type.Union([Type.String(), Type.Null()], {
+              description: '캐치테이블 ID (저장할 경우)',
+            })
+          ),
+          crawlReviews: Type.Optional(
+            Type.Boolean({ description: '리뷰 크롤링 여부', default: false })
+          ),
+          summarizeReviews: Type.Optional(
+            Type.Boolean({ description: '리뷰 요약 여부', default: false })
+          ),
+          useCloud: Type.Optional(
+            Type.Boolean({ description: 'Cloud AI 사용 여부', default: true })
+          ),
+        }),
         response: {
-          202: Type.Object({
+          200: Type.Object({
             result: Type.Boolean(),
             message: Type.String(),
             data: Type.Object({
-              jobId: Type.String({ description: 'Job ID' }),
-              restaurantId: Type.Number(),
-              catchtableId: Type.String(),
+              catchtableIdUpdated: Type.Boolean({ description: 'ID 저장 여부' }),
+              crawlJobId: Type.Optional(Type.String({ description: '크롤링 Job ID' })),
+              summarizeJobId: Type.Optional(Type.String({ description: '요약 Job ID' })),
             }),
             timestamp: Type.String(),
           }),
@@ -43,6 +59,17 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { restaurantId } = request.params as { restaurantId: number };
+      const {
+        catchtableId,
+        crawlReviews = false,
+        summarizeReviews = false,
+        useCloud = true,
+      } = (request.body || {}) as {
+        catchtableId?: string | null;
+        crawlReviews?: boolean;
+        summarizeReviews?: boolean;
+        useCloud?: boolean;
+      };
 
       try {
         // 1. 레스토랑 조회
@@ -51,60 +78,121 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
           return ResponseHelper.notFound(reply, `Restaurant not found: ${restaurantId}`);
         }
 
-        // 2. catchtable_id 확인
-        const catchtableId = restaurant.catchtable_id;
-        if (!catchtableId) {
-          return ResponseHelper.validationError(
-            reply,
-            `Restaurant ${restaurantId} does not have a catchtable_id`
-          );
+        const result: {
+          catchtableIdUpdated: boolean;
+          crawlJobId?: string;
+          summarizeJobId?: string;
+        } = {
+          catchtableIdUpdated: false,
+        };
+
+        // 2. 캐치테이블 ID 저장 (동기)
+        if (catchtableId !== undefined) {
+          await restaurantRepository.updateById(restaurantId, {
+            catchtable_id: catchtableId || null,
+          });
+          result.catchtableIdUpdated = true;
+          console.log(`[Catchtable] ID 저장 완료: restaurantId=${restaurantId}, catchtableId=${catchtableId}`);
         }
 
-        // 3. Job 시작
-        const jobId = await jobService.start({
-          restaurantId,
-          type: 'restaurant_crawl',
-          metadata: {
-            catchtableId,
-            task: 'catchtable_review_crawl',
-          },
-        });
+        // 사용할 catchtableId 결정 (새로 저장된 값 또는 기존 값)
+        const effectiveCatchtableId = catchtableId !== undefined ? catchtableId : restaurant.catchtable_id;
 
-        // 4. 백그라운드 실행 (비동기)
-        catchtableService
-          .crawlReviews(jobId, restaurantId, catchtableId)
-          .then(async (result) => {
-            // 완료
-            await jobService.complete(jobId, {
-              ...result,
-              completedAt: Date.now(),
-            });
-          })
-          .catch(async (error) => {
-            // 에러
-            console.error('[Catchtable] 크롤링 에러:', error);
-            await jobService.error(
-              jobId,
-              error instanceof Error ? error.message : 'Catchtable review crawling failed'
+        // 3. 리뷰 크롤링 (백그라운드)
+        if (crawlReviews) {
+          if (!effectiveCatchtableId) {
+            return ResponseHelper.validationError(
+              reply,
+              '리뷰 크롤링을 위해 캐치테이블 ID가 필요합니다'
             );
+          }
+
+          const crawlJobId = await jobService.start({
+            restaurantId,
+            type: 'restaurant_crawl',
+            metadata: {
+              catchtableId: effectiveCatchtableId,
+              task: 'catchtable_review_crawl',
+            },
           });
 
-        // 5. 즉시 응답 (202 Accepted)
+          result.crawlJobId = crawlJobId;
+
+          // 백그라운드 실행
+          catchtableService
+            .crawlReviews(crawlJobId, restaurantId, effectiveCatchtableId)
+            .then(async (crawlResult) => {
+              await jobService.complete(crawlJobId, {
+                ...crawlResult,
+                completedAt: Date.now(),
+              });
+            })
+            .catch(async (error) => {
+              console.error('[Catchtable] 크롤링 에러:', error);
+              await jobService.error(
+                crawlJobId,
+                error instanceof Error ? error.message : 'Catchtable review crawling failed'
+              );
+            });
+        }
+
+        // 4. 리뷰 요약 (백그라운드)
+        if (summarizeReviews) {
+          // 요약은 catchtableId가 없어도 기존 리뷰가 있으면 가능
+          const totalReviews = await catchtableReviewRepository.countByRestaurantId(restaurantId);
+
+          if (totalReviews === 0 && !crawlReviews) {
+            return ResponseHelper.validationError(
+              reply,
+              '요약할 캐치테이블 리뷰가 없습니다'
+            );
+          }
+
+          const summarizeJobId = await jobService.start({
+            restaurantId,
+            type: 'restaurant_crawl',
+            metadata: {
+              task: 'catchtable_review_summary',
+              useCloud,
+            },
+          });
+
+          result.summarizeJobId = summarizeJobId;
+
+          // 백그라운드 실행
+          catchtableReviewSummaryProcessor
+            .processWithJobId(summarizeJobId, restaurantId, useCloud)
+            .then(async (summaryResult) => {
+              await jobService.complete(summarizeJobId, {
+                ...summaryResult,
+                completedAt: Date.now(),
+              });
+            })
+            .catch(async (error) => {
+              console.error('[Catchtable] 요약 에러:', error);
+              await jobService.error(
+                summarizeJobId,
+                error instanceof Error ? error.message : 'Catchtable review summarization failed'
+              );
+            });
+        }
+
+        // 5. 응답
+        const messages: string[] = [];
+        if (result.catchtableIdUpdated) messages.push('ID 저장 완료');
+        if (result.crawlJobId) messages.push('크롤링 시작');
+        if (result.summarizeJobId) messages.push('요약 시작');
+
         return ResponseHelper.success(
           reply,
-          {
-            jobId,
-            restaurantId,
-            catchtableId,
-          },
-          '캐치테이블 리뷰 크롤링이 시작되었습니다',
-          202
+          result,
+          messages.length > 0 ? messages.join(', ') : '처리할 작업이 없습니다'
         );
       } catch (error) {
-        console.error('[Catchtable] 라우트 에러:', error);
+        console.error('[Catchtable] 통합 처리 에러:', error);
         return ResponseHelper.error(
           reply,
-          error instanceof Error ? error.message : 'Failed to start catchtable review crawling',
+          error instanceof Error ? error.message : 'Failed to process catchtable',
           500
         );
       }
@@ -171,111 +259,6 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
         return ResponseHelper.error(
           reply,
           error instanceof Error ? error.message : 'Failed to get summary status',
-          500
-        );
-      }
-    }
-  );
-
-  /**
-   * POST /:restaurantId/reviews/summarize
-   * 캐치테이블 리뷰 요약 시작 (백그라운드 실행)
-   */
-  fastify.post(
-    '/:restaurantId/reviews/summarize',
-    {
-      schema: {
-        tags: ['catchtable'],
-        summary: '캐치테이블 리뷰 요약 시작',
-        description:
-          '레스토랑의 캐치테이블 리뷰를 AI로 요약합니다. 백그라운드에서 실행되며 Socket.io로 진행률을 전송합니다.',
-        params: Type.Object({
-          restaurantId: Type.Number({ description: '레스토랑 ID' }),
-        }),
-        body: Type.Object({
-          useCloud: Type.Optional(
-            Type.Boolean({ description: 'Cloud AI 사용 여부 (기본: false)', default: false })
-          ),
-        }),
-        response: {
-          202: Type.Object({
-            result: Type.Boolean(),
-            message: Type.String(),
-            data: Type.Object({
-              jobId: Type.String({ description: 'Job ID' }),
-              restaurantId: Type.Number(),
-              totalToProcess: Type.Number({ description: '처리할 리뷰 수' }),
-            }),
-            timestamp: Type.String(),
-          }),
-        },
-      },
-    },
-    async (request, reply) => {
-      const { restaurantId } = request.params as { restaurantId: number };
-      const { useCloud = true } = (request.body || {}) as { useCloud?: boolean };
-
-      try {
-        // 1. 레스토랑 확인
-        const restaurant = await restaurantRepository.findById(restaurantId);
-        if (!restaurant) {
-          return ResponseHelper.notFound(reply, `Restaurant not found: ${restaurantId}`);
-        }
-
-        // 2. 처리할 리뷰 수 확인
-        const totalReviews = await catchtableReviewRepository.countByRestaurantId(restaurantId);
-        if (totalReviews === 0) {
-          return ResponseHelper.validationError(
-            reply,
-            `Restaurant ${restaurantId} has no catchtable reviews to summarize`
-          );
-        }
-
-        // 3. Job 시작
-        const jobId = await jobService.start({
-          restaurantId,
-          type: 'restaurant_crawl',
-          metadata: {
-            task: 'catchtable_review_summary',
-            useCloud,
-          },
-        });
-
-        // 4. 백그라운드 실행 (비동기)
-        catchtableReviewSummaryProcessor
-          .processWithJobId(jobId, restaurantId, useCloud)
-          .then(async (result) => {
-            // 완료
-            await jobService.complete(jobId, {
-              ...result,
-              completedAt: Date.now(),
-            });
-          })
-          .catch(async (error) => {
-            // 에러
-            console.error('[Catchtable] 요약 에러:', error);
-            await jobService.error(
-              jobId,
-              error instanceof Error ? error.message : 'Catchtable review summarization failed'
-            );
-          });
-
-        // 5. 즉시 응답 (202 Accepted)
-        return ResponseHelper.success(
-          reply,
-          {
-            jobId,
-            restaurantId,
-            totalToProcess: totalReviews,
-          },
-          '캐치테이블 리뷰 요약이 시작되었습니다',
-          202
-        );
-      } catch (error) {
-        console.error('[Catchtable] 요약 라우트 에러:', error);
-        return ResponseHelper.error(
-          reply,
-          error instanceof Error ? error.message : 'Failed to start catchtable review summarization',
           500
         );
       }

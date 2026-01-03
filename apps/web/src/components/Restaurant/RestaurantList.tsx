@@ -126,47 +126,19 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     if (!selectedRestaurant) return
 
     try {
-      // ✅ 캐치테이블 ID 업데이트 (독립적으로 처리)
-      if (options.catchtableId !== undefined) {
-        const updateResponse = await apiService.updateRestaurant(selectedRestaurant.id, {
-          catchtable_id: options.catchtableId || null
-        })
-
-        if (!updateResponse.result) {
-          Alert.error('캐치테이블 ID 업데이트 실패', updateResponse.message || '업데이트에 실패했습니다')
-        } else if (updateResponse.data && onRestaurantUpdate) {
-          // 업데이트된 레스토랑 정보로 로컬 상태 업데이트
-          onRestaurantUpdate(updateResponse.data)
-        }
-      }
-
-      // ✅ 캐치테이블 리뷰 크롤링 (독립적으로 처리)
-      if (options.crawlCatchtableReviews) {
+      // ✅ 캐치테이블 통합 처리 (ID 저장 + 리뷰 크롤링 + 요약)
+      if (options.catchtableId !== undefined || options.crawlCatchtableReviews || options.summarizeCatchtableReviews) {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
-        const response = await fetch(`${API_URL}/api/catchtable/${selectedRestaurant.id}/reviews/crawl`, {
-          method: 'POST',
-          credentials: 'include',
-        })
-
-        const data = await response.json()
-
-        if (!response.ok || !data.result) {
-          Alert.error('캐치테이블 리뷰 크롤링 실패', data.message || '크롤링에 실패했습니다')
-        } else {
-          console.log(`[Catchtable] 리뷰 크롤링 시작: jobId=${data.data?.jobId}`)
-        }
-      }
-
-      // ✅ 캐치테이블 리뷰 요약 (독립적으로 처리)
-      if (options.summarizeCatchtableReviews) {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
-        const response = await fetch(`${API_URL}/api/catchtable/${selectedRestaurant.id}/reviews/summarize`, {
+        const response = await fetch(`${API_URL}/api/catchtable/${selectedRestaurant.id}/process`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
           body: JSON.stringify({
+            catchtableId: options.catchtableId,
+            crawlReviews: options.crawlCatchtableReviews || false,
+            summarizeReviews: options.summarizeCatchtableReviews || false,
             useCloud: true,
           }),
         })
@@ -174,9 +146,17 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         const data = await response.json()
 
         if (!response.ok || !data.result) {
-          Alert.error('캐치테이블 리뷰 요약 실패', data.message || '요약에 실패했습니다')
+          Alert.error('캐치테이블 처리 실패', data.message || '처리에 실패했습니다')
         } else {
-          console.log(`[Catchtable] 리뷰 요약 시작: jobId=${data.data?.jobId}, totalToProcess=${data.data?.totalToProcess}`)
+          console.log(`[Catchtable] 처리 완료:`, data.data)
+
+          // ID가 업데이트되었으면 로컬 상태 업데이트
+          if (data.data?.catchtableIdUpdated && onRestaurantUpdate) {
+            onRestaurantUpdate({
+              ...selectedRestaurant,
+              catchtable_id: options.catchtableId || null,
+            })
+          }
         }
       }
 
