@@ -25,6 +25,9 @@ export const SOCKET_EVENTS = {
   REVIEW_SUMMARY_PROGRESS: 'review_summary:progress',
   REVIEW_SUMMARY_ERROR: 'review_summary:error',
   REVIEW_SUMMARY_INTERRUPTED: 'review_summary:interrupted',
+
+  // 캐치테이블 리뷰 크롤링 이벤트
+  CATCHTABLE_REVIEW_PROGRESS: 'catchtable:review_progress',
 } as const;
 
 export type SocketEventType = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];
