@@ -33,4 +33,5 @@ export type {
   RestaurantSearchRequest,
   CatchtableReviewData,
   CatchtableReviewListResponse,
+  CatchtableReviewSummary,
 } from './api.service';

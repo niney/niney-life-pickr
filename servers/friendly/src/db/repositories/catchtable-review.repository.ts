@@ -122,6 +122,25 @@ export class CatchtableReviewRepository {
       [restaurantId, limit, offset]
     );
   }
+
+  /**
+   * 레스토랑의 리뷰 페이지네이션 조회 (요약 포함)
+   */
+  async findByRestaurantIdPaginatedWithSummary(
+    restaurantId: number,
+    limit: number,
+    offset: number
+  ): Promise<(CatchtableReviewDB & { summary_data: string | null })[]> {
+    return await db.all<CatchtableReviewDB & { summary_data: string | null }>(
+      `SELECT r.*, s.summary_data
+       FROM catchtable_reviews r
+       LEFT JOIN catchtable_review_summaries s ON r.id = s.review_id AND s.status = 'completed'
+       WHERE r.restaurant_id = ?
+       ORDER BY r.reg_date DESC
+       LIMIT ? OFFSET ?`,
+      [restaurantId, limit, offset]
+    );
+  }
 }
 
 export const catchtableReviewRepository = new CatchtableReviewRepository();

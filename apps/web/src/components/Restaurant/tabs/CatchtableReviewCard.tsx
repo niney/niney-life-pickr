@@ -391,6 +391,200 @@ const CatchtableReviewCard: React.FC<CatchtableReviewCardProps> = ({ review }) =
         </div>
       </div>
 
+      {/* AI 요약 섹션 */}
+      {review.summary && review.summary.summary !== '요약 내용이 없습니다' && (
+        <div
+          style={{
+            margin: '0 20px 16px',
+            padding: 16,
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)'
+              : 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.03) 100%)',
+            borderRadius: 12,
+            border: `1px solid ${isDark ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.15)'}`,
+          }}
+        >
+          {/* 헤더 */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>🤖</span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: '#8B5CF6',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                AI 요약
+              </span>
+            </div>
+            {/* 감정 뱃지 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {review.summary.satisfactionScore !== null && review.summary.satisfactionScore > 0 && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: review.summary.satisfactionScore >= 70 ? '#10B981' : review.summary.satisfactionScore >= 40 ? '#F59E0B' : '#EF4444',
+                  }}
+                >
+                  만족도 {review.summary.satisfactionScore}%
+                </span>
+              )}
+              <span
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: '600',
+                  backgroundColor:
+                    review.summary.sentiment === 'positive'
+                      ? isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)'
+                      : review.summary.sentiment === 'negative'
+                        ? isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.15)'
+                        : isDark ? 'rgba(156, 163, 175, 0.2)' : 'rgba(156, 163, 175, 0.15)',
+                  color:
+                    review.summary.sentiment === 'positive'
+                      ? '#10B981'
+                      : review.summary.sentiment === 'negative'
+                        ? '#EF4444'
+                        : colors.textSecondary,
+                }}
+              >
+                {review.summary.sentiment === 'positive' ? '긍정' : review.summary.sentiment === 'negative' ? '부정' : '중립'}
+              </span>
+            </div>
+          </div>
+
+          {/* 요약 내용 */}
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: colors.text,
+            }}
+          >
+            {review.summary.summary}
+          </p>
+
+          {/* 키워드 */}
+          {review.summary.keyKeywords.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 6,
+                marginTop: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              {review.summary.keyKeywords.map((keyword, idx) => (
+                <span
+                  key={idx}
+                  style={{
+                    padding: '3px 8px',
+                    backgroundColor: isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.1)',
+                    color: '#6366F1',
+                    fontSize: 11,
+                    borderRadius: 4,
+                    fontWeight: '500',
+                  }}
+                >
+                  #{keyword}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 메뉴 아이템 */}
+          {review.summary.menuItems && review.summary.menuItems.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: '600',
+                  color: colors.textSecondary,
+                  marginBottom: 6,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                언급된 메뉴
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {review.summary.menuItems.map((item, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: '500',
+                      backgroundColor:
+                        item.sentiment === 'positive'
+                          ? isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)'
+                          : item.sentiment === 'negative'
+                            ? isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)'
+                            : isDark ? 'rgba(156, 163, 175, 0.15)' : 'rgba(156, 163, 175, 0.1)',
+                      color:
+                        item.sentiment === 'positive'
+                          ? '#10B981'
+                          : item.sentiment === 'negative'
+                            ? '#EF4444'
+                            : colors.textSecondary,
+                    }}
+                    title={item.reason || ''}
+                  >
+                    {item.sentiment === 'positive' ? '👍 ' : item.sentiment === 'negative' ? '👎 ' : ''}
+                    {item.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 팁 */}
+          {review.summary.tips && review.summary.tips.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: '600',
+                  color: colors.textSecondary,
+                  marginBottom: 6,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                💡 팁
+              </div>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 16,
+                  fontSize: 12,
+                  color: colors.textSecondary,
+                  lineHeight: 1.6,
+                }}
+              >
+                {review.summary.tips.map((tip, idx) => (
+                  <li key={idx}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 사장님 답글 */}
       {review.boss_reply && (
         <div

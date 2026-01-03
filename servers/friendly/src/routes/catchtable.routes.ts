@@ -256,6 +256,30 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
                   crawled_at: Type.String(),
                   created_at: Type.String(),
                   updated_at: Type.String(),
+                  summary: Type.Optional(Type.Union([
+                    Type.Object({
+                      summary: Type.String(),
+                      keyKeywords: Type.Array(Type.String()),
+                      sentiment: Type.Union([
+                        Type.Literal('positive'),
+                        Type.Literal('negative'),
+                        Type.Literal('neutral'),
+                      ]),
+                      sentimentReason: Type.String(),
+                      satisfactionScore: Type.Union([Type.Number(), Type.Null()]),
+                      tips: Type.Array(Type.String()),
+                      menuItems: Type.Array(Type.Object({
+                        name: Type.String(),
+                        sentiment: Type.Union([
+                          Type.Literal('positive'),
+                          Type.Literal('negative'),
+                          Type.Literal('neutral'),
+                        ]),
+                        reason: Type.Optional(Type.String()),
+                      })),
+                    }),
+                    Type.Null(),
+                  ])),
                 })
               ),
               pagination: Type.Object({
@@ -284,12 +308,24 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
         // 전체 개수 조회
         const total = await catchtableReviewRepository.countByRestaurantId(restaurantId);
 
-        // 리뷰 리스트 조회
-        const reviews = await catchtableReviewRepository.findByRestaurantIdPaginated(
+        // 리뷰 리스트 조회 (요약 포함)
+        const reviewsWithSummary = await catchtableReviewRepository.findByRestaurantIdPaginatedWithSummary(
           restaurantId,
           limit,
           offset
         );
+
+        // summary_data JSON 파싱
+        const reviews = reviewsWithSummary.map(({ summary_data, ...review }) => ({
+          ...review,
+          summary: summary_data ? (() => {
+            try {
+              return JSON.parse(summary_data);
+            } catch {
+              return null;
+            }
+          })() : null,
+        }));
 
         return ResponseHelper.success(reply, {
           reviews,

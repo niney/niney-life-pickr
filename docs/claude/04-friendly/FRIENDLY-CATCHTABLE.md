@@ -1,6 +1,6 @@
 # FRIENDLY-CATCHTABLE.md
 
-> **Last Updated**: 2025-01-04
+> **Last Updated**: 2026-01-04
 > **Purpose**: 캐치테이블 리뷰 크롤링 및 AI 요약
 
 ---
@@ -64,7 +64,7 @@
 
 **Endpoint**: `GET /api/catchtable/:restaurantId/reviews`
 
-레스토랑의 캐치테이블 리뷰 리스트를 페이지네이션하여 조회합니다.
+레스토랑의 캐치테이블 리뷰 리스트를 페이지네이션하여 조회합니다. AI 요약 데이터가 있으면 함께 반환합니다.
 
 **Query Parameters**:
 | Parameter | Type | Default | Description |
@@ -94,7 +94,18 @@
         "like_cnt": 5,
         "crawled_at": "2025-01-04T12:00:00",
         "created_at": "2025-01-04T12:00:00",
-        "updated_at": "2025-01-04T12:00:00"
+        "updated_at": "2025-01-04T12:00:00",
+        "summary": {
+          "summary": "전통주와 안주가 훌륭해 여름에 마시기 딱 좋았으며...",
+          "keyKeywords": ["전통주", "안주맛", "서비스우수"],
+          "sentiment": "positive",
+          "sentimentReason": "맛과 분위기, 서비스 모두 훌륭했기 때문",
+          "satisfactionScore": 100,
+          "tips": ["여름에 마시기 좋은 전통주 추천"],
+          "menuItems": [
+            { "name": "남산의 밤", "sentiment": "positive", "reason": "맛있음" }
+          ]
+        }
       }
     ],
     "pagination": {
@@ -107,6 +118,19 @@
   "timestamp": "2025-01-04T12:00:00.000Z"
 }
 ```
+
+### Summary 필드 구조
+| Field | Type | Description |
+|-------|------|-------------|
+| `summary` | string | AI 요약 텍스트 |
+| `keyKeywords` | string[] | 핵심 키워드 |
+| `sentiment` | string | 감정 (positive/negative/neutral) |
+| `sentimentReason` | string | 감정 판단 이유 |
+| `satisfactionScore` | number | 만족도 점수 (0-100) |
+| `tips` | string[] | 방문 팁 |
+| `menuItems` | array | 언급된 메뉴 목록 |
+
+> **Note**: `summary`가 "요약 내용이 없습니다"인 경우 UI에서 미표시 처리
 
 ---
 
@@ -354,6 +378,32 @@ const { catchtableSummaryProgress } = useSocket();
     title="🍽️ 캐치테이블 리뷰 요약 중..."
   />
 )}
+```
+
+### 캡리뷰 탭 (CatchtableReviewTab)
+
+**위치**: `apps/web/src/components/Restaurant/tabs/`
+
+**구성 파일**:
+- `CatchtableReviewTab.tsx` - 탭 컴포넌트
+- `CatchtableReviewCard.tsx` - 리뷰 카드 컴포넌트
+
+**커스텀 훅**: `useCatchtableReviews.ts`
+```typescript
+const {
+  catchtableReviews,
+  catchtableReviewsLoading,
+  catchtableReviewsTotal,
+  hasMoreCatchtableReviews,
+  fetchCatchtableReviews,
+  loadMoreCatchtableReviews,
+  resetCatchtableReviews,
+} = useCatchtableReviews();
+```
+
+**TabMenu 타입**:
+```typescript
+type TabType = 'menu' | 'review' | 'catchtable' | 'statistics' | 'map' | 'vworld'
 ```
 
 ### RecrawlModal 옵션

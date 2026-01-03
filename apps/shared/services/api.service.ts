@@ -272,6 +272,21 @@ export interface RestaurantRankingsResponse {
   rankings: RestaurantRanking[];
 }
 
+// 캐치테이블 리뷰 요약 타입
+export interface CatchtableReviewSummary {
+  summary: string;
+  keyKeywords: string[];
+  sentiment: 'positive' | 'negative' | 'neutral';
+  sentimentReason: string;
+  satisfactionScore: number | null;
+  tips: string[];
+  menuItems: Array<{
+    name: string;
+    sentiment: 'positive' | 'negative' | 'neutral';
+    reason?: string;
+  }>;
+}
+
 // 캐치테이블 리뷰 관련 타입
 export interface CatchtableReviewData {
   id: number;
@@ -302,6 +317,7 @@ export interface CatchtableReviewData {
   crawled_at: string;
   created_at: string;
   updated_at: string;
+  summary?: CatchtableReviewSummary | null;
 }
 
 export interface CatchtableReviewListResponse {
