@@ -3,13 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 
-export type TabType = 'menu' | 'review' | 'statistics' | 'map' | 'vworld'
+export type TabType = 'menu' | 'review' | 'catchtable' | 'statistics' | 'map' | 'vworld'
 
 interface TabMenuProps {
   activeTab: TabType
   onTabChange: (tab: TabType) => void
   menuCount: number
   reviewCount: number
+  catchtableReviewCount?: number
 }
 
 const TabMenu: React.FC<TabMenuProps> = ({
@@ -17,6 +18,7 @@ const TabMenu: React.FC<TabMenuProps> = ({
   onTabChange,
   menuCount,
   reviewCount,
+  catchtableReviewCount = 0,
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
@@ -24,6 +26,7 @@ const TabMenu: React.FC<TabMenuProps> = ({
   const tabs: Array<{ key: TabType; label: string }> = [
     { key: 'menu', label: `메뉴 ${menuCount > 0 ? `(${menuCount})` : ''}` },
     { key: 'review', label: `리뷰 (${reviewCount})` },
+    { key: 'catchtable', label: `캡리뷰 ${catchtableReviewCount > 0 ? `(${catchtableReviewCount})` : ''}` },
     { key: 'statistics', label: '📊 통계' },
     { key: 'map', label: '🗺️ 네이버맵' },
     { key: 'vworld', label: '🌏 VWorld' },

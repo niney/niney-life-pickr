@@ -31,4 +31,6 @@ export type {
   NaverPlaceItem,
   NaverPlaceSearchResult,
   RestaurantSearchRequest,
+  CatchtableReviewData,
+  CatchtableReviewListResponse,
 } from './api.service';

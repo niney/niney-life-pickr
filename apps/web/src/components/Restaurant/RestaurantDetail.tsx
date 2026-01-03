@@ -16,12 +16,14 @@ import MapTab from './tabs/MapTab'
 import VworldMapTab from './tabs/VworldMapTab'
 import StatisticsTab from './tabs/StatisticsTab'
 import ReviewTab from './tabs/ReviewTab'
+import CatchtableReviewTab from './tabs/CatchtableReviewTab'
 import ResummaryModal from './modals/ResummaryModal'
 
 // 커스텀 훅 임포트
 import { useMenuStatistics } from './hooks/useMenuStatistics'
 import { useResummary } from './hooks/useResummary'
 import { useKeywordToggle } from './hooks/useKeywordToggle'
+import { useCatchtableReviews } from './hooks/useCatchtableReviews'
 
 // 유틸 함수 임포트
 import { openNaverMap } from './utils/openNaverMap'
@@ -83,6 +85,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     handleResummarize,
   } = useResummary()
 
+  const {
+    catchtableReviews,
+    catchtableReviewsLoading,
+    catchtableReviewsTotal,
+    hasMoreCatchtableReviews,
+    fetchCatchtableReviews,
+    loadMoreCatchtableReviews,
+    resetCatchtableReviews,
+  } = useCatchtableReviews()
+
   // 독립적으로 데이터 로드
   const {
     id,
@@ -142,6 +154,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     if (id) {
       // 레스토랑 변경 시 통계 데이터 초기화
       setMenuStatistics(null)
+      // 레스토랑 변경 시 캐치테이블 리뷰 초기화
+      resetCatchtableReviews()
 
       // 레스토랑 변경 시 스크롤 초기화
       if (scrollContainerRef.current) {
@@ -175,6 +189,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
       }
     }
   }, [activeTab, id, fetchMenuStatistics, fetchReviewStatistics])
+
+  // 캡리뷰 탭 활성화 시 데이터 로드
+  useEffect(() => {
+    if (activeTab === 'catchtable' && id) {
+      const restaurantId = parseInt(id, 10)
+      if (!isNaN(restaurantId) && catchtableReviews.length === 0 && !catchtableReviewsLoading) {
+        fetchCatchtableReviews(restaurantId)
+      }
+    }
+  }, [activeTab, id, catchtableReviews.length, catchtableReviewsLoading, fetchCatchtableReviews])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {
@@ -312,6 +336,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         onTabChange={handleTabChange}
         menuCount={menus.length}
         reviewCount={reviewsTotal}
+        catchtableReviewCount={catchtableReviewsTotal}
       />
 
       {/* 감정 필터 (리뷰 탭에서만 표시) */}
@@ -349,6 +374,24 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
             }}
             onResummary={openResummaryModal}
             onToggleKeywords={toggleKeywords}
+            loadMoreTriggerRef={loadMoreTriggerRef}
+          />
+        )}
+
+        {/* 캡리뷰 탭 (캐치테이블 리뷰) */}
+        {activeTab === 'catchtable' && id && (
+          <CatchtableReviewTab
+            reviews={catchtableReviews}
+            reviewsLoading={catchtableReviewsLoading}
+            reviewsTotal={catchtableReviewsTotal}
+            hasMoreReviews={hasMoreCatchtableReviews}
+            isMobile={isMobile}
+            onLoadMore={() => {
+              const restaurantId = parseInt(id, 10)
+              if (!isNaN(restaurantId)) {
+                loadMoreCatchtableReviews(restaurantId)
+              }
+            }}
             loadMoreTriggerRef={loadMoreTriggerRef}
           />
         )}

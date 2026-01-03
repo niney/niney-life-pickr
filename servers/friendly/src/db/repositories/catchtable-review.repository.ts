@@ -108,6 +108,20 @@ export class CatchtableReviewRepository {
       [restaurantId]
     );
   }
+
+  /**
+   * 레스토랑의 리뷰 페이지네이션 조회
+   */
+  async findByRestaurantIdPaginated(
+    restaurantId: number,
+    limit: number,
+    offset: number
+  ): Promise<CatchtableReviewDB[]> {
+    return await db.all<CatchtableReviewDB>(
+      'SELECT * FROM catchtable_reviews WHERE restaurant_id = ? ORDER BY reg_date DESC LIMIT ? OFFSET ?',
+      [restaurantId, limit, offset]
+    );
+  }
 }
 
 export const catchtableReviewRepository = new CatchtableReviewRepository();

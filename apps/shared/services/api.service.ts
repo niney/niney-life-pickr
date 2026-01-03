@@ -272,6 +272,48 @@ export interface RestaurantRankingsResponse {
   rankings: RestaurantRanking[];
 }
 
+// 캐치테이블 리뷰 관련 타입
+export interface CatchtableReviewData {
+  id: number;
+  restaurant_id: number;
+  article_seq: number | null;
+  is_editable: number;
+  reg_date: number | null;
+  writer_identifier: string | null;
+  writer_display_name: string | null;
+  writer_profile_thumb_url: string | null;
+  writer_grade: string | null;
+  writer_total_review_cnt: number | null;
+  writer_total_avg_score: number | null;
+  boss_reply: string | null;
+  total_score: number | null;
+  taste_score: number | null;
+  mood_score: number | null;
+  service_score: number | null;
+  review_content: string | null;
+  review_comment: string | null;
+  reservation_type: string | null;
+  is_take_out: number;
+  food_type_code: string | null;
+  food_type_label: string | null;
+  reply_cnt: number;
+  like_cnt: number;
+  is_liked: number;
+  crawled_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CatchtableReviewListResponse {
+  reviews: CatchtableReviewData[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
 // 네이버 플레이스 검색 관련 타입
 export interface NaverPlaceItem {
   name: string;
@@ -722,6 +764,20 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(params),
     });
+  }
+
+  /**
+   * 캐치테이블 리뷰 목록 조회
+   */
+  async getCatchtableReviews(
+    restaurantId: number,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<ApiResponse<CatchtableReviewListResponse>> {
+    return this.request<CatchtableReviewListResponse>(
+      `/api/catchtable/${restaurantId}/reviews?limit=${limit}&offset=${offset}`,
+      { method: 'GET' }
+    );
   }
 }
 

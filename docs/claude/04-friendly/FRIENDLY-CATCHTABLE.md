@@ -19,6 +19,7 @@
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/catchtable/:restaurantId/process` | POST | 통합 처리 (ID 저장 + 크롤링 + 요약) |
+| `/api/catchtable/:restaurantId/reviews` | GET | 리뷰 리스트 조회 (페이지네이션) |
 | `/api/catchtable/:restaurantId/reviews/summary/status` | GET | 요약 상태 조회 |
 
 ---
@@ -59,7 +60,57 @@
 
 ---
 
-## 2. 요약 상태 조회
+## 2. 리뷰 리스트 조회
+
+**Endpoint**: `GET /api/catchtable/:restaurantId/reviews`
+
+레스토랑의 캐치테이블 리뷰 리스트를 페이지네이션하여 조회합니다.
+
+**Query Parameters**:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | 20 | 조회 개수 (1-100) |
+| `offset` | number | 0 | 조회 시작 위치 |
+
+**Response**:
+```json
+{
+  "result": true,
+  "message": "Success",
+  "data": {
+    "reviews": [
+      {
+        "id": 12345,
+        "restaurant_id": 1,
+        "reg_date": 1704067200000,
+        "writer_display_name": "홍길동",
+        "total_score": 4.5,
+        "taste_score": 5.0,
+        "mood_score": 4.0,
+        "service_score": 4.5,
+        "review_content": "음식이 정말 맛있었어요!",
+        "boss_reply": "감사합니다!",
+        "reply_cnt": 1,
+        "like_cnt": 5,
+        "crawled_at": "2025-01-04T12:00:00",
+        "created_at": "2025-01-04T12:00:00",
+        "updated_at": "2025-01-04T12:00:00"
+      }
+    ],
+    "pagination": {
+      "total": 150,
+      "limit": 20,
+      "offset": 0,
+      "hasMore": true
+    }
+  },
+  "timestamp": "2025-01-04T12:00:00.000Z"
+}
+```
+
+---
+
+## 3. 요약 상태 조회
 
 **Endpoint**: `GET /api/catchtable/:restaurantId/reviews/summary/status`
 
@@ -78,7 +129,7 @@
 
 ---
 
-## 3. Socket.io 이벤트
+## 4. Socket.io 이벤트
 
 ### 리뷰 크롤링 진행률
 ```typescript
@@ -129,7 +180,7 @@
 
 ---
 
-## 4. 데이터베이스 스키마
+## 5. 데이터베이스 스키마
 
 ### catchtable_reviews 테이블
 ```sql
@@ -189,7 +240,7 @@ CREATE TABLE catchtable_review_summaries (
 
 ---
 
-## 5. 타입 정의
+## 6. 타입 정의
 
 ### CatchtableApiReview (API 응답)
 ```typescript
@@ -244,7 +295,7 @@ interface CatchtableReviewInput {
 
 ---
 
-## 6. 크롤링 설정
+## 7. 크롤링 설정
 
 **상수** (`catchtable.service.ts`):
 ```typescript
@@ -261,7 +312,7 @@ GET https://ct-api.catchtable.co.kr/api/review/v1/shops/{catchtableId}/reviews?p
 
 ---
 
-## 7. AI 요약 설정
+## 8. AI 요약 설정
 
 **서비스**: `CatchtableReviewSummaryService` (UnifiedOllamaService 상속)
 
@@ -285,7 +336,7 @@ GET https://ct-api.catchtable.co.kr/api/review/v1/shops/{catchtableId}/reviews?p
 
 ---
 
-## 8. 클라이언트 연동
+## 9. 클라이언트 연동
 
 ### SocketContext (apps/shared)
 ```typescript
@@ -316,7 +367,7 @@ const { catchtableSummaryProgress } = useSocket();
 
 ---
 
-## 9. 관련 문서
+## 10. 관련 문서
 
 - [FRIENDLY-JOB-SOCKET](./FRIENDLY-JOB-SOCKET.md) - Job + Socket.io 통합
 - [FRIENDLY-REVIEW-SUMMARY](./FRIENDLY-REVIEW-SUMMARY.md) - 네이버 리뷰 요약

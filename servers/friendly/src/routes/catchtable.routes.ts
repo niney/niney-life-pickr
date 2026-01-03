@@ -200,6 +200,118 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * GET /:restaurantId/reviews
+   * 캐치테이블 리뷰 리스트 조회
+   */
+  fastify.get(
+    '/:restaurantId/reviews',
+    {
+      schema: {
+        tags: ['catchtable'],
+        summary: '캐치테이블 리뷰 리스트 조회',
+        description: '레스토랑의 캐치테이블 리뷰 리스트를 페이지네이션하여 조회합니다.',
+        params: Type.Object({
+          restaurantId: Type.Number({ description: '레스토랑 ID' }),
+        }),
+        querystring: Type.Object({
+          limit: Type.Optional(
+            Type.Number({ description: '조회 개수 (기본: 20, 최대: 100)', default: 20, minimum: 1, maximum: 100 })
+          ),
+          offset: Type.Optional(
+            Type.Number({ description: '조회 시작 위치 (기본: 0)', default: 0, minimum: 0 })
+          ),
+        }),
+        response: {
+          200: Type.Object({
+            result: Type.Boolean(),
+            message: Type.String(),
+            data: Type.Object({
+              reviews: Type.Array(
+                Type.Object({
+                  id: Type.Number({ description: '리뷰 ID (reviewSeq)' }),
+                  restaurant_id: Type.Number({ description: '레스토랑 ID' }),
+                  article_seq: Type.Union([Type.Number(), Type.Null()]),
+                  is_editable: Type.Number(),
+                  reg_date: Type.Union([Type.Number(), Type.Null()], { description: '작성일 (Unix timestamp)' }),
+                  writer_identifier: Type.Union([Type.String(), Type.Null()]),
+                  writer_display_name: Type.Union([Type.String(), Type.Null()], { description: '작성자 이름' }),
+                  writer_profile_thumb_url: Type.Union([Type.String(), Type.Null()]),
+                  writer_grade: Type.Union([Type.String(), Type.Null()]),
+                  writer_total_review_cnt: Type.Union([Type.Number(), Type.Null()]),
+                  writer_total_avg_score: Type.Union([Type.Number(), Type.Null()]),
+                  boss_reply: Type.Union([Type.String(), Type.Null()], { description: '사장님 답글' }),
+                  total_score: Type.Union([Type.Number(), Type.Null()], { description: '총점' }),
+                  taste_score: Type.Union([Type.Number(), Type.Null()], { description: '맛 점수' }),
+                  mood_score: Type.Union([Type.Number(), Type.Null()], { description: '분위기 점수' }),
+                  service_score: Type.Union([Type.Number(), Type.Null()], { description: '서비스 점수' }),
+                  review_content: Type.Union([Type.String(), Type.Null()], { description: '리뷰 내용' }),
+                  review_comment: Type.Union([Type.String(), Type.Null()]),
+                  reservation_type: Type.Union([Type.String(), Type.Null()]),
+                  is_take_out: Type.Number(),
+                  food_type_code: Type.Union([Type.String(), Type.Null()]),
+                  food_type_label: Type.Union([Type.String(), Type.Null()]),
+                  reply_cnt: Type.Number(),
+                  like_cnt: Type.Number(),
+                  is_liked: Type.Number(),
+                  crawled_at: Type.String(),
+                  created_at: Type.String(),
+                  updated_at: Type.String(),
+                })
+              ),
+              pagination: Type.Object({
+                total: Type.Number({ description: '전체 리뷰 수' }),
+                limit: Type.Number({ description: '조회 개수' }),
+                offset: Type.Number({ description: '조회 시작 위치' }),
+                hasMore: Type.Boolean({ description: '더 많은 데이터 존재 여부' }),
+              }),
+            }),
+            timestamp: Type.String(),
+          }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { restaurantId } = request.params as { restaurantId: number };
+      const { limit = 20, offset = 0 } = request.query as { limit?: number; offset?: number };
+
+      try {
+        // 레스토랑 확인
+        const restaurant = await restaurantRepository.findById(restaurantId);
+        if (!restaurant) {
+          return ResponseHelper.notFound(reply, `Restaurant not found: ${restaurantId}`);
+        }
+
+        // 전체 개수 조회
+        const total = await catchtableReviewRepository.countByRestaurantId(restaurantId);
+
+        // 리뷰 리스트 조회
+        const reviews = await catchtableReviewRepository.findByRestaurantIdPaginated(
+          restaurantId,
+          limit,
+          offset
+        );
+
+        return ResponseHelper.success(reply, {
+          reviews,
+          pagination: {
+            total,
+            limit,
+            offset,
+            hasMore: offset + reviews.length < total,
+          },
+        });
+      } catch (error) {
+        console.error('[Catchtable] 리뷰 리스트 조회 에러:', error);
+        return ResponseHelper.error(
+          reply,
+          error instanceof Error ? error.message : 'Failed to get reviews',
+          500
+        );
+      }
+    }
+  );
+
+  /**
    * GET /:restaurantId/reviews/summary/status
    * 캐치테이블 리뷰 요약 상태 조회
    */
