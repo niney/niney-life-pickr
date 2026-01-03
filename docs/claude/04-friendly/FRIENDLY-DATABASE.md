@@ -1,6 +1,6 @@
 # FRIENDLY-DATABASE.md
 
-> **Last Updated**: 2025-10-23 23:30
+> **Last Updated**: 2026-01-03
 > **Purpose**: SQLite database layer and migrations
 
 ---
@@ -30,10 +30,12 @@
 |-------|---------|
 | `users` | User accounts |
 | `sessions` | Session tokens (prepared for JWT) |
-| `restaurants` | Restaurant metadata |
+| `restaurants` | Restaurant metadata (+catchtable_id) |
 | `menus` | Menu items |
-| `reviews` | Customer reviews |
-| `review_summaries` | AI-generated summaries |
+| `reviews` | Naver customer reviews |
+| `review_summaries` | Naver AI-generated summaries |
+| `catchtable_reviews` | Catchtable customer reviews |
+| `catchtable_review_summaries` | Catchtable AI-generated summaries |
 | `jobs` | Background task tracking |
 
 **See**: [DATABASE.md](../00-core/DATABASE.md) for full schema
@@ -78,6 +80,8 @@
 - `menus.restaurant_id` → Deletes menus when restaurant deleted
 - `reviews.restaurant_id` → Deletes reviews when restaurant deleted
 - `review_summaries.review_id` → Deletes summaries when review deleted
+- `catchtable_reviews.restaurant_id` → Deletes catchtable reviews when restaurant deleted
+- `catchtable_review_summaries.review_id` → Deletes catchtable summaries when review deleted
 - `jobs.restaurant_id` → Deletes jobs when restaurant deleted
 
 ---
