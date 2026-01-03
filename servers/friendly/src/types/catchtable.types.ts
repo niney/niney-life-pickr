@@ -50,10 +50,10 @@ export interface CatchtableApiResponse {
   };
 }
 
-// DB 저장용 Input 타입
+// DB 저장용 Input 타입 (id = reviewSeq)
 export interface CatchtableReviewInput {
+  id: number;  // reviewSeq 값을 id로 사용
   restaurant_id: number;
-  review_seq: number;
   article_seq: number | null;
   is_editable: boolean;
   reg_date: number | null;
@@ -79,11 +79,10 @@ export interface CatchtableReviewInput {
   is_liked: boolean;
 }
 
-// DB 엔티티 타입
+// DB 엔티티 타입 (id = reviewSeq)
 export interface CatchtableReviewDB {
-  id: number;
+  id: number;  // reviewSeq 값이 id로 사용됨
   restaurant_id: number;
-  review_seq: number;
   article_seq: number | null;
   is_editable: number; // SQLite boolean (0/1)
   reg_date: number | null;
@@ -110,4 +109,28 @@ export interface CatchtableReviewDB {
   crawled_at: string;
   created_at: string;
   updated_at: string;
+}
+
+// 캐치테이블 리뷰 요약 상태 타입
+export type CatchtableReviewSummaryStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+// 캐치테이블 리뷰 요약 DB 타입
+export interface CatchtableReviewSummaryDB {
+  id: number;
+  review_id: number;
+  restaurant_id: number;
+  status: CatchtableReviewSummaryStatus;
+  summary_data: string | null;
+  error_message: string | null;
+  retry_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 캐치테이블 리뷰 요약 입력 타입
+export interface CatchtableReviewSummaryInput {
+  review_id: number;
+  restaurant_id: number;
+  status?: CatchtableReviewSummaryStatus;
+  summary_data?: string | null;
 }

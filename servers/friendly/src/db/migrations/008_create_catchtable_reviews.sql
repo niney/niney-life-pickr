@@ -1,15 +1,15 @@
 -- 008_create_catchtable_reviews.sql
 -- 캐치테이블 전용 리뷰 테이블 생성 (flat 구조)
+-- review_seq를 id(PK)로 사용
 
 CREATE TABLE IF NOT EXISTS catchtable_reviews (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER PRIMARY KEY,                  -- review_seq 값을 id로 사용 (AUTOINCREMENT 제거)
   restaurant_id INTEGER NOT NULL,
 
   -- 리뷰 기본 정보
-  review_seq INTEGER NOT NULL,
   article_seq INTEGER,
   is_editable INTEGER DEFAULT 0,
-  reg_date INTEGER,                      -- Unix timestamp (ms)
+  reg_date INTEGER,                        -- Unix timestamp (ms)
 
   -- 작성자 정보 (writer.*)
   writer_identifier TEXT,
@@ -31,10 +31,10 @@ CREATE TABLE IF NOT EXISTS catchtable_reviews (
   review_comment TEXT,
 
   -- 예약 정보 (reservation.*)
-  reservation_type TEXT,                 -- 'DINING' 등
+  reservation_type TEXT,                   -- 'DINING' 등
   is_take_out INTEGER DEFAULT 0,
-  food_type_code TEXT,                   -- 'LUNCH', 'DINNER' 등
-  food_type_label TEXT,                  -- '점심', '저녁' 등
+  food_type_code TEXT,                     -- 'LUNCH', 'DINNER' 등
+  food_type_label TEXT,                    -- '점심', '저녁' 등
 
   -- 반응 정보 (engagement.*)
   reply_cnt INTEGER DEFAULT 0,
@@ -50,9 +50,6 @@ CREATE TABLE IF NOT EXISTS catchtable_reviews (
 );
 
 -- 인덱스
-CREATE UNIQUE INDEX IF NOT EXISTS idx_catchtable_reviews_seq
-  ON catchtable_reviews(review_seq);
-
 CREATE INDEX IF NOT EXISTS idx_catchtable_reviews_restaurant
   ON catchtable_reviews(restaurant_id);
 

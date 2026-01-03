@@ -122,8 +122,8 @@ class CatchtableService {
       const review = allReviews[i];
       try {
         await catchtableReviewRepository.upsertReview({
+          id: review.reviewSeq,
           restaurant_id: restaurantId,
-          review_seq: review.reviewSeq,
           article_seq: review.articleSeq || null,
           is_editable: review.isEditable,
           reg_date: review.regDate || null,

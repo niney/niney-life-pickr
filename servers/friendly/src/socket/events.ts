@@ -28,6 +28,10 @@ export const SOCKET_EVENTS = {
 
   // 캐치테이블 리뷰 크롤링 이벤트
   CATCHTABLE_REVIEW_PROGRESS: 'catchtable:review_progress',
+
+  // 캐치테이블 리뷰 요약 이벤트
+  CATCHTABLE_REVIEW_SUMMARY_PROGRESS: 'catchtable:review_summary_progress',
+  CATCHTABLE_REVIEW_SUMMARY_ERROR: 'catchtable:review_summary_error',
 } as const;
 
 export type SocketEventType = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];
