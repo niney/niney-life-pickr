@@ -623,26 +623,37 @@ class ApiService {
 
   /**
    * 레스토랑 리뷰 감정 통계 조회
+   * @param restaurantId restaurantId
+   * @param source 리뷰 소스 (naver | catchtable | all)
    */
-  async getRestaurantStatistics(restaurantId: number): Promise<ApiResponse<RestaurantReviewStatistics>> {
-    return this.request<RestaurantReviewStatistics>(`/api/restaurants/${restaurantId}/statistics`, {
+  async getRestaurantStatistics(
+    restaurantId: number,
+    source: 'naver' | 'catchtable' | 'all' = 'naver'
+  ): Promise<ApiResponse<RestaurantReviewStatistics>> {
+    const url = `/api/restaurants/${restaurantId}/statistics?source=${source}`;
+    return this.request<RestaurantReviewStatistics>(url, {
       method: 'GET',
     });
   }
 
   /**
    * 레스토랑 메뉴별 감정 통계 조회
+   * @param restaurantId 레스토랑 ID
+   * @param minMentions 최소 언급 횟수 필터 (기본: 1)
+   * @param source 리뷰 소스 (naver | catchtable | all)
    */
   async getRestaurantMenuStatistics(
     restaurantId: number,
-    minMentions: number = 1
+    minMentions: number = 1,
+    source: 'naver' | 'catchtable' | 'all' = 'naver'
   ): Promise<ApiResponse<RestaurantMenuStatistics>> {
-    let url = `/api/restaurants/${restaurantId}/menu-statistics`;
-
+    const params = new URLSearchParams();
     if (minMentions > 1) {
-      url += `?minMentions=${minMentions}`;
+      params.append('minMentions', minMentions.toString());
     }
+    params.append('source', source);
 
+    const url = `/api/restaurants/${restaurantId}/menu-statistics?${params.toString()}`;
     return this.request<RestaurantMenuStatistics>(url, {
       method: 'GET',
     });

@@ -532,9 +532,16 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
     schema: {
       tags: ['restaurants'],
       summary: '레스토랑별 리뷰 감정 통계 조회',
-      description: '레스토랑의 리뷰를 분석하여 긍정/부정/중립 통계와 비율을 제공합니다.',
+      description: '레스토랑의 리뷰를 분석하여 긍정/부정/중립 통계와 비율을 제공합니다. source 파라미터로 네이버/캐치테이블/전체를 선택할 수 있습니다.',
       params: Type.Object({
         id: Type.Number({ description: '레스토랑 ID' })
+      }),
+      querystring: Type.Object({
+        source: Type.Optional(Type.Union([
+          Type.Literal('naver'),
+          Type.Literal('catchtable'),
+          Type.Literal('all')
+        ], { description: '리뷰 소스 (기본: naver)', default: 'naver' }))
       }),
       response: {
         200: Type.Object({
@@ -559,6 +566,7 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }, async (request, reply) => {
     const { id } = request.params as { id: number };
+    const { source = 'naver' } = request.query as { source?: 'naver' | 'catchtable' | 'all' };
 
     try {
       // 1. 음식점 존재 여부 확인
@@ -568,13 +576,14 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
         return ResponseHelper.notFound(reply, `레스토랑 ID ${id}를 찾을 수 없습니다`);
       }
 
-      // 2. 통계 계산
-      const statistics = await restaurantStatisticsService.calculateReviewStatistics(id);
+      // 2. 통계 계산 (source 전달)
+      const statistics = await restaurantStatisticsService.calculateReviewStatistics(id, source);
 
+      const sourceLabel = source === 'all' ? '전체' : source === 'catchtable' ? '캐치테이블' : '네이버';
       return ResponseHelper.success(
         reply,
         statistics,
-        '리뷰 통계를 성공적으로 조회했습니다.'
+        `${sourceLabel} 리뷰 통계를 성공적으로 조회했습니다.`
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

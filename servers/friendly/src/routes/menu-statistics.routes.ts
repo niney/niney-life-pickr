@@ -56,16 +56,21 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
     schema: {
       tags: ['menu-statistics'],
       summary: '레스토랑별 메뉴 감정 통계 조회',
-      description: '레스토랑의 리뷰에서 언급된 메뉴별로 긍정/부정/중립 통계를 집계합니다.',
+      description: '레스토랑의 리뷰에서 언급된 메뉴별로 긍정/부정/중립 통계를 집계합니다. source 파라미터로 네이버/캐치테이블/전체를 선택할 수 있습니다.',
       params: Type.Object({
         id: Type.String({ description: '레스토랑 ID' })
       }),
       querystring: Type.Object({
-        minMentions: Type.Optional(Type.Number({ 
-          description: '최소 언급 횟수 필터 (기본: 1)', 
+        minMentions: Type.Optional(Type.Number({
+          description: '최소 언급 횟수 필터 (기본: 1)',
           default: 1,
           minimum: 1
-        }))
+        })),
+        source: Type.Optional(Type.Union([
+          Type.Literal('naver'),
+          Type.Literal('catchtable'),
+          Type.Literal('all')
+        ], { description: '리뷰 소스 (기본: naver)', default: 'naver' }))
       }),
       response: {
         200: Type.Object({
@@ -90,37 +95,41 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { minMentions = 1 } = request.query as { minMentions?: number };
+    const { minMentions = 1, source = 'naver' } = request.query as {
+      minMentions?: number;
+      source?: 'naver' | 'catchtable' | 'all';
+    };
     const restaurantId = parseInt(id, 10);
-    
+
     if (isNaN(restaurantId)) {
       return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID입니다.', 400);
     }
-    
+
     try {
-      let stats = await menuStatisticsService.calculateMenuStatistics(restaurantId);
-      
+      let stats = await menuStatisticsService.calculateMenuStatistics(restaurantId, source);
+
       // 최소 언급 횟수 필터링
       if (minMentions > 1) {
         stats = {
           ...stats,
           menuStatistics: stats.menuStatistics.filter(
-            m => m.totalMentions >= minMentions
-          )
+            (m) => m.totalMentions >= minMentions
+          ),
         };
       }
-      
+
+      const sourceLabel = source === 'all' ? '전체' : source === 'catchtable' ? '캐치테이블' : '네이버';
       return ResponseHelper.success(
-        reply, 
+        reply,
         stats,
-        '메뉴 통계를 성공적으로 조회했습니다.'
+        `${sourceLabel} 메뉴 통계를 성공적으로 조회했습니다.`
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('❌ 메뉴 통계 조회 실패:', errorMessage);
       return ResponseHelper.error(
-        reply, 
-        `메뉴 통계 조회에 실패했습니다: ${errorMessage}`, 
+        reply,
+        `메뉴 통계 조회에 실패했습니다: ${errorMessage}`,
         500
       );
     }
