@@ -32,6 +32,31 @@ async function getCurrentReviewCount(ctx: CrawlerContext): Promise<number> {
 }
 
 /**
+ * 마지막 리뷰 아이템의 해시값 가져오기 (userName + visitDate 조합)
+ */
+async function getLastReviewHash(ctx: CrawlerContext): Promise<string> {
+  if (!ctx.page) return '';
+
+  return await ctx.page.evaluate(() => {
+    const reviewElements = document.querySelectorAll('#_review_list li.place_apply_pui');
+    if (reviewElements.length === 0) return '';
+
+    const lastElement = reviewElements[reviewElements.length - 1];
+    const userName = lastElement.querySelector('.pui__NMi-Dp')?.textContent?.trim() || '';
+    const visitInfoElements = lastElement.querySelectorAll('.pui__QKE5Pr .pui__gfuUIT');
+    let visitDate = '';
+    visitInfoElements.forEach(el => {
+      const text = el.textContent?.trim() || '';
+      if (text.match(/^\d+\.\d+\./)) {
+        visitDate = text;
+      }
+    });
+
+    return `${userName}|${visitDate}|${reviewElements.length}`;
+  });
+}
+
+/**
  * 더보기 버튼 클릭
  */
 async function clickMoreButton(ctx: CrawlerContext): Promise<boolean> {
@@ -102,8 +127,8 @@ export async function loadAllReviews(
         previousReviewCount = currentReviewCount;
       }
 
-      // 100ms 대기 후 클릭
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // 클릭 전 마지막 아이템 해시 저장
+      const lastHashBeforeClick = await getLastReviewHash(ctx);
 
       // 더보기 버튼 클릭
       const clicked = await clickMoreButton(ctx);
@@ -118,8 +143,24 @@ export async function loadAllReviews(
         console.log(`[LoadReviews] 더보기 클릭: ${clickCount}/${maxClicks}`);
       }
 
+      // 마지막 아이템 해시가 변경될 때까지 대기 (새 리뷰 로드 확인)
+      let hashChanged = false;
+      for (let i = 0; i < 50; i++) { // 최대 5초 대기 (100ms * 50)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const currentLastHash = await getLastReviewHash(ctx);
+        if (currentLastHash !== lastHashBeforeClick) {
+          hashChanged = true;
+          break;
+        }
+      }
+
+      if (!hashChanged) {
+        console.log('[LoadReviews] 새 리뷰 로드 대기 타임아웃, 로드 완료');
+        break;
+      }
+
       // 버튼이 다시 나타날 때까지 대기
-      const hasMore = await waitForMoreButton(ctx, 5000);
+      const hasMore = await waitForMoreButton(ctx, 3000);
       if (!hasMore) {
         console.log('[LoadReviews] 더보기 버튼 대기 타임아웃, 로드 완료');
         break;
