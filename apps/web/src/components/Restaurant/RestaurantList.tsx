@@ -120,6 +120,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     createSummary: boolean
     useQueue?: boolean
     catchtableId?: string
+    crawlCatchtableReviews?: boolean
   }) => {
     if (!selectedRestaurant) return
 
@@ -135,6 +136,23 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         } else if (updateResponse.data && onRestaurantUpdate) {
           // 업데이트된 레스토랑 정보로 로컬 상태 업데이트
           onRestaurantUpdate(updateResponse.data)
+        }
+      }
+
+      // ✅ 캐치테이블 리뷰 크롤링 (독립적으로 처리)
+      if (options.crawlCatchtableReviews) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+        const response = await fetch(`${API_URL}/api/catchtable/${selectedRestaurant.id}/reviews/crawl`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        const data = await response.json()
+
+        if (!response.ok || !data.result) {
+          Alert.error('캐치테이블 리뷰 크롤링 실패', data.message || '크롤링에 실패했습니다')
+        } else {
+          console.log(`[Catchtable] 리뷰 크롤링 완료: ${data.data?.totalSaved}개 저장`)
         }
       }
 
