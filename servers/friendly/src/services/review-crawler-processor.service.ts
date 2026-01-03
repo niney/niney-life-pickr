@@ -112,6 +112,7 @@ export class ReviewCrawlerProcessor {
   ): Promise<ReviewInfo[]> {
     const reviews: ReviewInfo[] = [];
     const total = processedReviews.length;
+    const processedHashes = new Set<string>();
 
     for (let i = 0; i < processedReviews.length; i++) {
       const review = processedReviews[i];
@@ -136,12 +137,22 @@ export class ReviewCrawlerProcessor {
 
       // 리뷰 해시 생성
       const reviewHash = generateReviewHash(
-        placeId,
-        review.userName,
-        review.visitInfo.visitDate,
-        review.visitInfo.visitCount,
-        review.visitInfo.verificationMethod
+          placeId,
+          review.userName,
+          review.visitInfo.visitDate,
+          review.visitInfo.visitCount,
+          review.visitInfo.verificationMethod
       );
+
+      // 중복 해시 확인
+      if (processedHashes.has(reviewHash)) {
+        console.warn(`[Job ${jobId}] ⚠️ 중복 해시 발견 (${current}/${total}): ${reviewHash}`, {
+          userName: review.userName,
+          visitDate: review.visitInfo.visitDate,
+          visitCount: review.visitInfo.visitCount
+        });
+      }
+      processedHashes.add(reviewHash);
 
       // DB 저장
       try {
