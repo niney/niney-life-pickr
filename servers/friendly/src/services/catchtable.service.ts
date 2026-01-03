@@ -6,7 +6,7 @@ import type { CatchtableApiResponse, CatchtableApiReview } from '../types/catcht
 // 상수
 const CATCHTABLE_API_BASE = 'https://ct-api.catchtable.co.kr/api/review/v1/shops';
 const PAGE_SIZE = 12;
-const MAX_REVIEWS = 300;
+const MAX_REVIEWS = 1000;
 const DELAY_MS = 500;
 
 export interface CatchtableReviewCrawlResult {

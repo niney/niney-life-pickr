@@ -325,7 +325,7 @@ interface CatchtableReviewInput {
 ```typescript
 const CATCHTABLE_API_BASE = 'https://ct-api.catchtable.co.kr/api/review/v1/shops';
 const PAGE_SIZE = 12;        // 페이지당 리뷰 수
-const MAX_REVIEWS = 300;     // 최대 크롤링 리뷰 수
+const MAX_REVIEWS = 1000;     // 최대 크롤링 리뷰 수
 const DELAY_MS = 500;        // 페이지 간 딜레이 (ms)
 ```
 

@@ -159,7 +159,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
                   { color: colors.textSecondary },
                   (!catchtableId && !currentCatchtableId) && { opacity: 0.5 }
                 ]}>
-                  캐치테이블에서 리뷰를 가져옵니다 (최대 300개)
+                  캐치테이블에서 리뷰를 가져옵니다 (최대 1000개)
                 </Text>
               </View>
             </TouchableOpacity>
