@@ -26,6 +26,7 @@ import reviewRoutes from './routes/review.routes';
 import menuStatisticsRoutes from './routes/menu-statistics.routes';
 import searchRoutes from './routes/search.routes';
 import vworldRoutes from './routes/vworld.routes';
+import catchtableRoutes from './routes/catchtable.routes';
 
 // Create Fastify app with TypeBox provider
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -106,7 +107,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
         { name: 'restaurants', description: 'Restaurant data management endpoints' },
         { name: 'reviews', description: 'Individual review operations' },
         { name: 'jobs', description: 'Background job management endpoints' },
-        { name: 'review-summary', description: 'Restaurant review summary batch operations' }
+        { name: 'review-summary', description: 'Restaurant review summary batch operations' },
+        { name: 'catchtable', description: 'Catchtable review crawling endpoints' }
       ],
       components: {
         securitySchemes: {
@@ -217,6 +219,9 @@ export const buildApp = async (): Promise<FastifyInstance> => {
 
   // VWorld 라우트
   await app.register(vworldRoutes, { prefix: '/api/vworld' }); // VWorld Geocoding API 프록시
+
+  // Catchtable 라우트
+  await app.register(catchtableRoutes, { prefix: '/api/catchtable' }); // 캐치테이블 리뷰 크롤링
 
   return app;
 };
