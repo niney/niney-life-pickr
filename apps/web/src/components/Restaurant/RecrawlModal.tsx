@@ -14,6 +14,7 @@ interface RecrawlModalProps {
     useQueue?: boolean  // ✅ Queue 사용 여부
     catchtableId?: string  // ✅ 캐치테이블 ID
     crawlCatchtableReviews?: boolean  // ✅ 캐치테이블 리뷰 크롤링
+    summarizeCatchtableReviews?: boolean  // ✅ 캐치테이블 리뷰 요약
   }) => Promise<void>
   restaurantName: string
   currentCatchtableId?: string | null  // ✅ 현재 캐치테이블 ID
@@ -36,6 +37,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
   const [useQueue, setUseQueue] = useState(false) // ✅ Queue 사용 여부
   const [catchtableId, setCatchtableId] = useState('') // ✅ 캐치테이블 ID
   const [crawlCatchtableReviews, setCrawlCatchtableReviews] = useState(false) // ✅ 캐치테이블 리뷰 크롤링
+  const [summarizeCatchtableReviews, setSummarizeCatchtableReviews] = useState(false) // ✅ 캐치테이블 리뷰 요약
   const [loading, setLoading] = useState(false)
 
   // ✅ 모달이 열릴 때 현재 캐치테이블 ID로 초기화 (없으면 빈 문자열)
@@ -50,14 +52,14 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
 
   const handleConfirm = async () => {
     // ✅ 재크롤링 옵션 또는 캐치테이블 ID 변경이 있어야 함
-    if (!crawlMenus && !crawlReviews && !createSummary && !crawlCatchtableReviews && !isCatchtableIdChanged) {
+    if (!crawlMenus && !crawlReviews && !createSummary && !crawlCatchtableReviews && !summarizeCatchtableReviews && !isCatchtableIdChanged) {
       alert('최소 하나 이상 선택하거나 캐치테이블 ID를 변경해주세요')
       return
     }
 
-    // ✅ 캐치테이블 리뷰 크롤링은 캐치테이블 ID가 필요함
-    if (crawlCatchtableReviews && !catchtableId && !currentCatchtableId) {
-      alert('캐치테이블 리뷰 크롤링을 위해 캐치테이블 ID가 필요합니다')
+    // ✅ 캐치테이블 리뷰 크롤링/요약은 캐치테이블 ID가 필요함
+    if ((crawlCatchtableReviews || summarizeCatchtableReviews) && !catchtableId && !currentCatchtableId) {
+      alert('캐치테이블 리뷰 크롤링/요약을 위해 캐치테이블 ID가 필요합니다')
       return
     }
 
@@ -71,6 +73,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
         useQueue, // ✅ Queue 사용 여부 전달
         catchtableId: isCatchtableIdChanged ? catchtableId : undefined, // ✅ 변경된 경우만 전달
         crawlCatchtableReviews, // ✅ 캐치테이블 리뷰 크롤링
+        summarizeCatchtableReviews, // ✅ 캐치테이블 리뷰 요약
       })
       onClose()
       // 상태 초기화
@@ -81,6 +84,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
       setUseQueue(false)
       setCatchtableId('')
       setCrawlCatchtableReviews(false)
+      setSummarizeCatchtableReviews(false)
     } catch (error) {
       console.error('재크롤링 실패:', error)
     } finally {
@@ -156,6 +160,37 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
                   (!catchtableId && !currentCatchtableId) && { opacity: 0.5 }
                 ]}>
                   캐치테이블에서 리뷰를 가져옵니다 (최대 300개)
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* ✅ 캐치테이블 리뷰 요약 체크박스 */}
+            <TouchableOpacity
+              style={[styles.optionRow, { marginTop: 12 }]}
+              onPress={() => setSummarizeCatchtableReviews(!summarizeCatchtableReviews)}
+              disabled={!catchtableId && !currentCatchtableId}
+            >
+              <View style={[
+                styles.checkbox,
+                summarizeCatchtableReviews && { backgroundColor: colors.primary },
+                (!catchtableId && !currentCatchtableId) && { opacity: 0.5 }
+              ]}>
+                {summarizeCatchtableReviews && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <View style={styles.optionText}>
+                <Text style={[
+                  styles.optionTitle,
+                  { color: colors.text },
+                  (!catchtableId && !currentCatchtableId) && { opacity: 0.5 }
+                ]}>
+                  캐치테이블 리뷰 요약
+                </Text>
+                <Text style={[
+                  styles.optionDescription,
+                  { color: colors.textSecondary },
+                  (!catchtableId && !currentCatchtableId) && { opacity: 0.5 }
+                ]}>
+                  캐치테이블 리뷰를 AI로 요약합니다
                 </Text>
               </View>
             </TouchableOpacity>

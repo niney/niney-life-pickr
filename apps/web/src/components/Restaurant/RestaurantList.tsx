@@ -99,7 +99,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     } else {
       setSelectedCategory(category)
     }
-    
+
     // 데스크탑에서는 선택 후 모달 닫기
     if (!isMobile) {
       setCategoryModalVisible(false)
@@ -121,6 +121,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
     useQueue?: boolean
     catchtableId?: string
     crawlCatchtableReviews?: boolean
+    summarizeCatchtableReviews?: boolean
   }) => {
     if (!selectedRestaurant) return
 
@@ -152,7 +153,30 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         if (!response.ok || !data.result) {
           Alert.error('캐치테이블 리뷰 크롤링 실패', data.message || '크롤링에 실패했습니다')
         } else {
-          console.log(`[Catchtable] 리뷰 크롤링 완료: ${data.data?.totalSaved}개 저장`)
+          console.log(`[Catchtable] 리뷰 크롤링 시작: jobId=${data.data?.jobId}`)
+        }
+      }
+
+      // ✅ 캐치테이블 리뷰 요약 (독립적으로 처리)
+      if (options.summarizeCatchtableReviews) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+        const response = await fetch(`${API_URL}/api/catchtable/${selectedRestaurant.id}/reviews/summarize`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            useCloud: true,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok || !data.result) {
+          Alert.error('캐치테이블 리뷰 요약 실패', data.message || '요약에 실패했습니다')
+        } else {
+          console.log(`[Catchtable] 리뷰 요약 시작: jobId=${data.data?.jobId}, totalToProcess=${data.data?.totalToProcess}`)
         }
       }
 
@@ -343,7 +367,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
 
         {/* 카테고리 섹션 */}
         <View style={styles.section}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.sectionHeader}
             onPress={() => !isMobile && categories.length > 0 && setCategoryModalVisible(true)}
             activeOpacity={isMobile ? 1 : 0.7}
@@ -363,8 +387,8 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
 
           {/* 모바일: 가로 스크롤 카테고리 */}
           {isMobile && categories.length > 0 && (
-            <div style={{ 
-              display: 'flex', 
+            <div style={{
+              display: 'flex',
               overflowX: 'auto',
               gap: '10px',
               flexWrap: 'nowrap',
@@ -379,9 +403,9 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                 >
                   <View
                     style={[
-                      styles.categoryCard, 
-                      { 
-                        backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface, 
+                      styles.categoryCard,
+                      {
+                        backgroundColor: theme === 'light' ? '#f8f9fa' : colors.surface,
                         borderColor: selectedCategory === category.category ? colors.primary : colors.border,
                         borderWidth: selectedCategory === category.category ? 2 : 1,
                         flexShrink: 0,
@@ -389,7 +413,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                     ]}
                   >
                     <Text style={[
-                      styles.categoryName, 
+                      styles.categoryName,
                       { color: selectedCategory === category.category ? colors.primary : colors.text }
                     ]}>
                       {category.category}
@@ -400,7 +424,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
               ))}
             </div>
           )}
-          
+
           {!categoriesLoading && categories.length === 0 && (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>등록된 카테고리가 없습니다</Text>
           )}
@@ -606,9 +630,9 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                 </TouchableOpacity>
               </View>
 
-              <div style={{ 
-                padding: 16, 
-                maxHeight: 500, 
+              <div style={{
+                padding: 16,
+                maxHeight: 500,
                 overflowY: 'auto',
                 overflowX: 'hidden',
               }}>
@@ -617,7 +641,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
                   style={[
                     styles.modalCategoryItem,
                     {
-                      backgroundColor: !selectedCategory 
+                      backgroundColor: !selectedCategory
                         ? (theme === 'light' ? '#f0f7ff' : 'rgba(33, 150, 243, 0.15)')
                         : 'transparent',
                       borderColor: !selectedCategory ? colors.primary : colors.border,
