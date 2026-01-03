@@ -1,26 +1,29 @@
-import React, { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput } from 'react-native'
 import { useTheme } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 
 interface RecrawlModalProps {
   visible: boolean
   onClose: () => void
-  onConfirm: (options: { 
+  onConfirm: (options: {
     crawlMenus: boolean
     crawlReviews: boolean
     createSummary: boolean
     resetSummary?: boolean
     useQueue?: boolean  // ✅ Queue 사용 여부
+    catchtableId?: string  // ✅ 캐치테이블 ID
   }) => Promise<void>
   restaurantName: string
+  currentCatchtableId?: string | null  // ✅ 현재 캐치테이블 ID
 }
 
 const RecrawlModal: React.FC<RecrawlModalProps> = ({
   visible,
   onClose,
   onConfirm,
-  restaurantName
+  restaurantName,
+  currentCatchtableId
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
@@ -30,11 +33,23 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
   const [createSummary, setCrawlSummary] = useState(false)
   const [resetSummary, setResetSummary] = useState(false)
   const [useQueue, setUseQueue] = useState(false) // ✅ Queue 사용 여부
+  const [catchtableId, setCatchtableId] = useState('') // ✅ 캐치테이블 ID
   const [loading, setLoading] = useState(false)
 
+  // ✅ 모달이 열릴 때 현재 캐치테이블 ID로 초기화 (없으면 빈 문자열)
+  useEffect(() => {
+    if (visible) {
+      setCatchtableId(currentCatchtableId || '')
+    }
+  }, [visible, currentCatchtableId])
+
+  // ✅ 캐치테이블 ID 변경 여부 확인
+  const isCatchtableIdChanged = catchtableId !== (currentCatchtableId || '')
+
   const handleConfirm = async () => {
-    if (!crawlMenus && !crawlReviews && !createSummary) {
-      alert('최소 하나 이상 선택해주세요')
+    // ✅ 재크롤링 옵션 또는 캐치테이블 ID 변경이 있어야 함
+    if (!crawlMenus && !crawlReviews && !createSummary && !isCatchtableIdChanged) {
+      alert('최소 하나 이상 선택하거나 캐치테이블 ID를 변경해주세요')
       return
     }
 
@@ -46,6 +61,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
         createSummary,
         resetSummary: createSummary && resetSummary,
         useQueue, // ✅ Queue 사용 여부 전달
+        catchtableId: isCatchtableIdChanged ? catchtableId : undefined, // ✅ 변경된 경우만 전달
       })
       onClose()
       // 상태 초기화
@@ -54,6 +70,7 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
       setCrawlSummary(false)
       setResetSummary(false)
       setUseQueue(false)
+      setCatchtableId('')
     } catch (error) {
       console.error('재크롤링 실패:', error)
     } finally {
@@ -75,6 +92,38 @@ const RecrawlModal: React.FC<RecrawlModalProps> = ({
           </Text>
           <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
             {restaurantName}
+          </Text>
+
+          {/* ✅ 캐치테이블 ID 입력 섹션 */}
+          <View style={styles.catchtableSection}>
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>
+              캐치테이블 ID
+            </Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  color: colors.text,
+                  backgroundColor: colors.background,
+                  borderColor: isCatchtableIdChanged ? colors.primary : colors.border
+                }
+              ]}
+              value={catchtableId}
+              onChangeText={setCatchtableId}
+              placeholder="캐치테이블 ID 입력"
+              placeholderTextColor={colors.textSecondary}
+            />
+            {isCatchtableIdChanged && (
+              <Text style={[styles.changeIndicator, { color: colors.primary }]}>
+                ✓ 변경됨
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.sectionDivider} />
+
+          <Text style={[styles.sectionLabel, { color: colors.text }]}>
+            재크롤링 옵션
           </Text>
 
           <View style={styles.optionsContainer}>
@@ -216,7 +265,32 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     fontSize: 14,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  catchtableSection: {
+    marginBottom: 8,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  changeIndicator: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    marginVertical: 16,
   },
   optionsContainer: {
     gap: 16,

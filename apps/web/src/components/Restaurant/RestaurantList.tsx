@@ -37,6 +37,7 @@ interface RestaurantListProps {
   isMobile?: boolean
   showSeoulMap?: boolean
   setShowSeoulMap?: (show: boolean) => void
+  onRestaurantUpdate?: (restaurant: RestaurantData) => void  // ✅ 레스토랑 업데이트 콜백
 }
 
 const RestaurantList: React.FC<RestaurantListProps> = ({
@@ -61,6 +62,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   isMobile = false,
   showSeoulMap = false,
   setShowSeoulMap,
+  onRestaurantUpdate,
 }) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
@@ -112,15 +114,35 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
   }
 
   // 재크롤링 실행
-  const handleRecrawlConfirm = async (options: { 
+  const handleRecrawlConfirm = async (options: {
     crawlMenus: boolean
     crawlReviews: boolean
     createSummary: boolean
     useQueue?: boolean
+    catchtableId?: string
   }) => {
     if (!selectedRestaurant) return
 
     try {
+      // ✅ 캐치테이블 ID 업데이트 (독립적으로 처리)
+      if (options.catchtableId !== undefined) {
+        const updateResponse = await apiService.updateRestaurant(selectedRestaurant.id, {
+          catchtable_id: options.catchtableId || null
+        })
+
+        if (!updateResponse.result) {
+          Alert.error('캐치테이블 ID 업데이트 실패', updateResponse.message || '업데이트에 실패했습니다')
+        } else if (updateResponse.data && onRestaurantUpdate) {
+          // 업데이트된 레스토랑 정보로 로컬 상태 업데이트
+          onRestaurantUpdate(updateResponse.data)
+        }
+      }
+
+      // ✅ 재크롤링 옵션이 없으면 여기서 종료
+      if (!options.crawlMenus && !options.crawlReviews && !options.createSummary) {
+        return
+      }
+
       // ✅ Queue 방식 선택 시
       if (options.useQueue && options.crawlReviews) {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -509,6 +531,7 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
           onClose={() => setRecrawlModalVisible(false)}
           onConfirm={handleRecrawlConfirm}
           restaurantName={selectedRestaurant?.name || ''}
+          currentCatchtableId={selectedRestaurant?.catchtable_id}
         />
 
         {/* 삭제 확인 다이얼로그 */}

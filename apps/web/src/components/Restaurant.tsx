@@ -35,6 +35,7 @@ interface DesktopLayoutProps {
   fetchCategories: () => Promise<void>
   showSeoulMap: boolean
   setShowSeoulMap: (show: boolean) => void
+  onRestaurantUpdate?: (restaurant: RestaurantData) => void
 }
 
 // 데스크탑 레이아웃 컴포넌트 (라우팅 컨텍스트 내부)
@@ -118,6 +119,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
     handleRestaurantClick,
     fetchRestaurants,
     fetchCategories,
+    handleRestaurantUpdate,
   } = restaurantState
 
   // 크롤링 시작 핸들러 (socket 콜백 설정)
@@ -186,6 +188,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   fetchRestaurants={fetchRestaurants}
                   fetchCategories={fetchCategories}
                   isMobile={isMobile}
+                  onRestaurantUpdate={handleRestaurantUpdate}
                 />
               )}
             />
@@ -228,6 +231,7 @@ const Restaurant: React.FC<RestaurantProps> = ({ onLogout }) => {
                   fetchCategories={fetchCategories}
                   showSeoulMap={showSeoulMap}
                   setShowSeoulMap={setShowSeoulMap}
+                  onRestaurantUpdate={handleRestaurantUpdate}
                 />
               )}
             />
