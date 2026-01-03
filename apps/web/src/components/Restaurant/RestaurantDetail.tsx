@@ -42,6 +42,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     dbProgress,
     imageProgress,
     catchtableProgress,
+    catchtableSummaryProgress,
     isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
@@ -242,6 +243,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   const isCrawling =
     menuProgress !== null || crawlProgress !== null || dbProgress !== null || imageProgress !== null || catchtableProgress !== null || isCrawlInterrupted
   const isSummarizing = reviewSummaryStatus.status === 'active'
+  const isCatchtableSummarizing = catchtableSummaryProgress !== null
 
   // 재요약 핸들러
   const onResummarizeConfirm = useCallback(async () => {
@@ -295,6 +297,14 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
       {/* 리뷰 요약 진행 상태 표시 */}
       {isSummarizing && <SummaryProgressCard summaryProgress={summaryProgress} />}
+
+      {/* 캐치테이블 리뷰 요약 진행 상태 표시 */}
+      {isCatchtableSummarizing && (
+        <SummaryProgressCard
+          summaryProgress={catchtableSummaryProgress}
+          title="🍽️ 캐치테이블 리뷰 요약 중..."
+        />
+      )}
 
       {/* 탭 메뉴 */}
       <TabMenu

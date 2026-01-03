@@ -14,9 +14,13 @@ interface SummaryProgressData {
 
 interface SummaryProgressCardProps {
   summaryProgress: SummaryProgressData | null
+  title?: string
 }
 
-const SummaryProgressCard: React.FC<SummaryProgressCardProps> = ({ summaryProgress }) => {
+const SummaryProgressCard: React.FC<SummaryProgressCardProps> = ({
+  summaryProgress,
+  title = '🤖 AI 리뷰 요약 중...'
+}) => {
   const { theme } = useTheme()
   const colors = THEME_COLORS[theme]
 
@@ -32,7 +36,7 @@ const SummaryProgressCard: React.FC<SummaryProgressCardProps> = ({ summaryProgre
         },
       ]}
     >
-      <Text style={[styles.title, { color: colors.text }]}>🤖 AI 리뷰 요약 중...</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
 
       <ProgressIndicator
         label="요약 진행"

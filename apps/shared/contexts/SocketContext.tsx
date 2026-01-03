@@ -37,6 +37,7 @@ interface SocketContextValue {
   dbProgress: ProgressData | null
   imageProgress: ProgressData | null
   catchtableProgress: ProgressData | null  // 캐치테이블 리뷰 크롤링 진행률
+  catchtableSummaryProgress: SummaryProgress | null  // 캐치테이블 리뷰 요약 진행률
   isCrawlInterrupted: boolean
   reviewSummaryStatus: ReviewSummaryStatus
   summaryProgress: SummaryProgress | null
@@ -91,6 +92,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const [dbProgress, setDbProgress] = useState<ProgressData | null>(null)
   const [imageProgress, setImageProgress] = useState<ProgressData | null>(null)
   const [catchtableProgress, setCatchtableProgress] = useState<ProgressData | null>(null)
+  const [catchtableSummaryProgress, setCatchtableSummaryProgress] = useState<SummaryProgress | null>(null)
   const [isCrawlInterrupted, setIsCrawlInterrupted] = useState(false)
   const [reviewSummaryStatus, setReviewSummaryStatus] = useState<ReviewSummaryStatus>({
     status: 'idle'
@@ -239,6 +241,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       // 캐치테이블: catchtable:review_progress가 없으면 초기화
       if (!activeEvents.has('catchtable:review_progress')) {
         setCatchtableProgress(null)
+      }
+
+      // 캐치테이블 요약: catchtable:review_summary_progress가 없으면 초기화
+      if (!activeEvents.has('catchtable:review_summary_progress')) {
+        setCatchtableSummaryProgress(null)
       }
 
       console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}], Interrupted: ${data.interruptedCount > 0}`)
@@ -410,6 +417,50 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
 
       // JobMonitor용: jobs 배열 업데이트
       handleProgressEvent(data, 'catchtable:review_progress', 'restaurant_crawl', { phase: 'catchtable' })
+    })
+
+    // 캐치테이블 리뷰 요약 진행 상황
+    socket.on('catchtable:review_summary_progress', (data: ProgressEventData) => {
+      console.log('[Socket.io] Catchtable Summary Progress:', data)
+
+      const jobId = data.jobId
+      const sequence = data.sequence || data.current || 0
+
+      // ✅ Sequence 체크
+      if (!sequenceManagerRef.current.check(jobId || 'default', 'catchtable:review_summary_progress', sequence)) return
+
+      // ✅ 완료 Job 체크
+      if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
+        console.warn(`[Socket.io] Ignored - catchtable summary job ${jobId} already completed`)
+        return
+      }
+
+      // Restaurant 화면용: 진행률 업데이트
+      if (data.restaurantId && data.restaurantId.toString() === currentRestaurantIdRef.current) {
+        setCatchtableSummaryProgress({
+          current: data.current || 0,
+          total: data.total || 0,
+          percentage: data.percentage || 0,
+          completed: (data as any).metadata?.succeeded || 0,
+          failed: (data as any).metadata?.failed || 0
+        })
+      }
+
+      // JobMonitor용: jobs 배열 업데이트
+      handleProgressEvent(data, 'catchtable:review_summary_progress', 'restaurant_crawl', { phase: 'catchtable_summary' })
+    })
+
+    // 캐치테이블 리뷰 요약 에러
+    socket.on('catchtable:review_summary_error', (data: ErrorEventData) => {
+      console.error('[Socket.io] Catchtable Summary Error:', data)
+      const errorMessage = data.error || '캐치테이블 리뷰 요약 중 오류가 발생했습니다'
+
+      // JobMonitor용: jobs 배열 업데이트
+      handleErrorEvent(data)
+
+      // Restaurant 화면용: 상태 업데이트
+      setCatchtableSummaryProgress(null)
+      Alert.error('캐치테이블 리뷰 요약 실패', errorMessage)
     })
 
     // 리뷰 요약 진행 (subscribe 시점 + 실시간 업데이트)
@@ -643,6 +694,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setMenuProgress(null)
       setSummaryProgress(null)
       setCatchtableProgress(null)
+      setCatchtableSummaryProgress(null)
 
       // 완료 콜백 호출
       if (callbacksRef.current.onReviewCrawlCompleted) {
@@ -679,6 +731,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setMenuProgress(null)
       setSummaryProgress(null)
       setCatchtableProgress(null)
+      setCatchtableSummaryProgress(null)
     })
 
     // ✅ 자동 정리 시작
@@ -697,6 +750,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       socket.off('review_summary:error')
       socket.off('review_summary:interrupted')
       socket.off('catchtable:review_progress')
+      socket.off('catchtable:review_summary_progress')
+      socket.off('catchtable:review_summary_error')
       socket.off('restaurant_crawl:completed')
       socket.off('restaurant_crawl:cancelled')
       socket.off('restaurant_crawl:interrupted')
@@ -765,6 +820,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setDbProgress(null)
     setImageProgress(null)
     setCatchtableProgress(null)
+    setCatchtableSummaryProgress(null)
     setIsCrawlInterrupted(false)
     // Sequence 초기화는 공통 유틸에서 관리 (clear는 전체 초기화이므로 생략)
   }, [])
@@ -796,6 +852,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     dbProgress,
     imageProgress,
     catchtableProgress,
+    catchtableSummaryProgress,
     isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
