@@ -15,6 +15,7 @@ interface CrawlProgressCardProps {
   crawlProgress: ProgressData | null
   imageProgress: ProgressData | null
   dbProgress: ProgressData | null
+  catchtableProgress: ProgressData | null
   isInterrupted?: boolean
 }
 
@@ -23,6 +24,7 @@ const CrawlProgressCard: React.FC<CrawlProgressCardProps> = ({
   crawlProgress,
   imageProgress,
   dbProgress,
+  catchtableProgress,
   isInterrupted = false,
 }) => {
   const { theme } = useTheme()
@@ -85,6 +87,16 @@ const CrawlProgressCard: React.FC<CrawlProgressCardProps> = ({
           total={dbProgress.total}
           percentage={dbProgress.percentage}
           color={colors.primary}
+        />
+      )}
+
+      {catchtableProgress && (
+        <ProgressIndicator
+          label="캐치테이블 리뷰"
+          current={catchtableProgress.current}
+          total={catchtableProgress.total}
+          percentage={catchtableProgress.percentage}
+          color="#9c27b0"
         />
       )}
     </View>

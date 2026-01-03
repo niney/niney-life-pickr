@@ -36,6 +36,7 @@ interface SocketContextValue {
   crawlProgress: ProgressData | null
   dbProgress: ProgressData | null
   imageProgress: ProgressData | null
+  catchtableProgress: ProgressData | null  // 캐치테이블 리뷰 크롤링 진행률
   isCrawlInterrupted: boolean
   reviewSummaryStatus: ReviewSummaryStatus
   summaryProgress: SummaryProgress | null
@@ -89,6 +90,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
   const [crawlProgress, setCrawlProgress] = useState<ProgressData | null>(null)
   const [dbProgress, setDbProgress] = useState<ProgressData | null>(null)
   const [imageProgress, setImageProgress] = useState<ProgressData | null>(null)
+  const [catchtableProgress, setCatchtableProgress] = useState<ProgressData | null>(null)
   const [isCrawlInterrupted, setIsCrawlInterrupted] = useState(false)
   const [reviewSummaryStatus, setReviewSummaryStatus] = useState<ReviewSummaryStatus>({
     status: 'idle'
@@ -234,6 +236,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
         setSummaryProgress(null)
       }
 
+      // 캐치테이블: catchtable:review_progress가 없으면 초기화
+      if (!activeEvents.has('catchtable:review_progress')) {
+        setCatchtableProgress(null)
+      }
+
       console.log(`[Socket.io] State initialized - Active events: [${Array.from(activeEvents).join(', ')}], Interrupted: ${data.interruptedCount > 0}`)
     })
 
@@ -374,6 +381,35 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
           error: data.reason || 'Server restarted - job was interrupted'
         })
       }
+    })
+
+    // 캐치테이블 리뷰 크롤링 진행 상황
+    socket.on('catchtable:review_progress', (data: ProgressEventData) => {
+      console.log('[Socket.io] Catchtable Progress:', data)
+
+      const jobId = data.jobId
+      const sequence = data.sequence || data.current || 0
+
+      // ✅ Sequence 체크
+      if (!sequenceManagerRef.current.check(jobId || 'default', 'catchtable:review_progress', sequence)) return
+
+      // ✅ 완료 Job 체크
+      if (jobId && completionTrackerRef.current.isCompleted(jobId)) {
+        console.warn(`[Socket.io] Ignored - catchtable job ${jobId} already completed`)
+        return
+      }
+
+      // Restaurant 화면용: 진행률 업데이트
+      if (data.restaurantId && data.restaurantId.toString() === currentRestaurantIdRef.current) {
+        setCatchtableProgress({
+          current: data.current || 0,
+          total: data.total || 0,
+          percentage: data.percentage || 0
+        })
+      }
+
+      // JobMonitor용: jobs 배열 업데이트
+      handleProgressEvent(data, 'catchtable:review_progress', 'restaurant_crawl', { phase: 'catchtable' })
     })
 
     // 리뷰 요약 진행 (subscribe 시점 + 실시간 업데이트)
@@ -606,6 +642,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setImageProgress(null)
       setMenuProgress(null)
       setSummaryProgress(null)
+      setCatchtableProgress(null)
 
       // 완료 콜백 호출
       if (callbacksRef.current.onReviewCrawlCompleted) {
@@ -641,6 +678,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       setImageProgress(null)
       setMenuProgress(null)
       setSummaryProgress(null)
+      setCatchtableProgress(null)
     })
 
     // ✅ 자동 정리 시작
@@ -658,6 +696,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
       socket.off('review_summary:progress')
       socket.off('review_summary:error')
       socket.off('review_summary:interrupted')
+      socket.off('catchtable:review_progress')
       socket.off('restaurant_crawl:completed')
       socket.off('restaurant_crawl:cancelled')
       socket.off('restaurant_crawl:interrupted')
@@ -725,6 +764,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     setCrawlProgress(null)
     setDbProgress(null)
     setImageProgress(null)
+    setCatchtableProgress(null)
     setIsCrawlInterrupted(false)
     // Sequence 초기화는 공통 유틸에서 관리 (clear는 전체 초기화이므로 생략)
   }, [])
@@ -755,6 +795,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
     crawlProgress,
     dbProgress,
     imageProgress,
+    catchtableProgress,
     isCrawlInterrupted,
     reviewSummaryStatus,
     summaryProgress,
