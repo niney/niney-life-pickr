@@ -5,6 +5,7 @@
 export interface RestaurantDB {
   id: number;
   place_id: string;
+  catchtable_id: string | null;
   name: string;
   place_name: string | null;
   category: string | null;

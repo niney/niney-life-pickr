@@ -92,6 +92,7 @@ export interface RestaurantCategory {
 export interface RestaurantData {
   id: number;
   place_id: string;
+  catchtable_id: string | null;
   name: string;
   place_name: string | null;
   category: string | null;
@@ -520,6 +521,25 @@ class ApiService {
 
     return this.request<ReviewListResponse>(url, {
       method: 'GET',
+    });
+  }
+
+  /**
+   * 음식점 부분 업데이트 (catchtable_id 등)
+   */
+  async updateRestaurant(id: number, fields: Partial<{
+    catchtable_id: string | null;
+    name: string;
+    place_name: string;
+    category: string;
+    phone: string;
+    address: string;
+    description: string;
+    business_hours: string;
+  }>): Promise<ApiResponse<RestaurantData>> {
+    return this.request(`/api/restaurants/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
     });
   }
 

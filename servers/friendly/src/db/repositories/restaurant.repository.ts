@@ -292,6 +292,46 @@ export class RestaurantRepository {
   }
 
   /**
+   * 음식점 부분 업데이트 (범용)
+   * @param id - 음식점 ID
+   * @param fields - 업데이트할 필드 객체 (예: { catchtable_id: 'xxx' })
+   * @returns 업데이트 성공 여부
+   */
+  async updateById(id: number, fields: Partial<RestaurantDB>): Promise<boolean> {
+    // 먼저 존재 여부 확인
+    const existing = await this.findById(id);
+    if (!existing) return false;
+
+    const allowedFields = [
+      'catchtable_id', 'name', 'place_name', 'category',
+      'phone', 'address', 'description', 'business_hours',
+      'lat', 'lng', 'url'
+    ];
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    for (const [key, value] of Object.entries(fields)) {
+      if (allowedFields.includes(key)) {
+        updates.push(`${key} = ?`);
+        values.push(value);
+      }
+    }
+
+    if (updates.length === 0) return false;
+
+    updates.push("updated_at = datetime('now', 'localtime')");
+    values.push(id);
+
+    await db.run(
+      `UPDATE restaurants SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    return true;
+  }
+
+  /**
    * 음식점 삭제 (하드 삭제)
    * CASCADE로 관련 데이터(메뉴, 리뷰, Job, 리뷰 요약)도 자동 삭제됩니다.
    *

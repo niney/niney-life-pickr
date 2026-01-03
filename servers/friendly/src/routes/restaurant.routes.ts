@@ -775,6 +775,78 @@ const restaurantRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * PATCH /api/restaurants/:id
+   * 음식점 부분 업데이트 (catchtable_id 등)
+   */
+  fastify.patch('/:id', {
+    schema: {
+      tags: ['restaurants'],
+      summary: '음식점 부분 업데이트',
+      description: '음식점의 특정 필드만 업데이트합니다. (catchtable_id, name, category 등)',
+      params: Type.Object({
+        id: Type.Number({ description: '음식점 ID' })
+      }),
+      body: Type.Object({
+        catchtable_id: Type.Optional(Type.Union([Type.String(), Type.Null()], { description: '캐치테이블 ID' })),
+        name: Type.Optional(Type.String({ description: '음식점 이름' })),
+        place_name: Type.Optional(Type.String({ description: '장소명' })),
+        category: Type.Optional(Type.String({ description: '카테고리' })),
+        phone: Type.Optional(Type.String({ description: '전화번호' })),
+        address: Type.Optional(Type.String({ description: '주소' })),
+        description: Type.Optional(Type.String({ description: '설명' })),
+        business_hours: Type.Optional(Type.String({ description: '영업시간' }))
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Any({ description: '업데이트된 레스토랑 정보' }),
+          timestamp: Type.String()
+        }),
+        404: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: number };
+    const body = request.body as Record<string, any>;
+
+    try {
+      const updated = await restaurantRepository.updateById(id, body);
+
+      if (!updated) {
+        return ResponseHelper.notFound(reply, `음식점 ID ${id}를 찾을 수 없습니다`);
+      }
+
+      // 업데이트된 레스토랑 정보 조회
+      const restaurant = await restaurantRepository.findById(id);
+
+      return ResponseHelper.success(
+        reply,
+        restaurant,
+        '음식점 정보가 업데이트되었습니다'
+      );
+    } catch (error) {
+      console.error('음식점 업데이트 에러:', error);
+      return ResponseHelper.error(
+        reply,
+        error instanceof Error ? error.message : 'Failed to update restaurant',
+        500
+      );
+    }
+  });
+
+  /**
    * DELETE /api/restaurants/:id
    * 음식점 삭제 (하드 삭제)
    * DB 레코드, 관련 데이터(메뉴, 리뷰, Job), 이미지 파일 모두 삭제

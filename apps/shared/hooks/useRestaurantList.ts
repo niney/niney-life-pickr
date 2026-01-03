@@ -132,6 +132,13 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     return () => clearTimeout(timer)
   }, [searchName, searchAddress])
 
+  // ✅ 레스토랑 정보 업데이트 (로컬 상태만)
+  const handleRestaurantUpdate = (updatedRestaurant: RestaurantData) => {
+    setRestaurants(prev => prev.map(r =>
+      r.id === updatedRestaurant.id ? updatedRestaurant : r
+    ))
+  }
+
   return {
     url,
     setUrl,
@@ -150,6 +157,7 @@ export const useRestaurantList = (options?: RestaurantListHookOptions) => {
     handleCrawl,
     fetchRestaurants,
     fetchCategories,
+    handleRestaurantUpdate,
   }
 }
 
