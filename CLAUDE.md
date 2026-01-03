@@ -83,6 +83,7 @@ cd apps/mobile && npm start
 - **[FRIENDLY-RESTAURANT](./docs/claude/04-friendly/FRIENDLY-RESTAURANT.md)** - 레스토랑 관리
 - **[FRIENDLY-REVIEW](./docs/claude/04-friendly/FRIENDLY-REVIEW.md)** - 리뷰 크롤링
 - **[FRIENDLY-REVIEW-SUMMARY](./docs/claude/04-friendly/FRIENDLY-REVIEW-SUMMARY.md)** - AI 리뷰 요약
+- **[FRIENDLY-CATCHTABLE](./docs/claude/04-friendly/FRIENDLY-CATCHTABLE.md)** - ⭐ 캐치테이블 리뷰 크롤링/요약
 - **[FRIENDLY-JOB-SOCKET](./docs/claude/04-friendly/FRIENDLY-JOB-SOCKET.md)** - ⭐ Unified Job + Socket.io
 - **[FRIENDLY-DATABASE](./docs/claude/04-friendly/FRIENDLY-DATABASE.md)** - Database 모듈
 - **[FRIENDLY-REPOSITORIES](./docs/claude/04-friendly/FRIENDLY-REPOSITORIES.md)** - Repository 패턴
@@ -145,12 +146,10 @@ cd servers/friendly && npm run db:reset
 
 ---
 
-**문서 버전**: 2.1
-**최종 업데이트**: 2025-11-13
+**문서 버전**: 2.2
+**최종 업데이트**: 2025-01-04
 **변경 사항**:
-- MOBILE-JOB-MONITOR.md 신규 추가 (Mobile Job 모니터링 화면)
-- SHARED-UTILS.md 업데이트 (JobCompletionTracker, SocketSequenceManager)
-- SHARED-CONSTANTS.md 업데이트 (SOCKET_CONFIG)
-- SHARED-CONTEXTS.md 업데이트 (SocketContext 리팩토링 반영)
-- WEB-JOB-MONITOR.md 업데이트 (공통 유틸 적용)
-**이전 버전**: 2.0 (43개 문서) → 2.1 (44개 문서)
+- FRIENDLY-CATCHTABLE.md 신규 추가 (캐치테이블 리뷰 크롤링/요약)
+- 캐치테이블 통합 API (/process) 문서화
+- Socket.io 이벤트 (catchtable:review_summary_progress) 추가
+**이전 버전**: 2.1 (44개 문서) → 2.2 (45개 문서)
