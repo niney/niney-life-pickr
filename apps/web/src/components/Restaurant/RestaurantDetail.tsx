@@ -3,7 +3,6 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native'
 import { useTheme, useSocket } from '@shared/contexts'
 import { THEME_COLORS } from '@shared/constants'
 import { useRestaurantDetail } from '../../hooks/useRestaurantDetail'
-import { useRestaurantStatistics } from '@shared/hooks'
 
 // 분리된 컴포넌트 임포트
 import RestaurantDetailHeader from './header/RestaurantDetailHeader'
@@ -20,7 +19,6 @@ import CatchtableReviewTab from './tabs/CatchtableReviewTab'
 import ResummaryModal from './modals/ResummaryModal'
 
 // 커스텀 훅 임포트
-import { useMenuStatistics } from './hooks/useMenuStatistics'
 import { useResummary } from './hooks/useResummary'
 import { useKeywordToggle } from './hooks/useKeywordToggle'
 import { useCatchtableReviews } from './hooks/useCatchtableReviews'
@@ -67,13 +65,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
 
   // 커스텀 훅 사용
   const { expandedKeywords, toggleKeywords } = useKeywordToggle()
-  const { menuStatistics, statisticsLoading, fetchMenuStatistics, setMenuStatistics } =
-    useMenuStatistics()
-  const {
-    reviewStatistics,
-    reviewStatisticsLoading,
-    fetchReviewStatistics,
-  } = useRestaurantStatistics()
   const {
     resummaryModalVisible,
     selectedModel,
@@ -130,10 +121,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     const restaurantId = parseInt(id!, 10)
     if (!isNaN(restaurantId)) {
       await fetchReviews(restaurantId)
-      // 통계 탭이면 통계도 새로고침
-      if (activeTab === 'statistics') {
-        await fetchMenuStatistics(restaurantId)
-      }
     }
   })
 
@@ -142,18 +129,12 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     const restaurantId = parseInt(id!, 10)
     if (!isNaN(restaurantId)) {
       await fetchReviews(restaurantId)
-      // 통계 탭이면 통계도 새로고침
-      if (activeTab === 'statistics') {
-        await fetchMenuStatistics(restaurantId)
-      }
     }
   })
 
   // restaurant id로 room 입장, 컴포넌트 언마운트 시 퇴장
   useEffect(() => {
     if (id) {
-      // 레스토랑 변경 시 통계 데이터 초기화
-      setMenuStatistics(null)
       // 레스토랑 변경 시 캐치테이블 리뷰 초기화
       resetCatchtableReviews()
 
@@ -178,17 +159,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     // useEffectEvent를 사용한 콜백들은 의존성에 포함하지 않음
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
-
-  // 통계 탭 활성화 시 데이터 로드
-  useEffect(() => {
-    if (activeTab === 'statistics' && id) {
-      const restaurantId = parseInt(id, 10)
-      if (!isNaN(restaurantId)) {
-        fetchMenuStatistics(restaurantId)
-        fetchReviewStatistics(restaurantId)
-      }
-    }
-  }, [activeTab, id, fetchMenuStatistics, fetchReviewStatistics])
 
   // 캡리뷰 탭 활성화 시 데이터 로드
   useEffect(() => {
@@ -397,13 +367,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
         )}
 
         {/* 통계 탭 */}
-        {activeTab === 'statistics' && (
-          <StatisticsTab
-            menuStatistics={menuStatistics}
-            reviewStatistics={reviewStatistics}
-            statisticsLoading={statisticsLoading}
-            reviewStatisticsLoading={reviewStatisticsLoading}
-          />
+        {activeTab === 'statistics' && id && (
+          <StatisticsTab restaurantId={parseInt(id, 10)} />
         )}
 
         {/* 네이버맵 탭 */}
