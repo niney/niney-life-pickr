@@ -133,10 +133,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
   })
 
   // restaurant id로 room 입장, 컴포넌트 언마운트 시 퇴장
+  // 일반 리뷰와 동일하게 id 변경 시 캐치테이블 리뷰도 함께 fetch
   useEffect(() => {
     if (id) {
-      // 레스토랑 변경 시 캐치테이블 리뷰 초기화
+      const restaurantId = parseInt(id, 10)
+
+      // 레스토랑 변경 시 캐치테이블 리뷰 초기화 후 fetch (일반 리뷰 방식과 동일)
       resetCatchtableReviews()
+      if (!isNaN(restaurantId)) {
+        fetchCatchtableReviews(restaurantId)
+      }
 
       // 레스토랑 변경 시 스크롤 초기화
       if (scrollContainerRef.current) {
@@ -159,16 +165,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ isMobile = false })
     // useEffectEvent를 사용한 콜백들은 의존성에 포함하지 않음
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
-
-  // 캡리뷰 탭 활성화 시 데이터 로드
-  useEffect(() => {
-    if (activeTab === 'catchtable' && id) {
-      const restaurantId = parseInt(id, 10)
-      if (!isNaN(restaurantId) && catchtableReviews.length === 0 && !catchtableReviewsLoading) {
-        fetchCatchtableReviews(restaurantId)
-      }
-    }
-  }, [activeTab, id, catchtableReviews.length, catchtableReviewsLoading, fetchCatchtableReviews])
 
   // 무한 스크롤 콜백
   const handleLoadMore = useCallback(() => {

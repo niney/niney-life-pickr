@@ -9,10 +9,12 @@ export const useCatchtableReviews = () => {
   const [reviewsTotal, setReviewsTotal] = useState(0)
   const [hasMoreReviews, setHasMoreReviews] = useState(false)
   const [currentOffset, setCurrentOffset] = useState(0)
+  const [hasFetched, setHasFetched] = useState(false)  // fetch 시도 여부 추적
 
   // 리뷰 조회 (초기 또는 새로고침)
   const fetchReviews = useCallback(async (restaurantId: number) => {
     setReviewsLoading(true)
+    setHasFetched(true)  // fetch 시도 표시
     try {
       const response = await apiService.getCatchtableReviews(
         restaurantId,
@@ -66,6 +68,7 @@ export const useCatchtableReviews = () => {
     setReviewsTotal(0)
     setHasMoreReviews(false)
     setCurrentOffset(0)
+    setHasFetched(false)  // 초기화 시 fetch 상태도 리셋
   }, [])
 
   return {
@@ -73,6 +76,7 @@ export const useCatchtableReviews = () => {
     catchtableReviewsLoading: reviewsLoading,
     catchtableReviewsTotal: reviewsTotal,
     hasMoreCatchtableReviews: hasMoreReviews,
+    hasFetchedCatchtableReviews: hasFetched,  // 추가
     fetchCatchtableReviews: fetchReviews,
     loadMoreCatchtableReviews: loadMoreReviews,
     resetCatchtableReviews: resetReviews,
