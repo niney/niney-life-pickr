@@ -258,25 +258,27 @@ const catchtableRoutes: FastifyPluginAsync = async (fastify) => {
                   updated_at: Type.String(),
                   summary: Type.Optional(Type.Union([
                     Type.Object({
-                      summary: Type.String(),
-                      keyKeywords: Type.Array(Type.String()),
+                      summary: Type.Union([Type.String(), Type.Null()]),
+                      keyKeywords: Type.Union([Type.Array(Type.String()), Type.Null()]),
                       sentiment: Type.Union([
                         Type.Literal('positive'),
                         Type.Literal('negative'),
                         Type.Literal('neutral'),
+                        Type.Null(),
                       ]),
-                      sentimentReason: Type.String(),
+                      sentimentReason: Type.Union([Type.String(), Type.Null()]),
                       satisfactionScore: Type.Union([Type.Number(), Type.Null()]),
-                      tips: Type.Array(Type.String()),
-                      menuItems: Type.Array(Type.Object({
-                        name: Type.String(),
+                      tips: Type.Union([Type.Array(Type.String()), Type.Null()]),
+                      menuItems: Type.Union([Type.Array(Type.Object({
+                        name: Type.Union([Type.String(), Type.Null()]),
                         sentiment: Type.Union([
                           Type.Literal('positive'),
                           Type.Literal('negative'),
                           Type.Literal('neutral'),
+                          Type.Null(),
                         ]),
-                        reason: Type.Optional(Type.String()),
-                      })),
+                        reason: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+                      })), Type.Null()]),
                     }),
                     Type.Null(),
                   ])),
