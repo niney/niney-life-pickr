@@ -23,7 +23,8 @@ export interface ChatOptions {
   top_p?: number;
   num_ctx?: number;
   num_predict?: number;
-  format?: 'json';
+  /** 응답 포맷 (기본: 'json', 텍스트 원하면 'text' 명시) */
+  format?: 'json' | 'text';
 }
 
 /**
@@ -120,6 +121,6 @@ export interface BatchOptions {
   timeout?: number;
   /** 진행률 콜백 */
   onProgress?: (completed: number, total: number) => void;
-  /** JSON 응답 파싱 여부 (format: 'json' 사용 시 자동 파싱) */
+  /** JSON 응답 파싱 여부 (기본: true) */
   parseJson?: boolean;
 }

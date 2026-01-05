@@ -44,12 +44,15 @@ export class LocalOllamaChatService extends BaseOllamaChatService {
    * 채팅 메시지 전송
    */
   async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
+    // format 기본값: 'json' ('text' 명시 시 텍스트 응답)
+    const format = options?.format === 'text' ? undefined : 'json';
+
     try {
       const response = await this.client.chat({
         model: this.model,
         messages,
         stream: false,
-        format: options?.format,
+        format,
         options: {
           temperature: options?.temperature,
           top_p: options?.top_p,
@@ -94,8 +97,9 @@ export class LocalOllamaChatService extends BaseOllamaChatService {
       try {
         const rawResponse = await this.chat(req.messages, req.options);
 
-        // JSON 파싱 옵션
-        const response = options?.parseJson
+        // JSON 파싱 옵션 (기본: true)
+        const shouldParse = options?.parseJson !== false;
+        const response = shouldParse
           ? this.parseJsonResponse<T>(rawResponse) ?? (rawResponse as unknown as T)
           : (rawResponse as unknown as T);
 
