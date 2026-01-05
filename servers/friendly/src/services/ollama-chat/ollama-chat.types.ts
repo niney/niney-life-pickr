@@ -91,12 +91,22 @@ export interface BatchChatRequest {
 }
 
 /**
- * 배치 채팅 결과
+ * 배치 Ask 요청 (시스템 프롬프트 + 사용자 메시지)
  */
-export interface BatchChatResult {
+export interface BatchAskRequest {
+  id: string;
+  userMessage: string;
+  options?: ChatOptions;
+}
+
+/**
+ * 배치 채팅 결과 (제네릭)
+ * @template T - 응답 데이터 타입 (기본: string)
+ */
+export interface BatchChatResult<T = string> {
   id: string;
   success: boolean;
-  response?: string;
+  response?: T;
   error?: string;
 }
 
@@ -110,4 +120,6 @@ export interface BatchOptions {
   timeout?: number;
   /** 진행률 콜백 */
   onProgress?: (completed: number, total: number) => void;
+  /** JSON 응답 파싱 여부 (format: 'json' 사용 시 자동 파싱) */
+  parseJson?: boolean;
 }

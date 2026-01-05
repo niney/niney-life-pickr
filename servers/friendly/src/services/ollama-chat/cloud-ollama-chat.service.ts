@@ -13,6 +13,7 @@ import type {
   BatchChatRequest,
   BatchChatResult,
   BatchOptions,
+  BatchAskRequest,
 } from './ollama-chat.types';
 
 export class CloudOllamaChatService extends BaseOllamaChatService {
@@ -86,13 +87,15 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
    * - 각 배치마다 락을 획득/해제하여 여러 요청이 번갈아가며 처리
    * - 배치 내에서는 병렬 실행 (concurrency만큼 동시 처리)
    * - API rate limit 준수 및 리소스 과부하 방지
+   * 
+   * @template T - 응답 타입 (parseJson: true 시 사용)
    */
-  async chatBatch(
+  async chatBatch<T = string>(
     requests: BatchChatRequest[],
     options?: BatchOptions
-  ): Promise<BatchChatResult[]> {
+  ): Promise<BatchChatResult<T>[]> {
     const concurrency = options?.concurrency ?? 15;
-    const results: BatchChatResult[] = [];
+    const results: BatchChatResult<T>[] = [];
     let completed = 0;
     const totalBatches = Math.ceil(requests.length / concurrency);
 
@@ -114,9 +117,15 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
         const chunkResults = await Promise.all(
           chunk.map(async (req) => {
             try {
-              const response = await this.chat(req.messages, req.options);
+              const rawResponse = await this.chat(req.messages, req.options);
               completed++;
               options?.onProgress?.(completed, requests.length);
+
+              // JSON 파싱 옵션
+              const response = options?.parseJson
+                ? this.parseJsonResponse<T>(rawResponse) ?? (rawResponse as unknown as T)
+                : (rawResponse as unknown as T);
+
               return {
                 id: req.id,
                 success: true,
@@ -142,5 +151,31 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
     }
 
     return results;
+  }
+
+  /**
+   * 시스템 프롬프트와 함께 배치 Ask (병렬 처리)
+   * 
+   * @template T - 응답 타입 (parseJson: true 시 사용)
+   * @param systemPrompt - 공통 시스템 프롬프트
+   * @param requests - 사용자 메시지 배열 (id, userMessage)
+   * @param options - 배치 옵션
+   */
+  async askBatch<T = string>(
+    systemPrompt: string,
+    requests: BatchAskRequest[],
+    options?: BatchOptions
+  ): Promise<BatchChatResult<T>[]> {
+    // BatchAskRequest를 BatchChatRequest로 변환
+    const chatRequests: BatchChatRequest[] = requests.map((req) => ({
+      id: req.id,
+      messages: [
+        { role: 'system' as const, content: systemPrompt },
+        { role: 'user' as const, content: req.userMessage },
+      ],
+      options: req.options,
+    }));
+
+    return this.chatBatch<T>(chatRequests, options);
   }
 }

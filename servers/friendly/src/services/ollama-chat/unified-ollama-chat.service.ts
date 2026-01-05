@@ -12,6 +12,7 @@ import type {
   BatchChatRequest,
   BatchChatResult,
   BatchOptions,
+  BatchAskRequest,
 } from './ollama-chat.types';
 
 type ServiceType = 'cloud' | 'local';
@@ -162,14 +163,30 @@ export class UnifiedOllamaChatService {
    * 배치 채팅 (활성 서비스에 위임)
    * - Cloud: 병렬 처리
    * - Local: 순차 처리
+   * @template T - 응답 타입 (parseJson: true 시 사용)
    */
-  async chatBatch(
+  async chatBatch<T = string>(
     requests: BatchChatRequest[],
     options?: BatchOptions
-  ): Promise<BatchChatResult[]> {
+  ): Promise<BatchChatResult<T>[]> {
     if (!this.activeService) {
       throw new Error('❌ 서비스가 초기화되지 않았습니다. ensureReady()를 먼저 호출하세요.');
     }
-    return this.activeService.chatBatch(requests, options);
+    return this.activeService.chatBatch<T>(requests, options);
+  }
+
+  /**
+   * 시스템 프롬프트와 함께 배치 Ask (활성 서비스에 위임)
+   * @template T - 응답 타입 (parseJson: true 시 사용)
+   */
+  async askBatch<T = string>(
+    systemPrompt: string,
+    requests: BatchAskRequest[],
+    options?: BatchOptions
+  ): Promise<BatchChatResult<T>[]> {
+    if (!this.activeService) {
+      throw new Error('❌ 서비스가 초기화되지 않았습니다. ensureReady()를 먼저 호출하세요.');
+    }
+    return this.activeService.askBatch<T>(systemPrompt, requests, options);
   }
 }

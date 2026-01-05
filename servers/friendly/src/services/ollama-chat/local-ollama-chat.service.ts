@@ -12,6 +12,7 @@ import type {
   BatchChatRequest,
   BatchChatResult,
   BatchOptions,
+  BatchAskRequest,
 } from './ollama-chat.types';
 
 export class LocalOllamaChatService extends BaseOllamaChatService {
@@ -80,17 +81,24 @@ export class LocalOllamaChatService extends BaseOllamaChatService {
 
   /**
    * 배치 채팅 (순차 처리)
+   * @template T - 응답 타입 (parseJson: true 시 사용)
    */
-  async chatBatch(
+  async chatBatch<T = string>(
     requests: BatchChatRequest[],
     options?: BatchOptions
-  ): Promise<BatchChatResult[]> {
-    const results: BatchChatResult[] = [];
+  ): Promise<BatchChatResult<T>[]> {
+    const results: BatchChatResult<T>[] = [];
 
     for (let i = 0; i < requests.length; i++) {
       const req = requests[i];
       try {
-        const response = await this.chat(req.messages, req.options);
+        const rawResponse = await this.chat(req.messages, req.options);
+
+        // JSON 파싱 옵션
+        const response = options?.parseJson
+          ? this.parseJsonResponse<T>(rawResponse) ?? (rawResponse as unknown as T)
+          : (rawResponse as unknown as T);
+
         results.push({
           id: req.id,
           success: true,
@@ -107,5 +115,26 @@ export class LocalOllamaChatService extends BaseOllamaChatService {
     }
 
     return results;
+  }
+
+  /**
+   * 시스템 프롬프트와 함께 배치 Ask (순차 처리)
+   * @template T - 응답 타입 (parseJson: true 시 사용)
+   */
+  async askBatch<T = string>(
+    systemPrompt: string,
+    requests: BatchAskRequest[],
+    options?: BatchOptions
+  ): Promise<BatchChatResult<T>[]> {
+    const chatRequests: BatchChatRequest[] = requests.map((req) => ({
+      id: req.id,
+      messages: [
+        { role: 'system' as const, content: systemPrompt },
+        { role: 'user' as const, content: req.userMessage },
+      ],
+      options: req.options,
+    }));
+
+    return this.chatBatch<T>(chatRequests, options);
   }
 }

@@ -336,6 +336,42 @@ async function testBatch() {
     });
     console.log('');
 
+    // 4. askBatch 테스트 (시스템 프롬프트 + 배치 + JSON + 타입)
+    console.log('4. askBatch 테스트 (제네릭 타입 + JSON 파싱)...');
+
+    // 응답 타입 정의
+    interface CapitalResponse {
+      country: string;
+      capital: string;
+    }
+
+    const askRequests = [
+      { id: 'a1', userMessage: '한국의 수도는?', options: { format: 'json' as const } },
+      { id: 'a2', userMessage: '일본의 수도는?', options: { format: 'json' as const } },
+      { id: 'a3', userMessage: '중국의 수도는?', options: { format: 'json' as const } },
+      { id: 'a4', userMessage: '미국의 수도는?', options: { format: 'json' as const } },
+      { id: 'a5', userMessage: '프랑스의 수도는?', options: { format: 'json' as const } },
+    ];
+
+    const askStartTime = Date.now();
+    const askResults = await unified.askBatch<CapitalResponse>(
+      'JSON 형식으로 응답하세요. {"country": "나라명", "capital": "수도명"} 형태로 답하세요.',
+      askRequests,
+      { parseJson: true }
+    );
+    const askElapsed = Date.now() - askStartTime;
+
+    console.log(`   ⏱️  소요 시간: ${(askElapsed / 1000).toFixed(2)}초`);
+    askResults.forEach((r) => {
+      if (r.success && r.response) {
+        // 타입 안전하게 접근 가능
+        console.log(`   [${r.id}] ✅ ${r.response.country} → ${r.response.capital}`);
+      } else {
+        console.log(`   [${r.id}] ❌ ${r.error}`);
+      }
+    });
+    console.log('');
+
     console.log('✅ 배치 테스트 완료!\n');
 
   } catch (error) {
