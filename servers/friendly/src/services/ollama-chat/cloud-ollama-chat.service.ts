@@ -5,6 +5,7 @@
 
 import { Ollama } from 'ollama';
 import { BaseOllamaChatService } from './base-ollama-chat.service';
+import { globalCloudOllamaMutex } from '../ollama/mutex';
 import type {
   ChatMessage,
   ChatOptions,
@@ -80,6 +81,11 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
 
   /**
    * 배치 채팅 (병렬 처리)
+   * 
+   * ⚠️ 배치 단위로 전역 뮤텍스를 사용하여 공평한 실행 보장
+   * - 각 배치마다 락을 획득/해제하여 여러 요청이 번갈아가며 처리
+   * - 배치 내에서는 병렬 실행 (concurrency만큼 동시 처리)
+   * - API rate limit 준수 및 리소스 과부하 방지
    */
   async chatBatch(
     requests: BatchChatRequest[],
@@ -88,35 +94,51 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
     const concurrency = options?.concurrency ?? 15;
     const results: BatchChatResult[] = [];
     let completed = 0;
+    const totalBatches = Math.ceil(requests.length / concurrency);
 
-    // 동시성 제어를 위한 청크 처리
+    // 배치 단위로 처리 (각 배치마다 락 획득/해제)
     for (let i = 0; i < requests.length; i += concurrency) {
       const chunk = requests.slice(i, i + concurrency);
+      const batchNumber = Math.floor(i / concurrency) + 1;
 
-      const chunkResults = await Promise.all(
-        chunk.map(async (req) => {
-          try {
-            const response = await this.chat(req.messages, req.options);
-            completed++;
-            options?.onProgress?.(completed, requests.length);
-            return {
-              id: req.id,
-              success: true,
-              response,
-            };
-          } catch (error) {
-            completed++;
-            options?.onProgress?.(completed, requests.length);
-            return {
-              id: req.id,
-              success: false,
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-        })
-      );
+      // 배치 시작 전 뮤텍스 대기 상태 확인
+      if (globalCloudOllamaMutex.isLocked()) {
+        const queueLength = globalCloudOllamaMutex.getQueueLength();
+        console.log(`[배치 ${batchNumber}/${totalBatches}] ⏳ 다른 배치 대기 중... (대기 순번: ${queueLength + 1})`);
+      }
 
-      results.push(...chunkResults);
+      // 배치 단위로 뮤텍스 획득
+      await globalCloudOllamaMutex.acquire();
+
+      try {
+        const chunkResults = await Promise.all(
+          chunk.map(async (req) => {
+            try {
+              const response = await this.chat(req.messages, req.options);
+              completed++;
+              options?.onProgress?.(completed, requests.length);
+              return {
+                id: req.id,
+                success: true,
+                response,
+              };
+            } catch (error) {
+              completed++;
+              options?.onProgress?.(completed, requests.length);
+              return {
+                id: req.id,
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+              };
+            }
+          })
+        );
+
+        results.push(...chunkResults);
+      } finally {
+        // 배치 완료 후 뮤텍스 해제 (다른 요청의 배치가 실행될 수 있음)
+        globalCloudOllamaMutex.release();
+      }
     }
 
     return results;
