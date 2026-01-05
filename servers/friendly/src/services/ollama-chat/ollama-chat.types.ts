@@ -35,6 +35,8 @@ export interface CloudOllamaChatConfig {
   model: string;
   apiKey: string;
   timeout?: number;
+  /** 병렬 처리 수 (기본값: base.yml parallelSize) */
+  parallelSize?: number;
 }
 
 /**
@@ -115,7 +117,7 @@ export interface BatchChatResult<T = string> {
  * 배치 처리 옵션
  */
 export interface BatchOptions {
-  /** 동시 처리 수 (기본: 15) */
+  /** 동시 처리 수 (기본: config parallelSize) */
   concurrency?: number;
   /** 개별 요청 타임아웃 (ms) */
   timeout?: number;

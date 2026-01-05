@@ -18,6 +18,7 @@ import type {
 
 export class CloudOllamaChatService extends BaseOllamaChatService {
   protected client: Ollama;
+  protected parallelSize: number;
 
   constructor(config: CloudOllamaChatConfig) {
     super(config.model, config.timeout ?? 60000);
@@ -25,6 +26,7 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
       host: config.host,
       headers: { Authorization: `Bearer ${config.apiKey}` },
     });
+    this.parallelSize = config.parallelSize ?? 15;
   }
 
   /**
@@ -97,7 +99,7 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
     requests: BatchChatRequest[],
     options?: BatchOptions
   ): Promise<BatchChatResult<T>[]> {
-    const concurrency = options?.concurrency ?? 15;
+    const concurrency = options?.concurrency ?? this.parallelSize;
     const results: BatchChatResult<T>[] = [];
     let completed = 0;
     const totalBatches = Math.ceil(requests.length / concurrency);

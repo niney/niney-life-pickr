@@ -29,6 +29,7 @@ export function createCloudChatService(
     model: overrides?.model ?? cloudConfig.model,
     apiKey: overrides?.apiKey ?? cloudConfig.apiKey!,
     timeout: overrides?.timeout ?? cloudConfig.timeout,
+    parallelSize: overrides?.parallelSize ?? cloudConfig.parallelSize,
   });
 }
 
@@ -48,6 +49,7 @@ export function createCloudWebService(
     model: overrides?.model ?? cloudConfig.model,
     apiKey: overrides?.apiKey ?? cloudConfig.apiKey!,
     timeout: overrides?.timeout ?? cloudConfig.timeout,
+    parallelSize: overrides?.parallelSize ?? cloudConfig.parallelSize,
   });
 }
 
@@ -101,6 +103,7 @@ export function createUnifiedChatService(
         model: options?.cloudOverrides?.model ?? cloudConfig.model,
         apiKey: options?.cloudOverrides?.apiKey ?? cloudConfig.apiKey!,
         timeout: options?.cloudOverrides?.timeout ?? cloudConfig.timeout,
+        parallelSize: options?.cloudOverrides?.parallelSize ?? cloudConfig.parallelSize,
       };
     }
   }
