@@ -5,7 +5,14 @@
 
 import { Ollama } from 'ollama';
 import { BaseOllamaChatService } from './base-ollama-chat.service';
-import type { ChatMessage, ChatOptions, LocalOllamaChatConfig } from './ollama-chat.types';
+import type {
+  ChatMessage,
+  ChatOptions,
+  LocalOllamaChatConfig,
+  BatchChatRequest,
+  BatchChatResult,
+  BatchOptions,
+} from './ollama-chat.types';
 
 export class LocalOllamaChatService extends BaseOllamaChatService {
   private client: Ollama;
@@ -69,5 +76,36 @@ export class LocalOllamaChatService extends BaseOllamaChatService {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * 배치 채팅 (순차 처리)
+   */
+  async chatBatch(
+    requests: BatchChatRequest[],
+    options?: BatchOptions
+  ): Promise<BatchChatResult[]> {
+    const results: BatchChatResult[] = [];
+
+    for (let i = 0; i < requests.length; i++) {
+      const req = requests[i];
+      try {
+        const response = await this.chat(req.messages, req.options);
+        results.push({
+          id: req.id,
+          success: true,
+          response,
+        });
+      } catch (error) {
+        results.push({
+          id: req.id,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      options?.onProgress?.(i + 1, requests.length);
+    }
+
+    return results;
   }
 }

@@ -252,6 +252,97 @@ async function testUnifiedChat() {
   }
 }
 
+/**
+ * 테스트: 배치 처리 기능
+ */
+async function testBatch() {
+  console.log('\n========================================');
+  console.log('🧪 테스트: 배치 처리 기능');
+  console.log('========================================\n');
+
+  try {
+    // Cloud 배치 (병렬)
+    console.log('1. Cloud 배치 처리 (병렬)...');
+    const cloudService = createCloudChatService();
+    const isCloudReady = await cloudService.checkStatus();
+
+    if (isCloudReady) {
+      const cloudRequests = Array.from({ length: 15 }, (_, i) => ({
+        id: `c${i + 1}`,
+        messages: [{ role: 'user' as const, content: `${i + 1}+${i + 1}=?` }],
+        options: { format: 'json' as const },
+      }));
+
+      const startTime = Date.now();
+      const cloudResults = await cloudService.chatBatch(cloudRequests, {
+        concurrency: 15,
+        onProgress: (done, total) => console.log(`   📊 진행: ${done}/${total}`),
+      });
+      const elapsed = Date.now() - startTime;
+
+      console.log(`   ⏱️  소요 시간: ${(elapsed / 1000).toFixed(2)}초`);
+      cloudResults.forEach((r) => {
+        console.log(`   [${r.id}] ${r.success ? '✅' : '❌'} ${r.response || r.error}`);
+      });
+      console.log('');
+    } else {
+      console.log('   ⚠️  Cloud 사용 불가, 스킵\n');
+    }
+
+    // Local 배치 (순차)
+    console.log('2. Local 배치 처리 (순차)...');
+    const localService = createLocalChatService();
+    const isLocalReady = await localService.checkStatus();
+
+    if (isLocalReady) {
+      const localRequests = [
+        { id: 'l1', messages: [{ role: 'user' as const, content: '4+4=?' }], options: { format: 'json' as const } },
+        { id: 'l2', messages: [{ role: 'user' as const, content: '5+5=?' }], options: { format: 'json' as const } },
+      ];
+
+      const startTime = Date.now();
+      const localResults = await localService.chatBatch(localRequests, {
+        onProgress: (done, total) => console.log(`   📊 진행: ${done}/${total}`),
+      });
+      const elapsed = Date.now() - startTime;
+
+      console.log(`   ⏱️  소요 시간: ${(elapsed / 1000).toFixed(2)}초`);
+      localResults.forEach((r) => {
+        console.log(`   [${r.id}] ${r.success ? '✅' : '❌'} ${r.response || r.error}`);
+      });
+      console.log('');
+    } else {
+      console.log('   ⚠️  Local 사용 불가, 스킵\n');
+    }
+
+    // Unified 배치
+    console.log('3. Unified 배치 처리...');
+    const unified = createUnifiedChatService({ prefer: 'cloud' });
+    await unified.ensureReady();
+
+    const unifiedRequests = [
+      { id: 'u1', messages: [{ role: 'user' as const, content: '6+6=?' }], options: { format: 'json' as const } },
+      { id: 'u2', messages: [{ role: 'user' as const, content: '7+7=?' }], options: { format: 'json' as const } },
+    ];
+
+    const startTime = Date.now();
+    const unifiedResults = await unified.chatBatch(unifiedRequests);
+    const elapsed = Date.now() - startTime;
+
+    console.log(`   📍 활성 서비스: ${unified.getActiveType()}`);
+    console.log(`   ⏱️  소요 시간: ${(elapsed / 1000).toFixed(2)}초`);
+    unifiedResults.forEach((r) => {
+      console.log(`   [${r.id}] ${r.success ? '✅' : '❌'} ${r.response || r.error}`);
+    });
+    console.log('');
+
+    console.log('✅ 배치 테스트 완료!\n');
+
+  } catch (error) {
+    console.error('❌ 배치 테스트 실패:', error);
+  }
+}
+
 // 실행
 async function main() {
   const args = process.argv.slice(2);
@@ -262,6 +353,7 @@ async function main() {
     await testLocalChat();
     await testCloudChat();
     await testUnifiedChat();
+    await testBatch();
     await testWebSearch();
   } else if (target === 'local') {
     await testLocalChat();
@@ -270,13 +362,16 @@ async function main() {
     await testWebSearch();
   } else if (target === 'unified') {
     await testUnifiedChat();
+  } else if (target === 'batch') {
+    await testBatch();
   } else if (target === 'websearch' || target === 'search') {
     await testWebSearch();
   } else {
-    console.log('사용법: ts-node ollama-chat.ts [local|cloud|unified|websearch|all]');
+    console.log('사용법: ts-node ollama-chat.ts [local|cloud|unified|batch|websearch|all]');
     console.log('  local     - Local Ollama 테스트');
     console.log('  cloud     - Cloud Ollama 테스트');
     console.log('  unified   - Unified (Cloud+Local) 테스트');
+    console.log('  batch     - 배치 처리 테스트');
     console.log('  websearch - Web Search 테스트');
     console.log('  all       - 전체 테스트 (기본)');
   }

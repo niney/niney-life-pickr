@@ -9,6 +9,9 @@ import type {
   ChatMessage,
   ChatOptions,
   UnifiedOllamaChatConfig,
+  BatchChatRequest,
+  BatchChatResult,
+  BatchOptions,
 } from './ollama-chat.types';
 
 type ServiceType = 'cloud' | 'local';
@@ -153,5 +156,20 @@ export class UnifiedOllamaChatService {
       return [];
     }
     return this.activeService.listModels();
+  }
+
+  /**
+   * 배치 채팅 (활성 서비스에 위임)
+   * - Cloud: 병렬 처리
+   * - Local: 순차 처리
+   */
+  async chatBatch(
+    requests: BatchChatRequest[],
+    options?: BatchOptions
+  ): Promise<BatchChatResult[]> {
+    if (!this.activeService) {
+      throw new Error('❌ 서비스가 초기화되지 않았습니다. ensureReady()를 먼저 호출하세요.');
+    }
+    return this.activeService.chatBatch(requests, options);
   }
 }

@@ -5,7 +5,14 @@
 
 import { Ollama } from 'ollama';
 import { BaseOllamaChatService } from './base-ollama-chat.service';
-import type { ChatMessage, ChatOptions, CloudOllamaChatConfig } from './ollama-chat.types';
+import type {
+  ChatMessage,
+  ChatOptions,
+  CloudOllamaChatConfig,
+  BatchChatRequest,
+  BatchChatResult,
+  BatchOptions,
+} from './ollama-chat.types';
 
 export class CloudOllamaChatService extends BaseOllamaChatService {
   protected client: Ollama;
@@ -69,5 +76,49 @@ export class CloudOllamaChatService extends BaseOllamaChatService {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * 배치 채팅 (병렬 처리)
+   */
+  async chatBatch(
+    requests: BatchChatRequest[],
+    options?: BatchOptions
+  ): Promise<BatchChatResult[]> {
+    const concurrency = options?.concurrency ?? 15;
+    const results: BatchChatResult[] = [];
+    let completed = 0;
+
+    // 동시성 제어를 위한 청크 처리
+    for (let i = 0; i < requests.length; i += concurrency) {
+      const chunk = requests.slice(i, i + concurrency);
+
+      const chunkResults = await Promise.all(
+        chunk.map(async (req) => {
+          try {
+            const response = await this.chat(req.messages, req.options);
+            completed++;
+            options?.onProgress?.(completed, requests.length);
+            return {
+              id: req.id,
+              success: true,
+              response,
+            };
+          } catch (error) {
+            completed++;
+            options?.onProgress?.(completed, requests.length);
+            return {
+              id: req.id,
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        })
+      );
+
+      results.push(...chunkResults);
+    }
+
+    return results;
   }
 }

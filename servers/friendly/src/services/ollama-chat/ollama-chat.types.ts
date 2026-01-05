@@ -80,3 +80,34 @@ export interface WebFetchResult {
   content: string;
   title?: string;
 }
+
+/**
+ * 배치 채팅 요청
+ */
+export interface BatchChatRequest {
+  id: string;
+  messages: ChatMessage[];
+  options?: ChatOptions;
+}
+
+/**
+ * 배치 채팅 결과
+ */
+export interface BatchChatResult {
+  id: string;
+  success: boolean;
+  response?: string;
+  error?: string;
+}
+
+/**
+ * 배치 처리 옵션
+ */
+export interface BatchOptions {
+  /** 동시 처리 수 (기본: 15) */
+  concurrency?: number;
+  /** 개별 요청 타임아웃 (ms) */
+  timeout?: number;
+  /** 진행률 콜백 */
+  onProgress?: (completed: number, total: number) => void;
+}
