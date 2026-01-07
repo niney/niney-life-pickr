@@ -81,7 +81,7 @@ async function testFoodCategory() {
   console.log(JSON.stringify(treeJson, null, 2));
   console.log('');
 
-  console.log('✅ 테스트 완료!\n');
+  console.log('✅ 분류 테스트 완료!\n');
 }
 
 // 실행
