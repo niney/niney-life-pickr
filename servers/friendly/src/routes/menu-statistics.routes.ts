@@ -49,6 +49,72 @@ const RestaurantMenuStatisticsSchema = Type.Object({
  */
 const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
+   * GET /api/restaurants/:id/menu-grouping
+   * 메뉴명별 그룹핑 결과 조회 (디버깅/테스트용)
+   */
+  fastify.get('/:id/menu-grouping', {
+    schema: {
+      tags: ['menu-statistics'],
+      summary: '메뉴명별 그룹핑 결과 조회',
+      description: '메뉴명을 정규화하여 그룹핑한 결과를 반환합니다. 통계 계산 전 그룹핑 상태를 확인할 수 있습니다.',
+      params: Type.Object({
+        id: Type.String({ description: '레스토랑 ID' })
+      }),
+      querystring: Type.Object({
+        source: Type.Optional(Type.Union([
+          Type.Literal('naver'),
+          Type.Literal('catchtable'),
+          Type.Literal('all')
+        ], { description: '리뷰 소스 (기본: naver)', default: 'naver' }))
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            restaurantId: Type.Number(),
+            source: Type.String(),
+            totalItems: Type.Number(),
+            groupedMenus: Type.Array(Type.Object({
+              normalizedName: Type.String(),
+              items: Type.Array(Type.Object({
+                name: Type.String(),
+                sentiment: Type.String(),
+                reason: Type.Optional(Type.String())
+              })),
+              count: Type.Number()
+            }))
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String()
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { source = 'naver' } = request.query as { source?: 'naver' | 'catchtable' | 'all' };
+    const restaurantId = parseInt(id, 10);
+
+    if (isNaN(restaurantId)) {
+      return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID입니다.', 400);
+    }
+
+    try {
+      const groupingResult = await menuStatisticsService.getMenuGrouping(restaurantId, source);
+      return ResponseHelper.success(reply, groupingResult, '메뉴 그룹핑 결과를 조회했습니다.');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ 메뉴 그룹핑 조회 실패:', errorMessage);
+      return ResponseHelper.error(reply, `메뉴 그룹핑 조회에 실패했습니다: ${errorMessage}`, 500);
+    }
+  });
+
+  /**
    * GET /api/restaurants/:id/menu-statistics
    * 레스토랑별 메뉴 감정 통계 조회
    */

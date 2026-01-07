@@ -64,6 +64,60 @@ class MenuStatisticsService {
   }
 
   /**
+   * 메뉴명별 그룹핑만 수행 (디버깅/테스트용)
+   */
+  async getMenuGrouping(
+    restaurantId: number,
+    source: StatisticsSource = 'naver'
+  ): Promise<{
+    restaurantId: number;
+    source: string;
+    totalItems: number;
+    groupedMenus: Array<{
+      normalizedName: string;
+      items: Array<{ name: string; sentiment: string; reason?: string }>;
+      count: number;
+    }>;
+  }> {
+    // 1. 소스별 메뉴 아이템 조회
+    const menuItemsData = await this.getMenuItems(restaurantId, source);
+    const menuItems = menuItemsData.map((item) => item.menuItem as MenuItemWithSentiment);
+
+    // 2. 메뉴명별로 그룹핑
+    const menuMap = new Map<string, MenuItemWithSentiment[]>();
+    for (const item of menuItems) {
+      const normalized = this.normalizeMenuName(item.name);
+      if (!menuMap.has(normalized)) {
+        menuMap.set(normalized, []);
+      }
+      menuMap.get(normalized)!.push(item);
+    }
+
+    // 3. 결과 변환
+    const groupedMenus = Array.from(menuMap.entries())
+      .map(([normalizedName, items]) => ({
+        normalizedName,
+        items: items.map((i) => ({
+          name: i.name,
+          sentiment: i.sentiment,
+          reason: i.reason,
+        })),
+        count: items.length,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+      // 정규화된 메뉴명 리스트만 출력
+      console.log('Normalized menu names:', Array.from(menuMap.keys()));
+
+    return {
+      restaurantId,
+      source,
+      totalItems: menuItems.length,
+      groupedMenus,
+    };
+  }
+
+  /**
    * 소스별 메뉴 아이템 조회
    */
   private async getMenuItems(
