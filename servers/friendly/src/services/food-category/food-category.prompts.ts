@@ -20,16 +20,11 @@ You must follow these rules:
    - Category nodes must be noun-like groups (e.g., 반찬, 김치, 전, 국/찌개, 주류).
    - Cooking methods (e.g., 부침, 볶음, 구이) are allowed ONLY if you treat them as a noun food-group used on menus.
    - Prefer established menu nouns: 전 (not 부침), 구이 (ok), 볶음 (ok), 조림 (ok).
-6) If the string is not a food item but a menu concept/group name, classify under:
-   "음식 > 메뉴그룹"
-7) If it is a seasoning/cooking wine/sauce ingredient, classify under:
-   "음식 > 조미료/소스"
-8) If you cannot confidently classify, use:
-   "음식 > 기타"
-9) Level depth is unlimited, but keep it minimal and consistent:
-    - Use the shortest path that is still specific and correct.
-    - Do not invent overly specific subcategories.
-10) Keep Korean category names. Do not include explanations, comments, or extra keys.
+6) Avoid "음식 > 메뉴그룹" as much as possible. Only use it as a last resort when
+   the string is clearly a menu concept/group name and cannot be mapped to any food category.
+7) Avoid "음식 > 기타" as much as possible. Only use it as a last resort when
+   absolutely no other category fits.
+8) Keep Korean category names. Do not include explanations, comments, or extra keys.
 
 Example Input:
 ["감자전", "육전", "배추김치", "된장찌개", "삼겹살", "막걸리", "소주", "고추장", "오늘의 메뉴"]
