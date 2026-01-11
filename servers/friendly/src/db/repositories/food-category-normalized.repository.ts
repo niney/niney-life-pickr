@@ -156,6 +156,27 @@ export class FoodCategoryNormalizedRepository {
     );
     return result?.count ?? 0;
   }
+
+  /**
+   * 여러 메뉴명이 정규화 테이블에 있는지 확인
+   * @param names 확인할 메뉴명 목록
+   * @returns 정규화 테이블에 없는 메뉴명 목록
+   */
+  async findMissingNames(names: string[]): Promise<string[]> {
+    if (names.length === 0) {
+      return [];
+    }
+
+    // 테이블에 존재하는 이름들 조회
+    const placeholders = names.map(() => '?').join(',');
+    const existing = await db.all<{ name: string }>(
+      `SELECT name FROM food_categories_normalized WHERE name IN (${placeholders})`,
+      names
+    );
+
+    const existingSet = new Set(existing.map(e => e.name));
+    return names.filter(name => !existingSet.has(name));
+  }
 }
 
 export default new FoodCategoryNormalizedRepository();

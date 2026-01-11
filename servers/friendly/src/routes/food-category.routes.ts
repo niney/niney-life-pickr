@@ -233,7 +233,7 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
           result: Type.Boolean(),
           message: Type.String(),
           data: Type.Object({
-            success: Type.Boolean(),
+            classificationSuccess: Type.Boolean(),
             restaurantId: Type.Number(),
             categories: Type.Array(Type.Object({
               item: Type.String(),
@@ -244,6 +244,12 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
               inserted: Type.Number(),
             }),
             errors: Type.Optional(Type.Array(Type.String())),
+            missingInNormalized: Type.Optional(Type.Array(Type.String())),
+            normalizedCoverage: Type.Optional(Type.Object({
+              total: Type.Number(),
+              missing: Type.Number(),
+              allNormalized: Type.Boolean(),
+            })),
           }),
           timestamp: Type.String(),
         }),
@@ -278,8 +284,24 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
       const existingCategories = await foodCategoryRepository.findByRestaurantId(restaurantId);
 
       if (existingCategories.length > 0 && !forceReclassify) {
+        // 기존 데이터도 정규화 테이블에 있는지 체크
+        const existingNames = existingCategories.map(c => c.name);
+        let missingInNormalized = await foodCategoryNormalizedRepository.findMissingNames(existingNames);
+
+        // 정규화 안된 메뉴가 있으면 전체 정규화 진행
+        let normalizeResult = null;
+        if (missingInNormalized.length > 0) {
+          console.log(`⚠️ 정규화 테이블에 없는 메뉴: ${missingInNormalized.length}개 → 전체 정규화 진행`);
+          await foodCategoryNormalizeService.init();
+          normalizeResult = await foodCategoryNormalizeService.normalize({ truncate: false });
+          console.log(`✅ 정규화 완료: ${normalizeResult.uniqueCopied}개 복사, ${normalizeResult.merged}개 병합`);
+
+          // 정규화 후 다시 체크
+          missingInNormalized = await foodCategoryNormalizedRepository.findMissingNames(existingNames);
+        }
+
         return ResponseHelper.success(reply, {
-          success: true,
+          classificationSuccess: true,
           restaurantId,
           categories: existingCategories.map(c => ({
             item: c.name,
@@ -288,7 +310,16 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
           })),
           dbStats: { inserted: 0 },
           skipped: true,
-        }, `기존 카테고리 데이터가 있습니다 (${existingCategories.length}개). forceReclassify=true로 재분류 가능`);
+          missingInNormalized,
+          normalizedCoverage: {
+            total: existingNames.length,
+            missing: missingInNormalized.length,
+            allNormalized: missingInNormalized.length === 0,
+          },
+          normalizeResult,
+        }, normalizeResult
+          ? `기존 카테고리 데이터가 있습니다 (${existingCategories.length}개), 정규화 ${normalizeResult.total}개 처리. forceReclassify=true로 재분류 가능`
+          : `기존 카테고리 데이터가 있습니다 (${existingCategories.length}개, 모두 정규화됨). forceReclassify=true로 재분류 가능`);
       }
 
       // 2. 강제 재분류 시 기존 데이터 삭제
@@ -312,13 +343,38 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
       await foodCategoryService.init();
       const classification = await foodCategoryService.classifyAndSave(restaurantId, menuNames);
 
+      // 5. 분류된 메뉴 중 정규화 테이블에 없는 것 체크
+      const classifiedNames = classification.categories.map(c => c.item);
+      let missingInNormalized = await foodCategoryNormalizedRepository.findMissingNames(classifiedNames);
+
+      // 6. 정규화 안된 메뉴가 있으면 전체 정규화 진행
+      let normalizeResult = null;
+      if (missingInNormalized.length > 0) {
+        console.log(`⚠️ 정규화 테이블에 없는 메뉴: ${missingInNormalized.length}개 → 전체 정규화 진행`);
+        await foodCategoryNormalizeService.init();
+        normalizeResult = await foodCategoryNormalizeService.normalize({ truncate: false });
+        console.log(`✅ 정규화 완료: ${normalizeResult.uniqueCopied}개 복사, ${normalizeResult.merged}개 병합`);
+
+        // 정규화 후 다시 체크
+        missingInNormalized = await foodCategoryNormalizedRepository.findMissingNames(classifiedNames);
+      }
+
       return ResponseHelper.success(reply, {
-        success: classification.success,
+        classificationSuccess: classification.success,
         restaurantId,
         categories: classification.categories,
         dbStats: classification.dbStats,
         errors: classification.errors,
-      }, `카테고리 분류 완료: ${classification.dbStats.inserted}개 저장`);
+        missingInNormalized,
+        normalizedCoverage: {
+          total: classifiedNames.length,
+          missing: missingInNormalized.length,
+          allNormalized: missingInNormalized.length === 0,
+        },
+        normalizeResult,
+      }, normalizeResult
+        ? `카테고리 분류 완료: ${classification.dbStats.inserted}개 저장, 정규화 ${normalizeResult.total}개 처리`
+        : `카테고리 분류 완료: ${classification.dbStats.inserted}개 저장 (모두 정규화됨)`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('❌ 카테고리 분류 실패:', errorMessage);
