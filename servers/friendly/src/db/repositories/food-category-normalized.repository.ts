@@ -109,6 +109,36 @@ export class FoodCategoryNormalizedRepository {
   }
 
   /**
+   * 일괄 삽입 (트랜잭션, 단순 삽입만)
+   */
+  async bulkInsert(
+    inputs: FoodCategoryNormalizedInput[]
+  ): Promise<{ inserted: number }> {
+    if (inputs.length === 0) {
+      return { inserted: 0 };
+    }
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      for (const input of inputs) {
+        await db.run(
+          `INSERT INTO food_categories_normalized (name, category_path, source_count)
+           VALUES (?, ?, ?)`,
+          [input.name, input.category_path, input.source_count ?? 1]
+        );
+      }
+
+      await db.run('COMMIT');
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+
+    return { inserted: inputs.length };
+  }
+
+  /**
    * 전체 삭제 (테이블 초기화)
    */
   async truncate(): Promise<number> {

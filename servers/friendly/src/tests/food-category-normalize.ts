@@ -45,7 +45,7 @@ async function main() {
     process.exit(1);
   }
 
-  const result = await foodCategoryNormalizeService.normalize({ truncate: true });
+  const result = await foodCategoryNormalizeService.normalize();
   console.log('\n   📋 정규화 결과:');
   console.log(`     - 중복 없이 복사: ${result.uniqueCopied}개`);
   console.log(`     - LLM 병합: ${result.merged}개`);

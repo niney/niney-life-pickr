@@ -19,13 +19,7 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
     schema: {
       tags: ['food-category'],
       summary: '음식 카테고리 정규화 실행',
-      description: '중복 없는 데이터는 그대로 복사하고, 같은 name에 다른 category_path가 있는 경우 LLM으로 병합하여 정규화 테이블에 저장합니다.',
-      querystring: Type.Object({
-        truncate: Type.Optional(Type.Boolean({
-          description: '기존 정규화 데이터 삭제 후 재생성 (기본: false)',
-          default: false,
-        })),
-      }),
+      description: '기존 정규화 데이터를 삭제하고, 중복 없는 데이터는 그대로 복사, 같은 name에 다른 category_path가 있는 경우 LLM으로 병합하여 정규화 테이블에 저장합니다.',
       response: {
         200: Type.Object({
           result: Type.Boolean(),
@@ -47,12 +41,10 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
         }),
       },
     },
-  }, async (request, reply) => {
-    const { truncate = false } = request.query as { truncate?: boolean };
-
+  }, async (_request, reply) => {
     try {
       await foodCategoryNormalizeService.init();
-      const result = await foodCategoryNormalizeService.normalize({ truncate });
+      const result = await foodCategoryNormalizeService.normalize();
 
       return ResponseHelper.success(
         reply,
@@ -302,7 +294,7 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
         if (missingInNormalized.length > 0) {
           console.log(`⚠️ 정규화 테이블에 없는 메뉴: ${missingInNormalized.length}개 → 전체 정규화 진행`);
           await foodCategoryNormalizeService.init();
-          normalizeResult = await foodCategoryNormalizeService.normalize({ truncate: false });
+          normalizeResult = await foodCategoryNormalizeService.normalize();
           console.log(`✅ 정규화 완료: ${normalizeResult.uniqueCopied}개 복사, ${normalizeResult.merged}개 병합`);
 
           // 정규화 후 다시 체크
@@ -361,7 +353,7 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
       if (missingInNormalized.length > 0) {
         console.log(`⚠️ 정규화 테이블에 없는 메뉴: ${missingInNormalized.length}개 → 전체 정규화 진행`);
         await foodCategoryNormalizeService.init();
-        normalizeResult = await foodCategoryNormalizeService.normalize({ truncate: false });
+        normalizeResult = await foodCategoryNormalizeService.normalize();
         console.log(`✅ 정규화 완료: ${normalizeResult.uniqueCopied}개 복사, ${normalizeResult.merged}개 병합`);
 
         // 정규화 후 다시 체크

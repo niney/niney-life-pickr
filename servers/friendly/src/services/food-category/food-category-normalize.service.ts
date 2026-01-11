@@ -47,8 +47,6 @@ export interface NormalizeResult {
  * 정규화 옵션
  */
 export interface NormalizeOptions {
-  /** 기존 정규화 데이터 삭제 후 재생성 (기본: false) */
-  truncate?: boolean;
   /** 진행률 콜백 */
   onProgress?: (phase: string, completed: number, total: number) => void;
 }
@@ -79,8 +77,9 @@ export class FoodCategoryNormalizeService {
 
   /**
    * 정규화 실행
-   * 1. 중복 없는 데이터 → 정규화 테이블에 직접 복사
-   * 2. 중복 데이터 (같은 name, 다른 category_path) → LLM 병합 후 저장
+   * 1. 기존 정규화 데이터 전체 삭제
+   * 2. 중복 없는 데이터 → 정규화 테이블에 직접 복사
+   * 3. 중복 데이터 (같은 name, 다른 category_path) → LLM 병합 후 저장
    */
   async normalize(options?: NormalizeOptions): Promise<NormalizeResult> {
     const startTime = Date.now();
@@ -88,11 +87,9 @@ export class FoodCategoryNormalizeService {
 
     console.log('\n🔄 Food Category 정규화 시작...');
 
-    // 1. 기존 데이터 삭제 (옵션)
-    if (options?.truncate) {
-      const deletedCount = await foodCategoryNormalizedRepository.truncate();
-      console.log(`🗑️ 기존 정규화 데이터 삭제: ${deletedCount}개`);
-    }
+    // 1. 기존 정규화 데이터 전체 삭제
+    const deletedCount = await foodCategoryNormalizedRepository.truncate();
+    console.log(`🗑️ 기존 정규화 데이터 삭제: ${deletedCount}개`);
 
     // 2. 중복 없는 데이터 조회
     const uniqueNames = await foodCategoryRepository.getUniqueNames();
@@ -106,8 +103,8 @@ export class FoodCategoryNormalizeService {
       source_count: 1,
     }));
 
-    const uniqueResult = await foodCategoryNormalizedRepository.bulkUpsert(uniqueInputs);
-    console.log(`✅ 중복 없는 항목 복사 완료: ${uniqueResult.inserted}개 삽입, ${uniqueResult.updated}개 업데이트`);
+    const uniqueResult = await foodCategoryNormalizedRepository.bulkInsert(uniqueInputs);
+    console.log(`✅ 중복 없는 항목 복사 완료: ${uniqueResult.inserted}개 삽입`);
     options?.onProgress?.('unique', uniqueNames.length, uniqueNames.length);
 
     // 4. 중복 데이터 조회
@@ -120,9 +117,9 @@ export class FoodCategoryNormalizeService {
       
       return {
         success: true,
-        uniqueCopied: uniqueResult.inserted + uniqueResult.updated,
+        uniqueCopied: uniqueResult.inserted,
         merged: 0,
-        total: uniqueResult.inserted + uniqueResult.updated,
+        total: uniqueResult.inserted,
       };
     }
 
@@ -161,8 +158,8 @@ export class FoodCategoryNormalizeService {
       };
     });
 
-    const mergedResult = await foodCategoryNormalizedRepository.bulkUpsert(mergeInputs);
-    console.log(`✅ 병합 결과 저장 완료: ${mergedResult.inserted}개 삽입, ${mergedResult.updated}개 업데이트`);
+    const mergedResult = await foodCategoryNormalizedRepository.bulkInsert(mergeInputs);
+    console.log(`✅ 병합 결과 저장 완료: ${mergedResult.inserted}개 삽입`);
 
     const totalTime = Date.now() - startTime;
     const totalNormalized = await foodCategoryNormalizedRepository.count();
@@ -170,8 +167,8 @@ export class FoodCategoryNormalizeService {
 
     return {
       success: errors.length === 0,
-      uniqueCopied: uniqueResult.inserted + uniqueResult.updated,
-      merged: mergedResult.inserted + mergedResult.updated,
+      uniqueCopied: uniqueResult.inserted,
+      merged: mergedResult.inserted,
       total: totalNormalized,
       errors: errors.length > 0 ? errors : undefined,
     };
