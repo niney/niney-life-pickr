@@ -50,13 +50,13 @@ const RestaurantMenuStatisticsSchema = Type.Object({
 const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/restaurants/:id/menu-grouping
-   * 메뉴명별 그룹핑 + 카테고리 분류
+   * 메뉴명별 그룹핑 + 정규화 테이블에서 카테고리 조회
    */
   fastify.get('/:id/menu-grouping', {
     schema: {
       tags: ['menu-statistics'],
-      summary: '메뉴명별 그룹핑 및 카테고리 분류',
-      description: '메뉴명을 정규화하여 그룹핑하고, LLM을 사용해 카테고리를 분류하여 DB에 저장합니다. skipClassify=true로 분류를 건너뛸 수 있습니다.',
+      summary: '메뉴명별 그룹핑 및 카테고리 조회',
+      description: '메뉴명을 정규화하여 그룹핑하고, 정규화 테이블에서 카테고리를 조회합니다. 정규화 테이블에 없는 메뉴가 있으면 실패로 응답합니다.',
       params: Type.Object({
         id: Type.String({description: '레스토랑 ID'})
       }),
@@ -65,26 +65,20 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
           Type.Literal('naver'),
           Type.Literal('catchtable'),
           Type.Literal('all')
-        ], {description: '리뷰 소스 (기본: naver)', default: 'naver'})),
-        skipClassify: Type.Optional(Type.Boolean({
-          description: '카테고리 분류 건너뛰기 (기본: false)',
-          default: false
-        })),
-        forceReclassify: Type.Optional(Type.Boolean({
-          description: '기존 데이터가 있어도 강제로 재분류 (기본: false)',
-          default: false
-        }))
+        ], {description: '리뷰 소스 (기본: naver)', default: 'naver'}))
       }),
       response: {
         200: Type.Object({
           result: Type.Boolean(),
           message: Type.String(),
           data: Type.Object({
+            allMenusNormalized: Type.Boolean({ description: '모든 메뉴가 정규화 테이블에 존재하는지 여부' }),
             restaurantId: Type.Number(),
             source: Type.String(),
             totalItems: Type.Number(),
             groupedMenus: Type.Array(Type.Object({
               normalizedName: Type.String(),
+              categoryPath: Type.Union([Type.String(), Type.Null()]),
               items: Type.Array(Type.Object({
                 name: Type.String(),
                 sentiment: Type.String(),
@@ -92,18 +86,12 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
               })),
               count: Type.Number()
             })),
-            classification: Type.Optional(Type.Object({
-              success: Type.Boolean(),
-              categories: Type.Array(Type.Object({
-                item: Type.String(),
-                path: Type.String(),
-                levels: Type.Array(Type.String())
-              })),
-              dbStats: Type.Object({
-                inserted: Type.Number()
-              }),
-              errors: Type.Optional(Type.Array(Type.String()))
-            }))
+            categories: Type.Array(Type.Object({
+              item: Type.String(),
+              path: Type.String(),
+              levels: Type.Array(Type.String())
+            })),
+            missingMenus: Type.Optional(Type.Array(Type.String()))
           }),
           timestamp: Type.String()
         }),
@@ -117,10 +105,8 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }, async (request, reply) => {
     const {id} = request.params as { id: string };
-    const {source = 'naver', skipClassify = false, forceReclassify = false} = request.query as {
+    const {source = 'naver'} = request.query as {
       source?: 'naver' | 'catchtable' | 'all';
-      skipClassify?: boolean;
-      forceReclassify?: boolean;
     };
     const restaurantId = parseInt(id, 10);
 
@@ -131,15 +117,12 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const groupingResult = await menuStatisticsService.getMenuGrouping(
         restaurantId,
-        source,
-        { skipClassify, forceReclassify }
+        source
       );
 
-      const message = skipClassify
-        ? '메뉴 그룹핑 결과를 조회했습니다.'
-        : groupingResult.classificationSkipped
-          ? `기존 카테고리 데이터가 있어 분류를 건너뛰었습니다. (forceReclassify=true로 강제 재분류 가능)`
-          : `메뉴 그룹핑 및 카테고리 분류 완료 (${groupingResult.classification?.dbStats.inserted ?? 0}개 저장)`;
+      const message = groupingResult.allMenusNormalized
+        ? `메뉴 그룹핑 완료: ${groupingResult.categories.length}개 카테고리 조회됨`
+        : `정규화 테이블에 없는 메뉴가 있습니다: ${groupingResult.missingMenus?.slice(0, 5).join(', ')}${(groupingResult.missingMenus?.length ?? 0) > 5 ? ` 외 ${(groupingResult.missingMenus?.length ?? 0) - 5}개` : ''}`;
 
       return ResponseHelper.success(reply, groupingResult, message);
     } catch (error) {
