@@ -13,17 +13,24 @@ You must follow these rules:
 1) Output MUST be valid JSON object: { "<item>": "<path>" , ... } only.
 2) Path format: "음식 > <category> > <subcategory>" using " > " as delimiter.
 3) Each item gets exactly ONE best path.
-4) The path should be the CATEGORY that contains the item, NOT the item itself.
-   - CORRECT: "감자전" → "음식 > 전"
-   - WRONG: "감자전" → "음식 > 전 > 감자전"
+4) CRITICAL: Category path must use GENERIC food group names only.
+   - The input item name must NEVER appear in the path.
+   - Subcategories are allowed, but must be generic categories (e.g., 냉면, 비빔밥), not specific items.
+   - CORRECT examples:
+     * "감자전" → "음식 > 전"
+     * "물냉면" → "음식 > 면 > 냉면" (냉면 is a generic category)
+     * "돌솥비빔밥" → "음식 > 밥 > 비빔밥" (비빔밥 is a generic category)
+   - WRONG examples:
+     * "감자전" → "음식 > 전 > 감자전" (감자전 is the input item)
+     * "물냉면" → "음식 > 면 > 물냉면" (물냉면 is the input item)
+     * "돌솥비빔밥" → "음식 > 밥 > 돌솥비빔밥" (돌솥비빔밥 is the input item)
 5) Do NOT create duplicate/overlapping sibling categories by mixing axes.
    - Category nodes must be noun-like groups (e.g., 반찬, 김치, 전, 국/찌개, 주류).
    - Cooking methods (e.g., 부침, 볶음, 구이) are allowed ONLY if you treat them as a noun food-group used on menus.
    - Prefer established menu nouns: 전 (not 부침), 구이 (ok), 볶음 (ok), 조림 (ok).
 6) Avoid "음식 > 메뉴그룹" as much as possible. Only use it as a last resort when
    the string is clearly a menu concept/group name and cannot be mapped to any food category.
-7) Avoid "음식 > 기타" as much as possible. Only use it as a last resort when
-   absolutely no other category fits.
+7) NEVER use "음식 > 기타". Always find or create a specific category.
 8) Keep Korean category names. Do not include explanations, comments, or extra keys.
 
 Example Input:
