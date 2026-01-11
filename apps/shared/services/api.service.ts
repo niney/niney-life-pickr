@@ -712,6 +712,37 @@ class ApiService {
   }
 
   /**
+   * 레스토랑 메뉴 LLM 분류
+   * @param restaurantId 레스토랑 ID
+   * @param options 분류 옵션
+   */
+  async classifyRestaurantMenus(
+    restaurantId: number,
+    options?: {
+      source?: 'naver' | 'catchtable' | 'all';
+      forceReclassify?: boolean;
+      prefer?: 'cloud' | 'local';
+    }
+  ): Promise<ApiResponse<{
+    classificationSuccess: boolean;
+    restaurantId: number;
+    categories: Array<{ item: string; path: string; levels: string[] }>;
+    dbStats: { inserted: number };
+    errors?: string[];
+    missingInNormalized?: string[];
+    normalizedCoverage?: { total: number; missing: number; allNormalized: boolean };
+  }>> {
+    const params = new URLSearchParams();
+    if (options?.source) params.append('source', options.source);
+    if (options?.forceReclassify) params.append('forceReclassify', 'true');
+    if (options?.prefer) params.append('prefer', options.prefer);
+
+    const queryString = params.toString();
+    const url = `/api/food-categories/classify/${restaurantId}${queryString ? `?${queryString}` : ''}`;
+    return this.request(url, { method: 'POST' });
+  }
+
+  /**
    * 레스토랑 순위 TOP N 조회
    */
   async getRestaurantRankings(

@@ -268,6 +268,8 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ restaurantId }) => {
   const [source, setSource] = useState<StatisticsSource>('all')
   const [menuGroupingData, setMenuGroupingData] = useState<MenuGroupingResponse | null>(null)
   const [menuGroupingLoading, setMenuGroupingLoading] = useState(false)
+  const [menuGroupingFailed, setMenuGroupingFailed] = useState(false)
+  const [classifying, setClassifying] = useState(false)
 
   // 훅 사용
   const { menuStatistics, statisticsLoading, fetchMenuStatistics } = useMenuStatistics()
@@ -291,23 +293,55 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ restaurantId }) => {
   }, [source, loadStatistics])
 
   // 메뉴 그룹핑 데이터 로드
-  useEffect(() => {
-    const fetchMenuGrouping = async () => {
-      if (!restaurantId) return
-      setMenuGroupingLoading(true)
-      try {
-        const response = await apiService.getRestaurantMenuGrouping(restaurantId, 'all')
-        if (response.result && response.data) {
-          setMenuGroupingData(response.data)
-        }
-      } catch (err) {
-        console.error('메뉴 그룹핑 데이터 로드 실패:', err)
-      } finally {
-        setMenuGroupingLoading(false)
+  const fetchMenuGrouping = useCallback(async () => {
+    if (!restaurantId) return
+    setMenuGroupingLoading(true)
+    setMenuGroupingFailed(false)
+    try {
+      const response = await apiService.getRestaurantMenuGrouping(restaurantId, 'all')
+      if (response.result && response.data) {
+        setMenuGroupingData(response.data)
+        setMenuGroupingFailed(!response.data.allMenusNormalized)
+      } else {
+        setMenuGroupingFailed(true)
       }
+    } catch (err) {
+      console.error('메뉴 그룹핑 데이터 로드 실패:', err)
+      setMenuGroupingFailed(true)
+    } finally {
+      setMenuGroupingLoading(false)
     }
-    fetchMenuGrouping()
   }, [restaurantId])
+
+  useEffect(() => {
+    fetchMenuGrouping()
+  }, [fetchMenuGrouping])
+
+  // LLM 메뉴 분류 핸들러
+  const handleClassifyMenus = async () => {
+    if (!restaurantId || classifying) return
+    setClassifying(true)
+    try {
+      const response = await apiService.classifyRestaurantMenus(restaurantId, {
+        source: 'all',
+        forceReclassify: true,
+        prefer: 'cloud',
+      })
+      if (response.result) {
+        // 분류 성공 후 그룹핑 데이터 다시 로드
+        await fetchMenuGrouping()
+      } else {
+        console.error('메뉴 분류 실패:', response.message)
+      }
+    } catch (err) {
+      console.error('메뉴 분류 오류:', err)
+    } finally {
+      setClassifying(false)
+    }
+  }
+
+  // 분류 필요 여부
+  const needsClassification = menuGroupingFailed || (menuGroupingData && !menuGroupingData.allMenusNormalized)
 
   // Source 변경 핸들러
   const handleSourceChange = (newSource: StatisticsSource) => {
@@ -425,16 +459,16 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ restaurantId }) => {
           )}
 
           {/* 카테고리별 그룹 통계 */}
-          {menuGroupingLoading ? (
+          {menuGroupingLoading || classifying ? (
             <View style={[styles.card, { backgroundColor: theme === 'light' ? '#fff' : colors.surface, borderColor: colors.border }]}>
               <View style={styles.groupLoadingContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
                 <Text style={[styles.groupLoadingText, { color: colors.textSecondary }]}>
-                  그룹 통계를 불러오는 중...
+                  {classifying ? '메뉴 분류 중...' : '그룹 통계를 불러오는 중...'}
                 </Text>
               </View>
             </View>
-          ) : menuGroupingData && menuGroupingData.categoryTree.totalCount > 0 ? (
+          ) : (
             <View
               style={[
                 styles.card,
@@ -444,10 +478,38 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ restaurantId }) => {
                 },
               ]}
             >
-              <Text style={[styles.title, { color: colors.text }]}>🗂️ 카테고리별 그룹 통계</Text>
-              <CategoryTreeView node={menuGroupingData.categoryTree} theme={theme} colors={colors} />
+              <View style={styles.cardHeader}>
+                <Text style={[styles.title, { color: colors.text, marginBottom: 0 }]}>🗂️ 카테고리별 그룹 통계</Text>
+                {needsClassification && (
+                  <Pressable
+                    onPress={handleClassifyMenus}
+                    style={[styles.classifyButton, { backgroundColor: '#4338ca' }]}
+                  >
+                    <Text style={styles.classifyButtonText}>분류</Text>
+                  </Pressable>
+                )}
+              </View>
+              {menuGroupingData && menuGroupingData.categoryTree.totalCount > 0 ? (
+                <>
+                  {needsClassification && menuGroupingData.missingMenus && menuGroupingData.missingMenus.length > 0 && (
+                    <View style={[styles.warningBox, { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
+                      <Text style={styles.warningText}>
+                        미분류 메뉴 {menuGroupingData.missingMenus.length}개: {menuGroupingData.missingMenus.slice(0, 3).join(', ')}
+                        {menuGroupingData.missingMenus.length > 3 ? ` 외 ${menuGroupingData.missingMenus.length - 3}개` : ''}
+                      </Text>
+                    </View>
+                  )}
+                  <CategoryTreeView node={menuGroupingData.categoryTree} theme={theme} colors={colors} />
+                </>
+              ) : (
+                <View style={styles.emptyGroupContainer}>
+                  <Text style={[styles.emptyGroupText, { color: colors.textSecondary }]}>
+                    {needsClassification ? '메뉴 분류가 필요합니다' : '분류된 메뉴가 없습니다'}
+                  </Text>
+                </View>
+              )}
             </View>
-          ) : null}
+          )}
 
           {/* 전체 메뉴 통계 */}
           {menuStatistics && menuStatistics.menuStatistics.length > 0 && (
@@ -567,6 +629,39 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  classifyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  classifyButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  warningBox: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#92400e',
+  },
+  emptyGroupContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyGroupText: {
+    fontSize: 13,
   },
 })
 
