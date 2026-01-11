@@ -6,12 +6,14 @@
 import { createUnifiedChatService } from '../ollama-chat/ollama-chat.factory';
 import { UnifiedOllamaChatService } from '../ollama-chat/unified-ollama-chat.service';
 import { FOOD_CATEGORY_SYSTEM_PROMPT, createUserPrompt } from './food-category.prompts';
+import foodCategoryRepository from '../../db/repositories/food-category.repository';
 import type {
   CategoryPath,
   ClassifyResult,
   ClassifyOptions,
   CategoryTreeNode,
   ClassifyResponse,
+  ClassifyAndSaveResult,
 } from './food-category.types';
 
 /**
@@ -28,7 +30,7 @@ export class FoodCategoryService {
 
   constructor(options?: { batchSize?: number }) {
     this.chatService = createUnifiedChatService({ prefer: 'cloud' });
-    this.defaultBatchSize = options?.batchSize ?? 50;
+    this.defaultBatchSize = options?.batchSize ?? 20;
   }
 
   /**
@@ -54,85 +56,93 @@ export class FoodCategoryService {
   }
 
   /**
-   * 여러 항목 분류
+   * 여러 항목 분류 (병렬 배치 처리)
    */
   async classify(items: string[], options?: ClassifyOptions): Promise<ClassifyResult> {
     const batchSize = options?.batchSize ?? this.defaultBatchSize;
+    const startTime = Date.now();
+    
+    console.log(`🔄 분류 시작: ${items.length}개 항목, 배치 크기=${batchSize}`);
+    
+    // 배치 분할
+    const batches: string[][] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      batches.push(items.slice(i, i + batchSize));
+    }
+    console.log(`📦 ${batches.length}개 배치로 분할됨`);
+    batches.forEach((batch, idx) => {
+      const preview = batch.length <= 5 
+        ? batch.join(', ')
+        : `${batch.slice(0, 3).join(', ')} ... ${batch.slice(-2).join(', ')}`;
+      console.log(`   배치[${idx}] (${batch.length}개): ${preview}`);
+    });
+
+    // 각 배치를 askBatch 요청으로 변환
+    const batchRequests = batches.map((batch, idx) => ({
+      id: `batch-${idx}`,
+      userMessage: createUserPrompt(batch),
+      options: { format: 'json' as const },
+    }));
+
+    // 병렬 배치 처리
+    console.log(`🚀 ${batchRequests.length}개 배치 병렬 요청 시작...`);
+    let completed = 0;
+    const batchResults = await this.chatService.askBatch<ClassifyResponse>(
+      FOOD_CATEGORY_SYSTEM_PROMPT,
+      batchRequests,
+      {
+        parseJson: true,
+        onProgress: (done, _total) => {
+          // 배치 단위 진행률을 항목 단위로 변환
+          const batchIdx = done - 1;
+          if (batchIdx >= 0 && batchIdx < batches.length) {
+            completed += batches[batchIdx].length;
+            options?.onProgress?.(completed, items.length);
+          }
+        },
+      }
+    );
+
+    const llmTime = Date.now() - startTime;
+    console.log(`✅ LLM 병렬 처리 완료: ${(llmTime / 1000).toFixed(2)}초`);
+
+    // 결과 변환
     const allCategories: CategoryPath[] = [];
     const errors: string[] = [];
-    let completed = 0;
 
-    // 배치 분할 처리
-    for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
-
-      try {
-        const batchResult = await this.classifyBatch(batch);
-        allCategories.push(...batchResult.categories);
-        if (batchResult.errors) {
-          errors.push(...batchResult.errors);
+    batchResults.forEach((result, idx) => {
+      const batch = batches[idx];
+      
+      if (result.success && result.response) {
+        const parsed = result.response;
+        for (const item of batch) {
+          const path = parsed[item];
+          if (path && typeof path === 'string') {
+            allCategories.push(this.pathToCategory(item, path));
+          } else {
+            allCategories.push(this.createFallbackCategory(item));
+            errors.push(`${item}: 응답 없음`);
+          }
         }
-      } catch (error) {
-        // 배치 전체 실패 시 개별 항목을 기타로 분류
+      } else {
+        // 배치 실패 시 기타로 분류
         batch.forEach((item) => {
           allCategories.push(this.createFallbackCategory(item));
-          errors.push(`${item}: 분류 실패`);
+          errors.push(`${item}: ${result.error || '분류 실패'}`);
         });
       }
+    });
 
-      completed += batch.length;
-      options?.onProgress?.(completed, items.length);
+    const totalTime = Date.now() - startTime;
+    const successCount = allCategories.length - errors.length;
+    console.log(`🏁 분류 완료: 성공=${successCount}, 실패=${errors.length}, 총 ${(totalTime / 1000).toFixed(2)}초`);
+    if (errors.length > 0) {
+      console.warn(`⚠️ 분류 실패 항목: ${errors.slice(0, 5).join(', ')}${errors.length > 5 ? ` 외 ${errors.length - 5}개` : ''}`);
     }
 
     return {
       success: errors.length === 0,
       categories: allCategories,
-      errors: errors.length > 0 ? errors : undefined,
-    };
-  }
-
-  /**
-   * 배치 분류 (내부 사용)
-   */
-  private async classifyBatch(items: string[]): Promise<ClassifyResult> {
-    const userPrompt = createUserPrompt(items);
-
-    const response = await this.chatService.ask(
-      FOOD_CATEGORY_SYSTEM_PROMPT,
-      userPrompt
-    );
-
-    // 응답 파싱 (이미 JSON이거나 문자열)
-    let parsed: ClassifyResponse;
-    if (typeof response === 'string') {
-      // 마크다운 코드블록 제거
-      const cleaned = response
-        .replace(/^```(?:json)?\n?/i, '')
-        .replace(/\n?```$/i, '')
-        .trim();
-      parsed = JSON.parse(cleaned);
-    } else {
-      parsed = response as ClassifyResponse;
-    }
-
-    const categories: CategoryPath[] = [];
-    const errors: string[] = [];
-
-    // 응답 변환
-    for (const item of items) {
-      const path = parsed[item];
-      if (path && typeof path === 'string') {
-        categories.push(this.pathToCategory(item, path));
-      } else {
-        // 응답에 없는 항목은 기타로 분류
-        categories.push(this.createFallbackCategory(item));
-        errors.push(`${item}: 응답 없음`);
-      }
-    }
-
-    return {
-      success: errors.length === 0,
-      categories,
       errors: errors.length > 0 ? errors : undefined,
     };
   }
@@ -225,5 +235,56 @@ export class FoodCategoryService {
       children,
       items: node.items,
     };
+  }
+
+  /**
+   * 분류 후 DB 저장 (중복 허용)
+   */
+  async classifyAndSave(
+    restaurantId: number,
+    items: string[],
+    options?: ClassifyOptions
+  ): Promise<ClassifyAndSaveResult> {
+    console.log(`\n📝 classifyAndSave 시작: 레스토랑=${restaurantId}, 항목=${items.length}개`);
+    
+    // 1. LLM으로 분류
+    const classifyResult = await this.classify(items, options);
+
+    // 2. DB 저장용 데이터 변환
+    const inputs = classifyResult.categories.map((cat) => ({
+      restaurant_id: restaurantId,
+      name: cat.item,
+      category_path: cat.path,
+    }));
+
+    // 3. DB 저장 (중복 허용)
+    const dbStats = await foodCategoryRepository.bulkInsert(inputs);
+    console.log(`💾 DB 저장 완료: ${dbStats.inserted}개 삽입`);
+
+    return {
+      success: classifyResult.success,
+      categories: classifyResult.categories,
+      dbStats,
+      errors: classifyResult.errors,
+    };
+  }
+
+  /**
+   * 레스토랑의 저장된 카테고리 조회
+   */
+  async getSavedCategories(restaurantId: number): Promise<CategoryPath[]> {
+    const rows = await foodCategoryRepository.findByRestaurantId(restaurantId);
+    return rows.map((row) => ({
+      item: row.name,
+      path: row.category_path,
+      levels: row.category_path.split(PATH_DELIMITER),
+    }));
+  }
+
+  /**
+   * 카테고리 통계 조회
+   */
+  async getCategoryStats(): Promise<Array<{ category_path: string; count: number }>> {
+    return foodCategoryRepository.getCategoryStats();
   }
 }

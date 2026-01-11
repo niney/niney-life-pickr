@@ -1,7 +1,11 @@
 import reviewSummaryRepository from '../db/repositories/review-summary.repository';
 import reviewRepository from '../db/repositories/review.repository';
 import catchtableReviewRepository from '../db/repositories/catchtable-review.repository';
-import catchtableReviewSummaryRepository from '../db/repositories/catchtable-review-summary.repository';
+import catchtableReviewSummaryRepository
+  from '../db/repositories/catchtable-review-summary.repository';
+import foodCategoryRepository from '../db/repositories/food-category.repository';
+import { FoodCategoryService } from './food-category/food-category.service';
+import type { ClassifyAndSaveResult } from './food-category/food-category.types';
 import type {
   MenuSentimentStats,
   RestaurantMenuStatistics,
@@ -64,11 +68,12 @@ class MenuStatisticsService {
   }
 
   /**
-   * 메뉴명별 그룹핑만 수행 (디버깅/테스트용)
+   * 메뉴명별 그룹핑 + 카테고리 분류 수행
    */
   async getMenuGrouping(
     restaurantId: number,
-    source: StatisticsSource = 'naver'
+    source: StatisticsSource = 'naver',
+    options?: { skipClassify?: boolean; forceReclassify?: boolean }
   ): Promise<{
     restaurantId: number;
     source: string;
@@ -78,6 +83,8 @@ class MenuStatisticsService {
       items: Array<{ name: string; sentiment: string; reason?: string }>;
       count: number;
     }>;
+    classification?: ClassifyAndSaveResult;
+    classificationSkipped?: boolean;
   }> {
     // 1. 소스별 메뉴 아이템 조회
     const menuItemsData = await this.getMenuItems(restaurantId, source);
@@ -106,14 +113,52 @@ class MenuStatisticsService {
       }))
       .sort((a, b) => b.count - a.count);
 
-      // 정규화된 메뉴명 리스트만 출력
-      console.log('Normalized menu names:', Array.from(menuMap.keys()));
+    // 정규화된 메뉴명 리스트
+    const normalizedMenuNames = Array.from(menuMap.keys());
+    console.log('Normalized menu names:', normalizedMenuNames);
+
+    // 4. 카테고리 분류 (옵션)
+    let classification: ClassifyAndSaveResult | undefined;
+    let classificationSkipped = false;
+    
+    if (!options?.skipClassify && normalizedMenuNames.length > 0) {
+      // 기존 데이터 체크
+      const existingCategories = await foodCategoryRepository.findByRestaurantId(restaurantId);
+      
+      if (existingCategories.length > 0) {
+        if (options?.forceReclassify) {
+          // 강제 재분류: 기존 데이터 삭제
+          const deletedCount = await foodCategoryRepository.deleteByRestaurantId(restaurantId);
+          console.log(`🗑️ 기존 카테고리 데이터 삭제: ${deletedCount}개`);
+        } else {
+          // 기존 데이터가 있으면 건너뛰기
+          console.log(`⏭️ 기존 카테고리 데이터 존재 (${existingCategories.length}개), 분류 건너뜀`);
+          classificationSkipped = true;
+        }
+      }
+      
+      if (!classificationSkipped) {
+        try {
+          const foodCategoryService = new FoodCategoryService();
+          await foodCategoryService.init();
+          classification = await foodCategoryService.classifyAndSave(
+            restaurantId,
+            normalizedMenuNames
+          );
+          console.log(`✅ 카테고리 분류 완료: ${classification.dbStats.inserted}개 저장`);
+        } catch (error) {
+          console.error('❌ 카테고리 분류 실패:', error);
+        }
+      }
+    }
 
     return {
       restaurantId,
       source,
       totalItems: menuItems.length,
       groupedMenus,
+      classification,
+      classificationSkipped,
     };
   }
 

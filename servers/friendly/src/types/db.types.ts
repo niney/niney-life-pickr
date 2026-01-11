@@ -362,3 +362,25 @@ export interface RankingOptions {
   excludeNeutral?: boolean; // true: 긍정+부정 중에서 비율 계산, false: 전체 중에서 비율 계산 (기본값)
 }
 
+/**
+ * Food Category DB entity
+ * 음식 카테고리 분류 결과
+ */
+export interface FoodCategoryDB {
+  id: number;
+  restaurant_id: number;
+  name: string;
+  category_path: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Food Category Input (for DB insertion)
+ */
+export interface FoodCategoryInput {
+  restaurant_id: number;
+  name: string;
+  category_path: string;
+}
+

@@ -49,3 +49,19 @@ export interface CategoryTreeNode {
 export interface ClassifyResponse {
   [item: string]: string;
 }
+
+/**
+ * 분류 및 저장 결과
+ */
+export interface ClassifyAndSaveResult {
+  success: boolean;
+  /** 분류된 카테고리 목록 */
+  categories: CategoryPath[];
+  /** DB 저장 통계 */
+  dbStats: {
+    /** 저장된 개수 */
+    inserted: number;
+  };
+  /** 분류 실패한 항목들 */
+  errors?: string[];
+}
