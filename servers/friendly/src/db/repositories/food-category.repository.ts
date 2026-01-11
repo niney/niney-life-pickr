@@ -184,6 +184,52 @@ export class FoodCategoryRepository {
        ORDER BY count DESC`
     );
   }
+
+  /**
+   * 메뉴명별 category_path 그룹 조회 (정규화용)
+   * 같은 name에 대해 서로 다른 category_path가 몇 개 있는지 확인
+   */
+  async getNamePathGroups(): Promise<Array<{ name: string; paths: string[]; count: number }>> {
+    const rows = await db.all<{ name: string; category_path: string }>(
+      `SELECT name, category_path 
+       FROM food_categories 
+       GROUP BY name, category_path 
+       ORDER BY name`
+    );
+
+    // name별로 paths 그룹화
+    const grouped = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!grouped.has(row.name)) {
+        grouped.set(row.name, new Set());
+      }
+      grouped.get(row.name)!.add(row.category_path);
+    }
+
+    return Array.from(grouped.entries()).map(([name, pathsSet]) => ({
+      name,
+      paths: Array.from(pathsSet),
+      count: pathsSet.size,
+    }));
+  }
+
+  /**
+   * 중복 경로가 있는 메뉴명만 조회 (2개 이상의 다른 category_path)
+   */
+  async getDuplicateNames(): Promise<Array<{ name: string; paths: string[] }>> {
+    const all = await this.getNamePathGroups();
+    return all.filter((item) => item.count > 1).map(({ name, paths }) => ({ name, paths }));
+  }
+
+  /**
+   * 중복 없는 메뉴명만 조회 (1개의 category_path만 가진 것)
+   */
+  async getUniqueNames(): Promise<Array<{ name: string; path: string }>> {
+    const all = await this.getNamePathGroups();
+    return all
+      .filter((item) => item.count === 1)
+      .map(({ name, paths }) => ({ name, path: paths[0] }));
+  }
 }
 
 export default new FoodCategoryRepository();

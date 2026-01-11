@@ -384,3 +384,24 @@ export interface FoodCategoryInput {
   category_path: string;
 }
 
+/**
+ * Food Category Normalized DB entity
+ * 정규화된 음식 카테고리 (메뉴명 → 표준 카테고리 매핑)
+ */
+export interface FoodCategoryNormalizedDB {
+  id: number;
+  name: string;
+  category_path: string;
+  source_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Food Category Normalized Input (for DB insertion)
+ */
+export interface FoodCategoryNormalizedInput {
+  name: string;
+  category_path: string;
+  source_count?: number;
+}
