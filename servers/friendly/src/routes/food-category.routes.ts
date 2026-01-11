@@ -2,7 +2,10 @@ import { FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import foodCategoryNormalizeService from '../services/food-category/food-category-normalize.service';
 import foodCategoryNormalizedRepository from '../db/repositories/food-category-normalized.repository';
+import foodCategoryRepository from '../db/repositories/food-category.repository';
+import { FoodCategoryService } from '../services/food-category';
 import { ResponseHelper } from '../utils/response.utils';
+import menuStatisticsService from '../services/menu-statistics.service';
 
 /**
  * Food Category 라우트
@@ -189,7 +192,7 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const data = await foodCategoryNormalizedRepository.findByName(decodeURIComponent(name));
-      
+
       if (!data) {
         return ResponseHelper.error(reply, `'${name}' 메뉴를 찾을 수 없습니다.`, 404);
       }
@@ -199,6 +202,127 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('❌ 조회 실패:', errorMessage);
       return ResponseHelper.error(reply, `조회 실패: ${errorMessage}`, 500);
+    }
+  });
+
+  /**
+   * POST /api/food-categories/classify/:restaurantId
+   * 특정 레스토랑의 메뉴를 LLM으로 분류
+   */
+  fastify.post('/classify/:restaurantId', {
+    schema: {
+      tags: ['food-category'],
+      summary: '레스토랑 메뉴 LLM 분류',
+      description: '특정 레스토랑의 메뉴를 LLM을 사용해 카테고리로 분류하고 DB에 저장합니다.',
+      params: Type.Object({
+        restaurantId: Type.String({ description: '레스토랑 ID' }),
+      }),
+      querystring: Type.Object({
+        source: Type.Optional(Type.Union([
+          Type.Literal('naver'),
+          Type.Literal('catchtable'),
+          Type.Literal('all'),
+        ], { description: '리뷰 소스 (기본: naver)', default: 'naver' })),
+        forceReclassify: Type.Optional(Type.Boolean({
+          description: '기존 데이터가 있어도 삭제 후 재분류 (기본: false)',
+          default: false,
+        })),
+      }),
+      response: {
+        200: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          data: Type.Object({
+            success: Type.Boolean(),
+            restaurantId: Type.Number(),
+            categories: Type.Array(Type.Object({
+              item: Type.String(),
+              path: Type.String(),
+              levels: Type.Array(Type.String()),
+            })),
+            dbStats: Type.Object({
+              inserted: Type.Number(),
+            }),
+            errors: Type.Optional(Type.Array(Type.String())),
+          }),
+          timestamp: Type.String(),
+        }),
+        400: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String(),
+        }),
+        500: Type.Object({
+          result: Type.Boolean(),
+          message: Type.String(),
+          statusCode: Type.Number(),
+          timestamp: Type.String(),
+        }),
+      },
+    },
+  }, async (request, reply) => {
+    const { restaurantId: idStr } = request.params as { restaurantId: string };
+    const { source = 'naver', forceReclassify = false } = request.query as {
+      source?: 'naver' | 'catchtable' | 'all';
+      forceReclassify?: boolean;
+    };
+    const restaurantId = parseInt(idStr, 10);
+
+    if (isNaN(restaurantId)) {
+      return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID입니다.', 400);
+    }
+
+    try {
+      // 1. 기존 데이터 체크
+      const existingCategories = await foodCategoryRepository.findByRestaurantId(restaurantId);
+
+      if (existingCategories.length > 0 && !forceReclassify) {
+        return ResponseHelper.success(reply, {
+          success: true,
+          restaurantId,
+          categories: existingCategories.map(c => ({
+            item: c.name,
+            path: c.category_path,
+            levels: c.category_path.split(' > '),
+          })),
+          dbStats: { inserted: 0 },
+          skipped: true,
+        }, `기존 카테고리 데이터가 있습니다 (${existingCategories.length}개). forceReclassify=true로 재분류 가능`);
+      }
+
+      // 2. 강제 재분류 시 기존 데이터 삭제
+      if (existingCategories.length > 0 && forceReclassify) {
+        const deletedCount = await foodCategoryRepository.deleteByRestaurantId(restaurantId);
+        console.log(`🗑️ 기존 카테고리 데이터 삭제: ${deletedCount}개`);
+      }
+
+      // 3. 메뉴명 추출 (menu-statistics 서비스 활용)
+      const groupingResult = await menuStatisticsService.getMenuGrouping(restaurantId, source);
+      const menuNames = groupingResult.groupedMenus.map(g => g.normalizedName);
+
+      if (menuNames.length === 0) {
+        return ResponseHelper.error(reply, '분류할 메뉴가 없습니다.', 400);
+      }
+
+      console.log(`📋 분류할 메뉴: ${menuNames.length}개`);
+
+      // 4. LLM 분류 실행
+      const foodCategoryService = new FoodCategoryService();
+      await foodCategoryService.init();
+      const classification = await foodCategoryService.classifyAndSave(restaurantId, menuNames);
+
+      return ResponseHelper.success(reply, {
+        success: classification.success,
+        restaurantId,
+        categories: classification.categories,
+        dbStats: classification.dbStats,
+        errors: classification.errors,
+      }, `카테고리 분류 완료: ${classification.dbStats.inserted}개 저장`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ 카테고리 분류 실패:', errorMessage);
+      return ResponseHelper.error(reply, `카테고리 분류 실패: ${errorMessage}`, 500);
     }
   });
 };
