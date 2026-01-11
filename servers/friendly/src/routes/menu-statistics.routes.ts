@@ -76,20 +76,13 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
             restaurantId: Type.Number(),
             source: Type.String(),
             totalItems: Type.Number(),
-            groupedMenus: Type.Array(Type.Object({
-              normalizedName: Type.String(),
-              categoryPath: Type.Union([Type.String(), Type.Null()]),
-              items: Type.Array(Type.Object({
-                name: Type.String(),
-                sentiment: Type.String(),
-                reason: Type.Optional(Type.String())
-              })),
-              count: Type.Number()
-            })),
             categories: Type.Array(Type.Object({
               item: Type.String(),
               path: Type.String(),
-              levels: Type.Array(Type.String())
+              levels: Type.Array(Type.String()),
+              count: Type.Number({ description: '총 언급 횟수' }),
+              positive: Type.Number({ description: '긍정 평가 수' }),
+              negative: Type.Number({ description: '부정 평가 수' })
             })),
             missingMenus: Type.Optional(Type.Array(Type.String()))
           }),

@@ -4,7 +4,6 @@ import catchtableReviewRepository from '../db/repositories/catchtable-review.rep
 import catchtableReviewSummaryRepository
   from '../db/repositories/catchtable-review-summary.repository';
 import foodCategoryNormalizedRepository from '../db/repositories/food-category-normalized.repository';
-import type { CategoryPath } from './food-category/food-category.types';
 import type {
   MenuSentimentStats,
   RestaurantMenuStatistics,
@@ -77,13 +76,14 @@ class MenuStatisticsService {
     restaurantId: number;
     source: string;
     totalItems: number;
-    groupedMenus: Array<{
-      normalizedName: string;
-      categoryPath: string | null;
-      items: Array<{ name: string; sentiment: string; reason?: string }>;
+    categories: Array<{
+      item: string;
+      path: string;
+      levels: string[];
       count: number;
+      positive: number;
+      negative: number;
     }>;
-    categories: CategoryPath[];
     missingMenus?: string[];
   }> {
     // 1. 소스별 메뉴 아이템 조회
@@ -104,22 +104,40 @@ class MenuStatisticsService {
     const normalizedMenuNames = Array.from(menuMap.keys());
     console.log(`📋 정규화된 메뉴명: ${normalizedMenuNames.length}개`);
 
-    // 3. 정규화 테이블에서 카테고리 조회
-    const categories: CategoryPath[] = [];
+    // 3. 정규화 테이블에서 카테고리 조회 + 통계 계산
+    const categories: Array<{
+      item: string;
+      path: string;
+      levels: string[];
+      count: number;
+      positive: number;
+      negative: number;
+    }> = [];
     const missingMenus: string[] = [];
 
     for (const menuName of normalizedMenuNames) {
       const normalized = await foodCategoryNormalizedRepository.findByName(menuName);
+      const items = menuMap.get(menuName) ?? [];
+      const count = items.length;
+      const positive = items.filter(i => i.sentiment === 'positive').length;
+      const negative = items.filter(i => i.sentiment === 'negative').length;
+
       if (normalized) {
         categories.push({
           item: menuName,
           path: normalized.category_path,
           levels: normalized.category_path.split(' > '),
+          count,
+          positive,
+          negative,
         });
       } else {
         missingMenus.push(menuName);
       }
     }
+
+    // 개수 기준 정렬
+    categories.sort((a, b) => b.count - a.count);
 
     console.log(`✅ 정규화 테이블에서 조회: ${categories.length}개 발견`);
     if (missingMenus.length > 0) {
@@ -127,22 +145,7 @@ class MenuStatisticsService {
       console.log(`   - ${missingMenus.slice(0, 5).join(', ')}${missingMenus.length > 5 ? ` 외 ${missingMenus.length - 5}개` : ''}`);
     }
 
-    // 4. 결과 변환 (categoryPath 포함)
-    const categoryMap = new Map(categories.map(c => [c.item, c.path]));
-    const groupedMenus = Array.from(menuMap.entries())
-      .map(([normalizedName, items]) => ({
-        normalizedName,
-        categoryPath: categoryMap.get(normalizedName) ?? null,
-        items: items.map((i) => ({
-          name: i.name,
-          sentiment: i.sentiment,
-          reason: i.reason,
-        })),
-        count: items.length,
-      }))
-      .sort((a, b) => b.count - a.count);
-
-    // 5. 하나라도 없으면 실패
+    // 4. 하나라도 없으면 실패
     const allMenusNormalized = missingMenus.length === 0;
 
     return {
@@ -150,7 +153,6 @@ class MenuStatisticsService {
       restaurantId,
       source,
       totalItems: menuItems.length,
-      groupedMenus,
       categories,
       missingMenus: missingMenus.length > 0 ? missingMenus : undefined,
     };

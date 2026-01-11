@@ -331,7 +331,11 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
 
       // 3. 메뉴명 추출 (menu-statistics 서비스 활용)
       const groupingResult = await menuStatisticsService.getMenuGrouping(restaurantId, source);
-      const menuNames = groupingResult.groupedMenus.map(g => g.normalizedName);
+      // categories에 있는 메뉴 + missingMenus에 있는 메뉴 = 전체 메뉴
+      const menuNames = [
+        ...groupingResult.categories.map(c => c.item),
+        ...(groupingResult.missingMenus ?? []),
+      ];
 
       if (menuNames.length === 0) {
         return ResponseHelper.error(reply, '분류할 메뉴가 없습니다.', 400);
