@@ -84,6 +84,19 @@ const menuStatisticsRoutes: FastifyPluginAsync = async (fastify) => {
               positive: Type.Number({ description: '긍정 평가 수' }),
               negative: Type.Number({ description: '부정 평가 수' })
             })),
+            categoryTree: Type.Recursive(Self => Type.Object({
+              name: Type.String(),
+              children: Type.Record(Type.String(), Self),
+              items: Type.Array(Type.Object({
+                item: Type.String(),
+                count: Type.Number(),
+                positive: Type.Number(),
+                negative: Type.Number()
+              })),
+              totalCount: Type.Number({ description: '하위 모든 항목의 언급 횟수 합계' }),
+              totalPositive: Type.Number({ description: '하위 모든 항목의 긍정 수 합계' }),
+              totalNegative: Type.Number({ description: '하위 모든 항목의 부정 수 합계' })
+            })),
             missingMenus: Type.Optional(Type.Array(Type.String()))
           }),
           timestamp: Type.String()

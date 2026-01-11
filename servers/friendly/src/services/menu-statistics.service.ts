@@ -13,6 +13,22 @@ import type {
 
 export type StatisticsSource = 'naver' | 'catchtable' | 'all';
 
+/** 카테고리 트리 노드 타입 */
+export interface CategoryTreeNode {
+  name: string;
+  children: Record<string, CategoryTreeNode>;
+  items: Array<{
+    item: string;
+    count: number;
+    positive: number;
+    negative: number;
+  }>;
+  /** 해당 노드 하위의 모든 항목 합계 */
+  totalCount: number;
+  totalPositive: number;
+  totalNegative: number;
+}
+
 /**
  * 메뉴 통계 서비스
  */
@@ -84,6 +100,7 @@ class MenuStatisticsService {
       positive: number;
       negative: number;
     }>;
+    categoryTree: CategoryTreeNode;
     missingMenus?: string[];
   }> {
     // 1. 소스별 메뉴 아이템 조회
@@ -145,7 +162,10 @@ class MenuStatisticsService {
       console.log(`   - ${missingMenus.slice(0, 5).join(', ')}${missingMenus.length > 5 ? ` 외 ${missingMenus.length - 5}개` : ''}`);
     }
 
-    // 4. 하나라도 없으면 실패
+    // 4. 트리 구조로 변환
+    const categoryTree = this.buildCategoryTree(categories);
+
+    // 5. 하나라도 없으면 실패
     const allMenusNormalized = missingMenus.length === 0;
 
     return {
@@ -154,8 +174,90 @@ class MenuStatisticsService {
       source,
       totalItems: menuItems.length,
       categories,
+      categoryTree,
       missingMenus: missingMenus.length > 0 ? missingMenus : undefined,
     };
+  }
+
+  /**
+   * 카테고리 배열을 트리 구조로 변환
+   */
+  private buildCategoryTree(
+    categories: Array<{
+      item: string;
+      path: string;
+      levels: string[];
+      count: number;
+      positive: number;
+      negative: number;
+    }>
+  ): CategoryTreeNode {
+    const root: CategoryTreeNode = {
+      name: '음식',
+      children: {},
+      items: [],
+      totalCount: 0,
+      totalPositive: 0,
+      totalNegative: 0,
+    };
+
+    for (const category of categories) {
+      let current = root;
+
+      // 첣 번째 레벨(음식)은 스킵
+      for (let i = 1; i < category.levels.length; i++) {
+        const levelName = category.levels[i];
+
+        if (!current.children[levelName]) {
+          current.children[levelName] = {
+            name: levelName,
+            children: {},
+            items: [],
+            totalCount: 0,
+            totalPositive: 0,
+            totalNegative: 0,
+          };
+        }
+
+        current = current.children[levelName];
+      }
+
+      // 리프 노드에 항목 추가
+      current.items.push({
+        item: category.item,
+        count: category.count,
+        positive: category.positive,
+        negative: category.negative,
+      });
+    }
+
+    // 합계 계산 (재귀)
+    this.calculateTreeTotals(root);
+
+    return root;
+  }
+
+  /**
+   * 트리 노드의 합계 계산 (재귀)
+   */
+  private calculateTreeTotals(node: CategoryTreeNode): void {
+    // 자신의 items 합계
+    let totalCount = node.items.reduce((sum, i) => sum + i.count, 0);
+    let totalPositive = node.items.reduce((sum, i) => sum + i.positive, 0);
+    let totalNegative = node.items.reduce((sum, i) => sum + i.negative, 0);
+
+    // 자식 노드들의 합계
+    for (const childName of Object.keys(node.children)) {
+      const child = node.children[childName];
+      this.calculateTreeTotals(child);
+      totalCount += child.totalCount;
+      totalPositive += child.totalPositive;
+      totalNegative += child.totalNegative;
+    }
+
+    node.totalCount = totalCount;
+    node.totalPositive = totalPositive;
+    node.totalNegative = totalNegative;
   }
 
   /**
