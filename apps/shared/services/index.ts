@@ -34,4 +34,6 @@ export type {
   CatchtableReviewData,
   CatchtableReviewListResponse,
   CatchtableReviewSummary,
+  CategoryTreeNode,
+  MenuGroupingResponse,
 } from './api.service';

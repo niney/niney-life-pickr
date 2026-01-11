@@ -204,6 +204,43 @@ export interface RestaurantReviewStatistics {
   neutralRate: number;
 }
 
+/**
+ * 카테고리 트리 노드 타입
+ */
+export interface CategoryTreeNode {
+  name: string;
+  children: Record<string, CategoryTreeNode>;
+  items: Array<{
+    item: string;
+    count: number;
+    positive: number;
+    negative: number;
+  }>;
+  totalCount: number;
+  totalPositive: number;
+  totalNegative: number;
+}
+
+/**
+ * 메뉴 그룹핑 응답 타입
+ */
+export interface MenuGroupingResponse {
+  allMenusNormalized: boolean;
+  restaurantId: number;
+  source: string;
+  totalItems: number;
+  categories: Array<{
+    item: string;
+    path: string;
+    levels: string[];
+    count: number;
+    positive: number;
+    negative: number;
+  }>;
+  categoryTree: CategoryTreeNode;
+  missingMenus?: string[];
+}
+
 export interface ReviewData {
   id: number;
   userName: string | null;
@@ -655,6 +692,21 @@ class ApiService {
 
     const url = `/api/restaurants/${restaurantId}/menu-statistics?${params.toString()}`;
     return this.request<RestaurantMenuStatistics>(url, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 레스토랑 메뉴 그룹핑 조회 (카테고리 트리 포함)
+   * @param restaurantId 레스토랑 ID
+   * @param source 리뷰 소스 (naver | catchtable | all)
+   */
+  async getRestaurantMenuGrouping(
+    restaurantId: number,
+    source: 'naver' | 'catchtable' | 'all' = 'all'
+  ): Promise<ApiResponse<MenuGroupingResponse>> {
+    const url = `/api/restaurants/${restaurantId}/menu-grouping?source=${source}`;
+    return this.request<MenuGroupingResponse>(url, {
       method: 'GET',
     });
   }
