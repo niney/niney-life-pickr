@@ -27,10 +27,26 @@ const PATH_DELIMITER = ' > ';
 export class FoodCategoryService {
   private chatService: UnifiedOllamaChatService;
   private defaultBatchSize: number;
+  private modelName: string | undefined;
+  private preferType: 'cloud' | 'local';
 
-  constructor(options?: { batchSize?: number }) {
-    this.chatService = createUnifiedChatService({ prefer: 'cloud' });
+  /** Cloud 기본 모델 */
+  private static readonly DEFAULT_CLOUD_MODEL = 'gpt-oss:120b-cloud';
+
+  constructor(options?: { batchSize?: number; model?: string; prefer?: 'cloud' | 'local' }) {
+    this.preferType = options?.prefer ?? 'cloud';
+    
+    // model 미지정 시: cloud는 기본 모델, local은 config 기본값
+    const cloudOverride = { model: options?.model ?? FoodCategoryService.DEFAULT_CLOUD_MODEL };
+    const localOverride = options?.model ? { model: options.model } : undefined;
+    
+    this.chatService = createUnifiedChatService({
+      prefer: this.preferType,
+      cloudOverrides: cloudOverride,
+      localOverrides: localOverride,
+    });
     this.defaultBatchSize = options?.batchSize ?? 20;
+    this.modelName = options?.model ?? (this.preferType === 'cloud' ? FoodCategoryService.DEFAULT_CLOUD_MODEL : undefined);
   }
 
   /**
@@ -39,7 +55,8 @@ export class FoodCategoryService {
   async init(): Promise<boolean> {
     try {
       await this.chatService.ensureReady();
-      console.log(`✅ FoodCategoryService 초기화 완료 [${this.chatService.getActiveType()}]`);
+      const modelInfo = this.modelName ? `, model: ${this.modelName}` : '';
+      console.log(`✅ FoodCategoryService 초기화 완료 [${this.chatService.getActiveType()}${modelInfo}]`);
       return true;
     } catch (error) {
       console.error('❌ FoodCategoryService 초기화 실패:', error);

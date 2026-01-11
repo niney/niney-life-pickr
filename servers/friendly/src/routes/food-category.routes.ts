@@ -227,6 +227,13 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
           description: '기존 데이터가 있어도 삭제 후 재분류 (기본: false)',
           default: false,
         })),
+        model: Type.Optional(Type.String({
+          description: 'LLM 모델명 (기본: config 설정값). 예: gemma3:27b, qwen3:32b',
+        })),
+        prefer: Type.Optional(Type.Union([
+          Type.Literal('cloud'),
+          Type.Literal('local'),
+        ], { description: 'LLM 서비스 우선순위 (기본: cloud)', default: 'cloud' })),
       }),
       response: {
         200: Type.Object({
@@ -269,9 +276,11 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
     },
   }, async (request, reply) => {
     const { restaurantId: idStr } = request.params as { restaurantId: string };
-    const { source = 'naver', forceReclassify = false } = request.query as {
+    const { source = 'naver', forceReclassify = false, model, prefer } = request.query as {
       source?: 'naver' | 'catchtable' | 'all';
       forceReclassify?: boolean;
+      model?: string;
+      prefer?: 'cloud' | 'local';
     };
     const restaurantId = parseInt(idStr, 10);
 
@@ -339,7 +348,7 @@ const foodCategoryRoutes: FastifyPluginAsync = async (fastify) => {
       console.log(`📋 분류할 메뉴: ${menuNames.length}개`);
 
       // 4. LLM 분류 실행
-      const foodCategoryService = new FoodCategoryService();
+      const foodCategoryService = new FoodCategoryService({ model, prefer });
       await foodCategoryService.init();
       const classification = await foodCategoryService.classifyAndSave(restaurantId, menuNames);
 
