@@ -371,7 +371,8 @@ class MenuStatisticsService {
   /**
    * 메뉴명 정규화 (유사한 이름 통합)
    */
-  private normalizeMenuName(name: string): string {
+  private normalizeMenuName(name: string | undefined | null): string {
+    if (!name) return '';
     return name
       .trim()
       .toLowerCase()
