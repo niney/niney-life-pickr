@@ -54,6 +54,21 @@ class Database {
       });
     });
   }
+
+  /**
+   * SQL 실행 후 변경된 행 수 반환
+   */
+  async runWithChanges(sql: string, params: any[] = []): Promise<{ changes: number }> {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ changes: this.changes });
+        }
+      });
+    });
+  }
   
   async get<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
     return new Promise((resolve, reject) => {

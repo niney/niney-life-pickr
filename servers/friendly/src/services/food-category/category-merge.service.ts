@@ -108,8 +108,11 @@ export class CategoryMergeService {
       }
     }
 
+    console.log(`  📊 병합 분류: 단일 경로 ${noMergeNeeded.length}개, 병합 필요 ${needsMerge.length}개`);
+
     // 3. 병합이 필요 없으면 바로 반환
     if (needsMerge.length === 0) {
+      console.log(`  ✅ 병합 필요 항목 없음, 바로 완료`);
       options?.onProgress?.(noMergeNeeded.length, noMergeNeeded.length);
       return {
         success: true,
@@ -118,20 +121,32 @@ export class CategoryMergeService {
     }
 
     // 4. 배치 분할 처리
+    const totalBatches = Math.ceil(needsMerge.length / batchSize);
+    console.log(`  🔀 ${needsMerge.length}개 항목을 ${totalBatches}개 배치로 분할 (배치당 ${batchSize}개)`);
+
     const allMerged: CategoryPath[] = [...noMergeNeeded];
     const errors: string[] = [];
     let completed = noMergeNeeded.length;
+    let batchIndex = 0;
 
     for (let i = 0; i < needsMerge.length; i += batchSize) {
       const batch = needsMerge.slice(i, i + batchSize);
+      batchIndex++;
+      console.log(`  📦 배치 ${batchIndex}/${totalBatches} 처리 중... (${batch.length}개 항목)`);
 
       try {
+        const startTime = Date.now();
         const batchResult = await this.mergeBatch(batch);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
         allMerged.push(...batchResult.merged);
         if (batchResult.errors) {
           errors.push(...batchResult.errors);
+          console.log(`  ⚠️  배치 ${batchIndex} 완료: ${batchResult.merged.length}개 병합, ${batchResult.errors.length}개 오류 (${elapsed}초)`);
+        } else {
+          console.log(`  ✅ 배치 ${batchIndex} 완료: ${batchResult.merged.length}개 병합 (${elapsed}초)`);
         }
       } catch (error) {
+        console.error(`  ❌ 배치 ${batchIndex} 실패:`, error);
         // 배치 실패 시 첫번째 경로 사용
         batch.forEach(({ item, paths }) => {
           allMerged.push(this.pathToCategory(item, paths[0]));
@@ -140,8 +155,12 @@ export class CategoryMergeService {
       }
 
       completed += batch.length;
+      const progress = ((completed / (noMergeNeeded.length + needsMerge.length)) * 100).toFixed(1);
+      console.log(`  📈 진행률: ${completed}/${noMergeNeeded.length + needsMerge.length} (${progress}%)`);
       options?.onProgress?.(completed, noMergeNeeded.length + needsMerge.length);
     }
+
+    console.log(`  🏁 병합 완료: 총 ${allMerged.length}개, 오류 ${errors.length}개`);
 
     return {
       success: errors.length === 0,

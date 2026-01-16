@@ -178,9 +178,9 @@ export class FoodCategoryRepository {
    */
   async getCategoryStats(): Promise<Array<{ category_path: string; count: number }>> {
     return await db.all<{ category_path: string; count: number }>(
-      `SELECT category_path, COUNT(*) as count 
-       FROM food_categories 
-       GROUP BY category_path 
+      `SELECT category_path, COUNT(*) as count
+       FROM food_categories
+       GROUP BY category_path
        ORDER BY count DESC`
     );
   }
@@ -191,9 +191,9 @@ export class FoodCategoryRepository {
    */
   async getNamePathGroups(): Promise<Array<{ name: string; paths: string[]; count: number }>> {
     const rows = await db.all<{ name: string; category_path: string }>(
-      `SELECT name, category_path 
-       FROM food_categories 
-       GROUP BY name, category_path 
+      `SELECT name, category_path
+       FROM food_categories
+       GROUP BY name, category_path
        ORDER BY name`
     );
 
@@ -229,6 +229,53 @@ export class FoodCategoryRepository {
     return all
       .filter((item) => item.count === 1)
       .map(({ name, paths }) => ({ name, path: paths[0] }));
+  }
+
+  /**
+   * 메뉴명으로 category_path 일괄 업데이트
+   * @param name 메뉴명
+   * @param newCategoryPath 새 카테고리 경로
+   * @returns 업데이트된 행 수
+   */
+  async updateCategoryPathByName(name: string, newCategoryPath: string): Promise<number> {
+    const result = await db.runWithChanges(
+      'UPDATE food_categories SET category_path = ? WHERE name = ?',
+      [newCategoryPath, name]
+    );
+    return result.changes;
+  }
+
+  /**
+   * 주어진 업데이트 데이터를 기반으로 food_categories 테이블에서 항목의 category_path를 업데이트합니다.
+   *
+   * @param {Array<{name: string, categoryPath: string}>} updates 업데이트할 데이터 배열. 각 객체는 항목의 이름(name)과 새 categoryPath를 포함해야 합니다.
+   * @return {Promise<number>} 업데이트된 행(row)의 총 개수.
+   */
+  async bulkUpdateCategoryPathByName(
+    updates: Array<{ name: string; categoryPath: string }>
+  ): Promise<number> {
+    if (updates.length === 0) return 0;
+
+    let totalUpdated = 0;
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      for (const { name, categoryPath } of updates) {
+        const result = await db.runWithChanges(
+          'UPDATE food_categories SET category_path = ? WHERE name = ?',
+          [categoryPath, name]
+        );
+        totalUpdated += result.changes;
+      }
+
+      await db.run('COMMIT');
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+
+    return totalUpdated;
   }
 }
 

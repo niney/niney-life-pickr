@@ -37,6 +37,8 @@ export interface NormalizeResult {
   uniqueCopied: number;
   /** LLM 병합 후 저장된 항목 수 */
   merged: number;
+  /** 원본 테이블에 업데이트된 행 수 */
+  originalUpdated: number;
   /** 총 정규화된 항목 수 */
   total: number;
   /** 에러 목록 */
@@ -119,6 +121,7 @@ export class FoodCategoryNormalizeService {
         success: true,
         uniqueCopied: uniqueResult.inserted,
         merged: 0,
+        originalUpdated: 0,
         total: uniqueResult.inserted,
       };
     }
@@ -149,17 +152,23 @@ export class FoodCategoryNormalizeService {
 
     // 7. 병합 결과 저장
     const dupList = duplicateNames as NamePaths[];
-    const mergeInputs: FoodCategoryNormalizedInput[] = mergeResult.merged.map((cat) => {
-      const original = dupList.find((d) => d.name === cat.item);
-      return {
-        name: cat.item,
-        category_path: cat.path,
-        source_count: original?.paths.length ?? 1,
-      };
-    });
+    const dupMap = new Map(dupList.map((d) => [d.name, d.paths.length]));
+    const mergeInputs: FoodCategoryNormalizedInput[] = mergeResult.merged.map((cat) => ({
+      name: cat.item,
+      category_path: cat.path,
+      source_count: dupMap.get(cat.item) ?? 1,
+    }));
 
     const mergedResult = await foodCategoryNormalizedRepository.bulkInsert(mergeInputs);
     console.log(`✅ 병합 결과 저장 완료: ${mergedResult.inserted}개 삽입`);
+
+    // 8. 원본 food_categories 테이블에도 병합된 category_path 업데이트
+    const updateInputs = mergeResult.merged.map((cat) => ({
+      name: cat.item,
+      categoryPath: cat.path,
+    }));
+    const updatedRows = await foodCategoryRepository.bulkUpdateCategoryPathByName(updateInputs);
+    console.log(`✅ 원본 테이블 업데이트 완료: ${updatedRows}개 행 업데이트`);
 
     const totalTime = Date.now() - startTime;
     const totalNormalized = await foodCategoryNormalizedRepository.count();
@@ -169,6 +178,7 @@ export class FoodCategoryNormalizeService {
       success: errors.length === 0,
       uniqueCopied: uniqueResult.inserted,
       merged: mergedResult.inserted,
+      originalUpdated: updatedRows,
       total: totalNormalized,
       errors: errors.length > 0 ? errors : undefined,
     };
