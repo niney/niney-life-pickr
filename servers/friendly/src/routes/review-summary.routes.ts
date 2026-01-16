@@ -1,7 +1,27 @@
 import { FastifyPluginAsync } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import reviewSummaryRepository from '../db/repositories/review-summary.repository';
+import catchtableReviewSummaryRepository from '../db/repositories/catchtable-review-summary.repository';
+import tipClusterRepository from '../db/repositories/tip-cluster.repository';
+import { createTipClusteringService } from '../services/tip-clustering.service';
 import { ResponseHelper } from '../utils/response.utils';
+
+/**
+ * 두 테이블에서 팁 수집 (중복 제거)
+ */
+async function collectAllTips(restaurantId: number): Promise<string[]> {
+  // 네이버 리뷰 요약에서 팁 수집
+  const naverSummaries = await reviewSummaryRepository.findCompletedByRestaurant(restaurantId);
+  const naverTips = naverSummaries.flatMap(s => s.summary?.tips || []);
+  
+  // 캐치테이블 리뷰 요약에서 팁 수집
+  const catchtableSummaries = await catchtableReviewSummaryRepository.findCompletedByRestaurantId(restaurantId);
+  const catchtableTips = catchtableSummaries.flatMap(s => s.summary?.tips || []);
+  
+  // 중복 제거 후 반환
+  const allTips = [...naverTips, ...catchtableTips];
+  return allTips.filter((tip, idx, arr) => arr.indexOf(tip) === idx);
+}
 
 /**
  * 레스토랑의 리뷰 요약 관련 라우트
@@ -90,6 +110,125 @@ const reviewSummaryRoutes: FastifyPluginAsync = async (fastify) => {
       reply, 
       summaries, 
       `${summaries.length}개 요약 조회 성공`
+    );
+  });
+
+  /**
+   * GET /api/restaurants/:id/reviews/tips
+   * 레스토랑의 모든 리뷰에서 추출된 팁 목록 (네이버 + 캐치테이블)
+   */
+  fastify.get('/:id/reviews/tips', {
+    schema: {
+      tags: ['review-summary'],
+      summary: '레스토랑 리뷰 팁 목록 조회',
+      params: Type.Object({
+        id: Type.String({ description: '레스토랑 ID' })
+      })
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const restaurantId = parseInt(id, 10);
+    
+    if (isNaN(restaurantId)) {
+      return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID', 400);
+    }
+    
+    const tips = await collectAllTips(restaurantId);
+    
+    return ResponseHelper.success(reply, { tips }, `${tips.length}개 팁 조회`);
+  });
+
+  /**
+   * GET /api/restaurants/:id/reviews/tips/clustered
+   * 클러스터링된 팁 조회 (캐시 있으면 반환, 없으면 생성)
+   */
+  fastify.get('/:id/reviews/tips/clustered', {
+    schema: {
+      tags: ['review-summary'],
+      summary: '클러스터링된 팁 목록 조회',
+      params: Type.Object({
+        id: Type.String({ description: '레스토랑 ID' })
+      })
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const restaurantId = parseInt(id, 10);
+    
+    if (isNaN(restaurantId)) {
+      return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID', 400);
+    }
+
+    // 캐시 확인
+    const cached = await tipClusterRepository.findParsedByRestaurantId(restaurantId);
+    if (cached) {
+      return ResponseHelper.success(reply, { groups: cached, fromCache: true });
+    }
+
+    // 팁 수집 (네이버 + 캐치테이블)
+    const tips = await collectAllTips(restaurantId);
+
+    if (tips.length === 0) {
+      return ResponseHelper.success(reply, { groups: [], fromCache: false });
+    }
+
+    // 클러스터링
+    const service = createTipClusteringService();
+    const groups = await service.cluster(tips);
+
+    // DB 저장
+    await tipClusterRepository.upsert({
+      restaurant_id: restaurantId,
+      cluster_data: groups,
+      total_tips: tips.length,
+      group_count: groups.length,
+    });
+
+    return ResponseHelper.success(reply, { groups, fromCache: false });
+  });
+
+  /**
+   * POST /api/restaurants/:id/reviews/tips/cluster
+   * 팁 클러스터링 강제 재생성
+   */
+  fastify.post('/:id/reviews/tips/cluster', {
+    schema: {
+      tags: ['review-summary'],
+      summary: '팁 클러스터링 재생성',
+      params: Type.Object({
+        id: Type.String({ description: '레스토랑 ID' })
+      })
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const restaurantId = parseInt(id, 10);
+    
+    if (isNaN(restaurantId)) {
+      return ResponseHelper.error(reply, '유효하지 않은 레스토랑 ID', 400);
+    }
+
+    // 팁 수집 (네이버 + 캐치테이블)
+    const tips = await collectAllTips(restaurantId);
+
+    if (tips.length === 0) {
+      return ResponseHelper.success(reply, { groups: [], totalTips: 0 });
+    }
+
+    // 클러스터링
+    const service = createTipClusteringService();
+    const groups = await service.cluster(tips);
+
+    // DB 저장 (기존 덮어쓰기)
+    await tipClusterRepository.upsert({
+      restaurant_id: restaurantId,
+      cluster_data: groups,
+      total_tips: tips.length,
+      group_count: groups.length,
+    });
+
+    return ResponseHelper.success(
+      reply,
+      { groups, totalTips: tips.length, groupCount: groups.length },
+      `${tips.length}개 팁 → ${groups.length}개 그룹으로 클러스터링 완료`
     );
   });
 

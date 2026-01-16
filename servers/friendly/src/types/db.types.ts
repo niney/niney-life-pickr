@@ -405,3 +405,47 @@ export interface FoodCategoryNormalizedInput {
   category_path: string;
   source_count?: number;
 }
+
+// ============================================
+// Tip Clustering Types
+// ============================================
+
+/**
+ * 팁 그룹 (유사 팁 묶음)
+ */
+export interface TipGroup {
+  representative: string;      // 대표 팁 (그룹명)
+  originalTips: string[];      // 원본 팁들
+  count: number;               // 병합된 팁 개수
+}
+
+/**
+ * LLM 클러스터링 응답
+ */
+export interface TipClusterResult {
+  groups: TipGroup[];
+  canMergeMore: boolean;       // LLM 판단: 더 병합 가능 여부
+}
+
+/**
+ * Tip Cluster DB entity
+ */
+export interface TipClusterDB {
+  id: number;
+  restaurant_id: number;
+  cluster_data: string;        // JSON (TipGroup[])
+  total_tips: number;          // 원본 팁 총 개수
+  group_count: number;         // 그룹 개수
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Tip Cluster Input
+ */
+export interface TipClusterInput {
+  restaurant_id: number;
+  cluster_data: TipGroup[];
+  total_tips: number;
+  group_count: number;
+}
